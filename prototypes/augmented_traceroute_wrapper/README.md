@@ -1,6 +1,6 @@
 # Install
 
-pScheduler:
+## pScheduler
 
 ```
 yum install -y http://software.internet2.edu/rpms/el7/x86_64/latest/packages/perfSONAR-repo-0.9-1.noarch.rpm
@@ -15,23 +15,21 @@ geoipupdate # Ran this just in case, may help with the missing deprecated geoloc
 yum install -y perfsonar-testpoint
 ```
 
-
-
-# pScheduler may still fail to run, if Globus software is on the machine.
-# To fix this, download the `mod_wsgi` package from http://software.internet2.edu/rpms/el7/x86_64/latest/packages/
-# And force-install it:
+pScheduler may still fail to run, if Globus software is on the machine.
+To fix this, download the `mod_wsgi` package from http://software.internet2.edu/rpms/el7/x86_64/latest/packages/
+And force-install it:
 ```
 rpm -ivh mod_wsgi*.rpm
 ```
 
-# Test
+## Test
 ```
 pscheduler troubleshoot
 pscheduler troubleshoot --host=$(hostname)
 ```
 
 
-#Globus CLI:
+## Globus CLI:
 ```
 yum -y install python3-pip
 python3 -m pip install globus-cli
