@@ -1,0 +1,1 @@
+pscheduler task --archive='{"archiver":"esmond","data":{"url":"http://155.101.66.2/esmond/perfsonar/archive/","_auth-token":"4fd12087cbcef9167926aa53f5d6b1adfeeccccb"}}' --repeat=PT600S --until 2020-02-25T08:00:00 --slip=PT600S --sliprand --tool=paris-traceroute --tool=traceroute trace --source=uofu-science-dmz-bandwidth.chpc.utah.edu --dest=dtn.scidmz.psu.edu

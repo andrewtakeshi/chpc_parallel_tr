@@ -1,0 +1,284 @@
+<!doctype html>
+<html>
+<head>
+    <title>Parallel Traceroute Visualizer</title>
+    <style type="text/css">
+        html, body {
+            margin:0px auto;
+            line-height:1.6;
+            font:18px monospace;
+            background:url(https://upload.wikimedia.org/wikipedia/commons/e/ea/Art-big-data-blur-373543.jpg);
+            background-attachment:fixed;
+        }
+        #background-img {
+            position:absolute;
+            opacity:0.5;
+            overflow:hidden;
+            z-index:-1
+        }
+        .container {
+            background-color:white;
+            display: grid;
+            justify-items: center;
+            width:1000px;
+            margin:0px auto;
+            box-shadow: 5px 0px 5px grey;
+        }
+        #viz {
+            width:900px;
+            height:700px;
+            border:1px solid lightgray
+        }
+        #viz-load-data {
+            text-align:center
+        }
+        #viz-container {
+            text-align:center
+        }
+        #viz-left-options {
+            text-align:left
+        }
+        #viz-right-options {
+            text-align:right;
+        }
+        #viz-config {
+            text-align:left;
+            padding-bottom: 20px
+        }
+
+    </style>
+
+    <script type="text/javascript"
+            src="https://rawgit.com/neo4j-contrib/neovis.js/master/dist/neovis.js"></script>
+
+    <script type="text/javascript"
+            src="/socket.io/socket.io.js"></script>
+
+    <script type="text/javascript"
+            src="https://code.jquery.com/jquery-3.2.1.min.js"
+            integrity="sha256-hwg4gsxgFZhOsEEamdOYGBf13FyQuiTwlAQgxVSNgt4="
+            crossorigin="anonymous"></script>
+
+    <script type="text/javascript">
+        var viz;
+        function draw() {
+            var config = {
+                container_id: "viz",
+                server_url: "bolt://habanero.chpc.utah.edu:7687",
+                server_user: "neo4j",
+                server_password: "test",
+                labels: {
+                    "Server": {
+                        "caption": "ipv4addr",
+                        "size": "visits",
+                        "community": "orgname_id"
+                        //"sizeCypher": "MATCH (n) WHERE id(n) = {id} MATCH (n)-[r]-() RETURN sum(r.weight) AS c"
+                    }
+                },
+                relationships: {
+                    "LINK": {
+                        "thickness": "avg_latency",
+                        "caption": "avg_latency"
+                    }
+                },
+                arrows: true,
+                hierarchical: true,
+                hierarchical_sort_method: "directed",
+                initial_cypher: "MATCH (n:Server)<-[l:LINK]->(m:Server) RETURN n,l,m"
+            };
+            viz = new NeoVis.default(config);
+            viz.render();
+            console.log(viz);
+        }
+    </script>
+</head>
+
+<body onload="draw()">
+<div class="container">
+    <h1>Parallel IPv4 Traceroute Visualizer</h1>
+    <div id="viz-load-data">
+    <form id="pscheduler_entry" action="">
+      <label for="pscheduler_source">Source (pScheduler required):</label>
+      <input type="text" name="pscheduler_source" placeholder="dtn01-dmz.chpc.utah.edu" id="pscheduler_source"></textarea>
+      <br>
+      <span id=pscheduler_source_status></span>
+      <br>
+      <label for="pscheduler_dest">Destination endpoint:</label>
+      <input type="text" name="pscheduler_dest" placeholder="dtn01-dmz.chpc.utah.edu" id="pscheduler_dest"></textarea>
+      <br>
+      <button id="pscheduler_button" disabled>Schedule end-to-end traceroute</button>
+    </form>
+    <h2>OR</h2>
+    <label for="slTraceroute">Traceroute implementation:</label>
+    <select id="slTraceroute">
+      <option value="paris" selected="selected">Paris</option>
+      <option value="linux">Linux</option>
+    </select>
+    <form id="quick_traceroute" action="">
+      <label for="traceroute_endpoint">Destination:</label>
+      <input type="text" name="destination_address" placeholder="dns.google" id="traceroute_endpoint"></textarea><br>
+      <button>Generate and merge traceroute</button>
+    </form>
+    <h2>OR</h2>
+    <form id="manual_traceroute_entry" action="">
+      <textarea rows=11 cols=80 id="traceroute_data" placeholder="# Multiple `traceroute` outputs may be concatenated, E.G.
+traceroute to google.com (172.217.4.142), 30 hops max, 60 byte packets
+ 1  my.gateway.edu (192.0.2.1)  0.623 ms
+ 2  another.gateway.edu (192.0.2.101)  0.426 ms
+ 3  198.51.100.1 (198.51.100.1) 1.632 ms
+ 4  *
+ 5  lax17s14-in-f14.1e100.net (172.217.4.142)  14.042 ms
+traceroute to example.com (93.184.216.34), 30 hops max, 60 byte packets
+ 1  my.gateway.edu (192.0.2.1)  0.623 ms
+ 2  another.gateway.edu (192.0.2.101)  0.426 ms
+..."></textarea><br>
+      <button>Paste and merge traceroutes</button>
+    </form>
+    <p id=job_info></p>
+    </div>
+    <div>
+    <div id="viz"></div>
+    <div id="viz-left-options">
+    <input type="submit" value="Refresh" id="reload">
+    <input type="submit" value="Color networks" id="colorize">
+    </div>
+    <div id="viz-right-options">
+    <input type="submit" value="Reset database" id="reset_db" style="color:red">
+    </div>
+    </div>
+    <div id="viz-config">
+    <h2>Configuration</h2>
+    <label for="slVizNodeSize">Size nodes by:</label>
+    <select id="slVizNodeSize" onchange="setVizNodeSize(this)">
+      <option value="visits" selected="selected">Visits</option>
+      <option value="">None</option>
+    </select>
+    </br>
+    <label for="slVizEdgeThickness">Size links by:</label>
+    <select id="slVizEdgeThickness" onchange="setVizEdgeThickness(this)">
+      <option value="avg_latency" selected="selected">Average latency</option>
+      <option value="intermediate_hops">Intermediate hops</option>
+      <option value="">None</option>
+    </select>
+    </br>
+    <label for="slVizNodeCaption">Node caption:</label>
+    <select id="slVizNodeCaption" onchange="setVizNodeCaption(this)">
+      <option value="ipv4addr" selected="selected">IPv4 address</option>
+      <option value="hostname">Hostname</option>
+    </select>
+    </br>
+    <label for="slVizLayout">Node layout:</label>
+    <select id="slVizLayout" onchange="setVizLayout(this)">
+      <option value="hierarchical" selected="selected">Hierarchical</option>
+      <option value="random">Random</option>
+    </select>
+    </div>
+    <!--<img id="background-img" src="https://upload.wikimedia.org/wikipedia/commons/e/ea/Art-big-data-blur-373543.jpg">-->
+</div>
+    <script>
+
+       $(document).ready(function () {
+         var socket = io();
+         $('#manual_traceroute_entry').submit( (e) => {
+           e.preventDefault(); // prevents page reloading
+           socket.emit('traceroute_data', $('#traceroute_data').val());
+           $('#traceroute_data').val('');
+           return false;
+         });
+         $('#quick_traceroute').submit( (e) => {
+           e.preventDefault(); // prevents page reloading
+           socket.emit('traceroute_endpoint', $('#traceroute_endpoint').val(), $('#slTraceroute').val());
+           return false;
+         });
+         socket.on('job_start', (jobs) => {
+                 $('#job_info').text(`Processing ${jobs} jobs...`);
+                 $('#job_info').css("color","orange");
+         });
+         socket.on('job_end', (jobs) => {
+                 refresh_viz();
+                 if (jobs > 0) {
+                    $('#job_info').text(`Processing ${jobs} jobs...`);
+                    $('#job_info').css("color","orange");
+                 } else {
+                    $('#job_info').text("Database is up to date!");
+                    $('#job_info').css("color","green");
+                 }
+         });
+         var pschedTimerSrc;
+         var inactionDuration = 4000;
+         $('#pscheduler_source').keyup( () => {
+             clearTimeout(pschedTimerSrc);
+             var sourceaddr = $('#pscheduler_source').val();
+             if (sourceaddr) {
+                 pschedTimerSrc = setTimeout( () => {
+                     socket.emit('pscheduler_test_source', sourceaddr);
+                 }, inactionDuration);
+             }
+         });
+
+         var pscheduler_source_ok = false;
+
+         function update_pscheduler_button() {
+             $('#pscheduler_button').prop('disabled', !(pscheduler_source_ok));
+         }
+
+         socket.on('pscheduler_test_source_pending', () => {
+             $('#pscheduler_source_status').text("Looking for pScheduler...");
+             $('#pscheduler_source_status').css("color", "orange");
+         });
+         socket.on('pscheduler_test_source_result', (result) => {
+             if (+result == 0) {
+                $('#pscheduler_source_status').text("pScheduler found!");
+                $('#pscheduler_source_status').css("color", "green");
+                pscheduler_source_ok = true;
+             }
+             else {
+                $('#pscheduler_source_status').text("Could not find pScheduler.");
+                $('#pscheduler_source_status').css("color", "red");
+                pscheduler_source_ok = false;
+             }
+             update_pscheduler_button();
+         });
+
+         $('#pscheduler_entry').submit( (e) => {
+           e.preventDefault(); // prevents page reloading
+           socket.emit('pscheduler_submit', $('#pscheduler_source').val(), $('#pscheduler_dest').val());
+           return false;
+         });
+       });
+    </script>
+</body>
+
+<script>
+    function refresh_viz() {
+        viz.renderWithCypher("MATCH (n:Server)<-[l:LINK]->(m:Server) RETURN n,l,m");
+    }
+    function setVizLayout(selectObject) {
+        viz._config.hierarchical = (selectObject.value === "hierarchical");
+        viz.reload();
+    }
+    function setVizNodeSize(selectObject) {
+        viz._config.labels.Server.size = selectObject.value; 
+        viz.reload();
+    }
+    function setVizNodeCaption(selectObject) {
+        viz._config.labels.Server.caption = selectObject.value;
+        viz.reload();
+    }
+    function setVizEdgeThickness(selectObject) {
+        viz._config.relationships.LINK.thickness = selectObject.value; 
+        viz.reload();
+    }
+    $("#reload").click(function() {
+            refresh_viz();
+    });
+    $("#colorize").click(function() {
+            viz.renderWithCypher("MATCH (n:Server) WITH collect(DISTINCT n.orgname) AS orgnames UNWIND [i IN range(0,size(orgnames)-1) | [i,orgnames[i]]] AS pair MATCH (n:Server) WHERE n.orgname = pair[1] SET n.orgname_id = pair[0] WITH n MATCH (n)<-[l:LINK]->(m:Server) RETURN n,l,m");
+    });
+    $("#reset_db").click(function() {
+            if (confirm("This will permanently delete all traceroute data from the graph database.")) {
+                viz.renderWithCypher("MATCH (n) DETACH DELETE n");
+            }
+    })
+</script>
+</html>
