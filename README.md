@@ -1,6 +1,4 @@
-# data-transfer-network-analysis
-
-Temporal analysis of network routes in the context of large and well-defined data transfers.
+# Temporal analysis of network routes for scientific data transfers
 
 ## Service overview
 
