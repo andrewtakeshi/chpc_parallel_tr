@@ -2,9 +2,13 @@
 
 Temporal analysis of network routes in the context of large and well-defined data transfers.
 
-## Tool overview
+## Service overview
 
 ![](images/dt-na_architecture.png)
+
+## Dataflow diagram
+
+![](images/dt-na_dataflow.png)
 
 ## Scope
 
