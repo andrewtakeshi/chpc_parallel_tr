@@ -4,11 +4,11 @@ Paul Fischer, Joe Breen (U of Utah CHPC)
 
 ## Service overview (U of U CHPC perspective)
 
-![](images/dt-na_architecture.png)
+![](resources/dt-na_architecture.png)
 
 ## Dataflow diagram
 
-![](images/dt-na_dataflow.png)
+![](resources/dt-na_dataflow.png)
 
 ## Scope
 
