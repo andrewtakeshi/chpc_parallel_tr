@@ -5,5 +5,14 @@ async function loadData() {
 }
 
 loadData().then((result) => {
-    console.log(inferNetworkGraph(result.traces));
+    const ips = inferNetworkGraph(result.traces);
+    const registry_AS = registryFromEsmondTraceroute(result.traces);
+    const clusters = clusterBy(ips, 
+        (entity) => registry_AS.get(entity.ip),
+        (entity) => new Set([...entity.source_ids, ...entity.target_ids]),
+        "AS");
+    console.log(clusters);
 })
+
+// Finish the clusterBy method for the third time
+// Get some basic visuals up (static graph viz method for entities)
