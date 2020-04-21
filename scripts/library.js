@@ -1,9 +1,3 @@
-// build requirejs, d3js?
-//d3 = require('d3');
-
-// how to just "run" a js file?
-// just run it as part of index.html and use the browser tools
-
 const getEsmondTraceroute = (esmond_server, esmond_key) => {
   return d3.json(`http://${esmond_server}/esmond/perfsonar/archive/${esmond_key}/?format=json`).then(metadata => {
     const [url_base, url_parameters] = metadata["url"].split("?");
@@ -60,7 +54,7 @@ const registryFromEsmondTraceroute = (traces) => {
 }
 
 // clusterBy takes a map of entities with an "id" property and returns a map of new entities that reference the input entities as children. Clustering is breadth-first driven by the given label equality, degree, and relationship parameters.
-clusterBy = (entities, getLabel, getRelationships, id_prefix = undefined, max_degree = 1) => {
+const clusterBy = (entities, getLabel, getRelationships, id_prefix = undefined, max_degree = 1) => {
   const result = new Map();
   
   // Helper method for cleanliness
@@ -93,7 +87,7 @@ clusterBy = (entities, getLabel, getRelationships, id_prefix = undefined, max_de
       const orphan = entities.get(orphan_ids[i]);
       const label = getLabel(orphan);
 
-      // Disjoint clusters of the same label are treated as distinct
+      // Disjoint clusters of the same label are enumerated for distinctness
       if (!cluster_count.has(label))
         cluster_count.set(label, 0);
       cluster_count.set(label, cluster_count.get(label) + 1);
@@ -123,3 +117,4 @@ clusterBy = (entities, getLabel, getRelationships, id_prefix = undefined, max_de
   }
   return result;
 };
+
