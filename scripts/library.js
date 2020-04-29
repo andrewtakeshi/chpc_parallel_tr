@@ -118,3 +118,7 @@ const clusterBy = (entities, getLabel, getRelationships, id_prefix = undefined, 
   return result;
 };
 
+const update = (nodes) => {
+  return 0;
+
+};
