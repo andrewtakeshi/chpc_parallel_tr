@@ -13,6 +13,10 @@ const inferNetworkGraph = (traces) => {
   for (var trace of traces) {
     const packets = trace.val;
     for (let i = 0; i < packets.length; i++) {
+      if (packets[i].ip == undefined)
+        packets[i].ip = "unknown";
+    }
+    for (let i = 0; i < packets.length; i++) {
       const packet = packets[i];
       packet.ts = trace.ts;
       const entity_id = `ip(${packet.ip})`;
@@ -43,10 +47,10 @@ const registryFromEsmondTraceroute = (traces) => {
   const map = new Map();
   for (let trace of traces) {
     for (let packet of trace.val) {
-      if (packet.ip)
-        map.set(packet.ip, packet.as ? packet.as.owner : "UNKNOWN")
+      if (packet.ip == undefined)
+        map.set("unknown", "ANONYMOUS");
       else
-        map.set(packet.ip, "ANONYMOUS");
+        map.set(packet.ip, packet.as ? packet.as.owner : "UNKNOWN");
     }
   }
   
@@ -60,7 +64,8 @@ const clusterBy = (entities, getLabel, getRelationships, id_prefix = undefined, 
   // Helper method for cleanliness
   const addToCluster = (cluster_id, entity) => {
     if (!result.has(cluster_id)) {
-        result.set(cluster_id, ({id: cluster_id, children: new Map()}));
+      // Use ES6 Proxy to recursively access properties of hierarchical clusters (see `handler` def)
+        result.set(cluster_id, new Proxy(({id: cluster_id, children: new Map()}), handler));
     }
     result.get(cluster_id).children.set(entity.id, entity);
   }
@@ -82,7 +87,8 @@ const clusterBy = (entities, getLabel, getRelationships, id_prefix = undefined, 
     const orphan_ids = Array.from(entities.keys());
     const cluster_count = new Map();
 
-    for (let i = 0; i < orphan_ids.length; i++) {
+    let i = 0;
+    while (i < orphan_ids.length) {
       // Start a new cluster from an unclustered entity
       const orphan = entities.get(orphan_ids[i]);
       const label = getLabel(orphan);
@@ -108,7 +114,7 @@ const clusterBy = (entities, getLabel, getRelationships, id_prefix = undefined, 
             addToCluster(cluster_id, candidate);
             const neighbors = Array.from(getRelationships(candidate));
             candidates = candidates.concat(neighbors); // Add neighbors as new search candidates
-            // TODO add support for max_degree > 1 (recursive neighbors), probably change candidates to a Set a the same time
+            //TODO add support for max_degree > 1 (recursive neighbors), probably change candidates to a Set a the same time
             orphan_ids.splice(orphan_ids.indexOf(candidate_id), 1); // This entity now belongs to a cluster
           } 
         }
@@ -118,7 +124,32 @@ const clusterBy = (entities, getLabel, getRelationships, id_prefix = undefined, 
   return result;
 };
 
-const update = (nodes) => {
-  return 0;
+const propReducer = (property) => {
+    let f = null;
+    switch (property) {
+      case "source_ids":
+      case "target_ids":
+        f = (a, b) => new Set([...a, ...b]);
+        break;
+      case "packets":
+        f = (a, b) => a.concat(b);
+        break;
+      default:
+        f = (a, b) => a == b ? a : undefined;
+    }
+    return f;
+}
 
-};
+const handler = ({ 
+  get: (obj, property) => property in obj 
+                         ? obj[property]
+                         : (obj.children ? Array.from(obj.children.values()).map( child => child[property]).reduce( (acc, value) => propReducer(property)(acc, value) ) : undefined )
+})
+
+// d3.
+//    min
+//    max
+//    mean
+//    variance
+//    deviation
+//    quantile
