@@ -140,11 +140,17 @@ const propReducer = (property) => {
     return f;
 }
 
+// If property is not present and the object has an array of child nodes, return an appropriate reduction
+// of that property across all children
 const handler = ({ 
   get: (obj, property) => property in obj 
                          ? obj[property]
-                         : (obj.children ? Array.from(obj.children.values()).map( child => child[property]).reduce( (acc, value) => propReducer(property)(acc, value) ) : undefined )
+                         : (obj.children ? Array.from(obj.children.values())
+                                            .map( child => child[property])
+                                            .reduce( (acc, value) => propReducer(property)(acc, value) ) 
+                                         : undefined )
 })
+
 
 // d3.
 //    min

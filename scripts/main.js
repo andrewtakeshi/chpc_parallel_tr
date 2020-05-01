@@ -49,6 +49,15 @@ loadData().then((result) => {
         }
     }
 
+    const nodeColor = d => {
+        const scale = d3.scaleOrdinal(d3.schemeCategory10);
+        return d => scale(registry_AS.get(d.ip));
+    }
+
+    const nodeRadius = d => {
+        const scale = d3.scaleLog().domain([1, d3.max(clusters.values(), d => clusters.packets.length)]).range([5,12]);
+    }
+
     chart = d3.select("body").append("svg")
         .attr("width", width)
         .attr("height", height);
@@ -100,17 +109,16 @@ loadData().then((result) => {
         .append("svg:path")
         .attr("d", "M0,-5L10,0L0,5");
 
-    let node = chart.append("g")
-        .attr("stroke", "#fff")
-        .attr("stroke-width", 1.5)
-        .selectAll("circle");
-
     let link = chart.append("g")
         .attr("stroke", "#999")
         .attr("stroke-opacity", 0.6)
         .attr("marker-end", "url(#end)")
         .selectAll("line");
 
+    let node = chart.append("g")
+        .attr("stroke", "#fff")
+        .attr("stroke-width", 1.5)
+        .selectAll("circle");
 
     const update = () => {
         var nodes = Array.from(clusters.values());
@@ -144,7 +152,9 @@ loadData().then((result) => {
         node = node
           .data(nodes, d => d.id)
           .join(enter => enter.append("circle")
+                //.attr("r", d => nodeRadius(d))
                 .attr("r", d => d.children ? 8 : 5)
+                //.attr("fill", d => nodeColor(d))
                 .attr("fill", d => d.children ? "green" : "red")
                 .on("dblclick", d => {
                     d3.event.preventDefault();
