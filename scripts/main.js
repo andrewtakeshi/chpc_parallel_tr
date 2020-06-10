@@ -63,9 +63,15 @@ loadData().then((result) => {
         .attr("height", height);
     
     // Tooltips
-    d3.select("body").append("div")
+    tooltip = d3.select("body").append("div")
         .attr("id", "tooltip")
         .attr("style", "position: absolute; opacity: 0;");
+
+    grafana_chart = tooltip.append("iframe")
+        .attr("width", 450)
+        .attr("height", 200);
+
+    traceroute_stats = tooltip.append("div");
 
     const simulation = d3.forceSimulation()
         .force("link", d3.forceLink().id())  // change to current_alias
@@ -133,6 +139,8 @@ loadData().then((result) => {
                 i += 1;
             }
         }
+
+        // TODO keep old nodes in place
         //if (node.data()[0] != undefined) {
         //    const old = new Map(node.data().map(d => [d.id, d]));
         //    nodes = nodes.map(d => Object.assign(old.get(d.id) || {}, d));
@@ -162,10 +170,18 @@ loadData().then((result) => {
                     update();
                     })
                 .on("mouseover", d => {
-                    d3.select("#tooltip").transition().duration(200).style('opacity', 1).text(`${d.id}\n\n  packets: ${d.packets.length}`)
+                    d3.select("#tooltip").transition().duration(200).style('opacity', 0.9);//.text(`${d.id}\n\n  packets: ${d.packets.length}`);
+                    let packets = d.packets;
+                    traceroute_stats.text(`${d.id} | ${packets.length} packets | RTT (mean): ${d3.mean(packets, p => p.rtt)}`);
+                    if (d.ip) {
+                        grafana_chart.style("display", "block");
+                        grafana_chart.attr("src", `https://snapp-portal.grnoc.iu.edu/grafana/d-solo/f_KR9xeZk/ip-address-lookup?orgId=2&from=1588478400000&to=1588564799000&var-ip_addr=${d.ip}&panelId=2`);
+                    } else {
+                        grafana_chart.style("display", "none");
+                    }
                 })
                 .on("mouseout", () => {
-                    d3.select("#tooltip").transition().duration(200).style('opacity', 0)
+                    //d3.select("#tooltip").transition().duration(200).style('opacity', 0)
                 })
                 .on('mousemove', () => {
                     d3.select('#tooltip').style('left', (d3.event.pageX+10) + 'px').style('top', (d3.event.pageY+10) + 'px')
