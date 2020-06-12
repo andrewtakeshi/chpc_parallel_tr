@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+
+        <script
+            src="https://code.jquery.com/jquery-3.5.1.slim.min.js"
+            integrity="sha384-DfXdz2htPH0lsSSs5nCTpuj/zy4C+OGpamoFVy38MVBnE+IbbVYUew+OrCXaRkfj"
+            crossorigin="anonymous">
+        </script>
+        <script
+            src="https://cdn.jsdelivr.net/npm/popper.js@1.16.0/dist/umd/popper.min.js"
+            integrity="sha384-Q6E9RHvbIyZFJoft+2mJbHaEWldlvI9IOYy5n3zV9zzTtmI3UksdQRVvoxMfooAo"
+            crossorigin="anonymous">
+        </script>
+        <script
+            src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.0/js/bootstrap.min.js"
+            integrity="sha384-OgVRvuATP1z7JjHLkuOU7Xw704+h835Lr+6QL9UvYjZE3Ipu6Tp75j7Bh/kR0JKI"
+            crossorigin="anonymous">
+        </script>
+        <link
+            href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.0/css/bootstrap.min.css"
+            rel="stylesheet"
+            integrity="sha384-9aIt2nRpC12Uk9gS9baDl411NQApFmC26EwAOH8WgZl5MYYxFfc+NcPb1dKGj7Sk"
+            crossorigin="anonymous">
+<!--        <link href="https://cdnjs.cloudflare.com/ajax/libs/axios/0.19.2/axios.min.js">-->
+<!--        <link href="https://cdn.jsdelivr.net/npm/xmlhttprequest@1.8.0/lib/XMLHttpRequest.min.js">-->
+        <script src="scripts/home.js"></script>
+        <script src="external/d3/d3.js"></script>
+        <script src="scripts/library.js"></script>
+        <script src="scripts/main.js"></script>
+
+
+        <title>Parallel Traceroute</title>
+    </head>
+
+    <body>
+        <div id="navbar_area">
+            <nav class="navbar navbar-expand-lg navbar-light bg-light">
+                <a class="navbar-brand" href="./home.html">Parallel Traceroute</a>
+                <div class="collapse navbar-collapse">
+                    <ul class="navbar-nav mr-auto">
+                        <li class="nav-item">
+                            <a class="nav-link" href="./netbeam.html">Netbeam Test</a>
+                        </li>
+                    </ul>
+                </div>
+            </nav>
+        </div>
+
+        <div id="input_area" class="container" style="margin-top: 25px;">
+            
+            <div id="esmond_div">
+                <form id="esmond_form" name="esmond_form" onsubmit="return false">
+                    <div class="form-row">
+                        <div class="form-group col-md-6">
+                            <label for="esmond_ip_source">Source IP</label>
+                            <input type="text" name="esmond_ip_source" id="esmond_ip_source" placeholder="1.1.1.1" class="form-control">
+                        </div>
+                        <div class="form-group col-md-6">
+                            <label for="esmond_ip_dest">Destination IP</label>
+                            <input type="text" name="esmond_ip_dest" id="esmond_ip_dest" placeholder="2.2.2.2" class="form-control">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <span class="form-group col-md-6" id="esmond_ip_source_warn" hidden="true" style="color: #ff0000;" name="warn">
+                            IP Source must have a value.
+                        </span>
+                    </div>
+                    <div class="form-row">
+                        <span class="form-group col-md-6" id="esmond_ip_dest_warn" hidden="true" style="color:red;" name="warn">
+                            IP Destination must have a value.
+                        </span>
+                    </div>
+                    <button id="esmond_btn" name="esmond_btn" onclick="formLogger(this.form)" type="submit" class="btn btn-light">Generate Traceroute</button>
+                </form>
+            </div>
+
+            <div class="d-flex justify-content-center" style="margin: 20px;">
+                <h3>or</h3>
+            </div>
+            
+            <div id="implementation_div">
+                <form id="implementation_form" name="implementation_form" onsubmit="return false">
+                    <div class="form-row">
+                        <div class="form-group col-md-6">
+                            <label for="implementation_select">Choose Implementation</label>
+                            <select class="custom-select" id="implementation_select" name="implementation_select">
+                                <option selected value="paris">Paris</option>
+                                <option value="linux">Linux</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group col-md-6">
+                            <label for="implementation_dest">Destination:</label>
+                            <input type="text" name="implementation_dest" id="implementation_dest" placeholder="google.com" class="form-control">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <span class="form-group col-md-6" id="implementation_dest_warn" hidden="true" style="color: red;" name="warn">
+                            Destination must have a value.
+                        </span>
+                    </div>
+                    <button id="implementation_btn" name="implementation_btn" onclick="formLogger(this.form)" type="submit" class="btn btn-light">Generate Traceroute</button>
+                </form>
+            </div>
+
+        </div>
+
+        <div id="vis_area" style="margin-top: 25px;">
+            <span id="d3_placeholder" class="d-flex justify-content-center">
+                <h4>Enter information to view visualisation</h4>
+            </span>
+            <div id="d3_vis">
+                <!-- Placeholder for actual visualization -->
+            </div>
+<!--            <div class="row" hidden="true" style="margin-top: 10px;">-->
+<!--                <button id="refresh_vis_btn" class="btn btn-light"></button>-->
+<!--                <button id="color_networks_btn" class="btn btn-light"></button>-->
+<!--            </div>-->
+        </div>
+
+        <div id="config_area" style="margin-top: 25px; margin-bottom: 50px;" class="container">
+            <div class="d-flex justify-content-center">
+                <h2>Configuration</h2>
+            </div>
+            <div class="d-flex justify-content-center">   
+                <form id="configuration_form" name="configuration_form" onsubmit="return false">
+                    <div class="form-row">
+                        <label for="size_node_select">Size nodes by:</label>
+                        <select class="custom-select" id="size_node_select" name="size_node_select">
+                            <option selected value="visits">Visits</option>
+                            <option value="none">None</option>
+                        </select>
+                    </div> 
+                    <div class="form-row">
+                        <label for="size_link_select">Size links by:</label>
+                        <select class="custom-select" id="size_link_select" name="size_link_select">
+                            <option selected value="latency">Average latency</option>
+                            <option value="hops">Intermediate hops</option>
+                            <option value="none">None</option>
+                        </select>
+                    </div> 
+                    <div class="form-row">
+                        <label for="node_caption_select">Node Caption:</label>
+                        <select class="custom-select" id="node_caption_select" name="node_caption_select">
+                            <option selected value="ipv4">IPv4 Address</option>
+                            <option value="hostname">Hostname</option>
+                        </select>
+                    </div>
+                    <div class="form-row">
+                        <label for="node_layout_select">Node Layout:</label>
+                        <select class="custom-select" id="node_layout_select" name="node_layout_select">
+                            <option selected value="hierarchical">Hierarchical</option>
+                            <option value="random">Random</option>
+                        </select>
+                    </div>
+                    <div class="form-row btn-group" style="margin-top: 10px;">
+                        <button id="refresh_vis_btn" class="btn btn-outline-primary" onclick="formLogger(this.form)">Refresh Visualisation</button>
+                        <button id="color_networks_btn" class="btn btn-outline-primary" onclick="formLogger(this.form)">Color Networks</button>
+                    </div>
+                    <div class="form-row" style="margin-top: 10px;">
+                        <button id="reset_config_btn" class="btn btn-danger w-100" onclick="resetForms()">Reset</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </body>
+</html>

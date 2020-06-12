@@ -58,12 +58,14 @@ loadData().then((result) => {
         const scale = d3.scaleLog().domain([1, d3.max(clusters.values(), d => clusters.packets.length)]).range([5,12]);
     }
 
-    chart = d3.select("body").append("svg")
+    chart = d3.select("#d3_vis").append("svg")
         .attr("width", width)
-        .attr("height", height);
+        .attr("height", height)
+        .style('transform', 'translate(100%, 0)')
+        .attr("align", "center");
     
     // Tooltips
-    tooltip = d3.select("body").append("div")
+    tooltip = d3.select("#d3_vis").append("div")
         .attr("id", "tooltip")
         .attr("style", "position: absolute; opacity: 0;");
 
