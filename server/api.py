@@ -1,27 +1,9 @@
 import flask
 from flask import request, jsonify
+import d3_conversion
 
 app = flask.Flask(__name__)
 app.config["DEBUG"] = True
-
-# Create some test data for our catalog in the form of a list of dictionaries.
-books = [
-    {'id': 0,
-     'title': 'A Fire Upon the Deep',
-     'author': 'Vernor Vinge',
-     'first_sentence': 'The coldsleep itself was dreamless.',
-     'year_published': '1992'},
-    {'id': 1,
-     'title': 'The Ones Who Walk Away From Omelas',
-     'author': 'Ursula K. Le Guin',
-     'first_sentence': 'With a clamor of bells that set the swallows soaring, the Festival of Summer came to the city Omelas, bright-towered by the sea.',
-     'published': '1973'},
-    {'id': 2,
-     'title': 'Dhalgren',
-     'author': 'Samuel R. Delany',
-     'first_sentence': 'to wound the autumnal city.',
-     'published': '1975'}
-]
 
 
 @app.route('/', methods=['GET'])
@@ -31,37 +13,26 @@ def home():
 
 @app.route('/api/v1/resources/traceroutes', methods=['GET'])
 def traceroutes():
-    # Check if an ID was provided as part of the URL.
-    # If ID is provided, assign it to a variable.
-    # If no ID is provided, display an error in the browser.
-    #if 'id' in request.args:
-    #    id = int(request.args['id'])
-    #else:
-    #    return "Error: No id field provided. Please specify an id."
+    if "dest" in request.args:
+        dest = request.args["dest"]
+    else:
+        return "Error: No dest field provided. Please specify a destination address."
 
-    # Create an empty list for our results
-    result = {"traceroutes": [
-        {"ts": 1593196532,
-         "source_address": "155.101.16.198",
-         "target_address": "8.8.8.8",
-         "data_source": {
-             "name": "perfSONAR Esmond database",
-             "hostname": "uofu-science-dmz-bandwidth.chpc.utah.edu"
-         },
-         "packets": [
-             {"ip": "155.101.16.198",
-              "ttl": 0,
-              "rtt_ms": 0},
-             {"ip": "155.101.16.1",
-              "ttl": 1,
-              "rtt_ms": 0.808}
-         ]
-        }
-        ]
-    }
+    source = None
+    if "source" in request.args:
+        source = request.args["source"]
+
 
     # Use the jsonify function from Flask to convert our list of
     # Python dictionaries to the JSON format.
+    if source:
+        if d3_conversion.check_pscheduler(source):
+            result = d3_conversion.pscheduler_to_d3(source, dest)
+        else:
+            return f"Error: pScheduler not found at {source}"
+    else:
+        result = d3_conversion.system_to_d3(dest)
+
     return jsonify(result)
 
-app.run()
+app.run(host='0.0.0.0')

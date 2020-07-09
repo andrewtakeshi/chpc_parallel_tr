@@ -113,7 +113,7 @@ def pscheduler_to_d3(source, dest, numRuns = 1):
         process.kill()
 
     # Convert to an actual JSON (takes care of some formatting).
-    output = json.dumps(output)
+    #output = json.dumps(output)
 
     # sys.stdout.write(output)
     # print(output)
@@ -184,8 +184,9 @@ def system_to_d3(dest, numRuns = 1):
         process.stdout.close()
         process.kill()
 
-    output = json.dumps(output)
-    sys.stdout.write(output)
+    return output
+    #output = json.dumps(output)
+    #sys.stdout.write(output)
 
 
 def system_copy_to_d3(dataIn):
