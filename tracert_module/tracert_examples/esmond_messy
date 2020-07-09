@@ -1,0 +1,31 @@
+Submitting task...
+Task URL:
+https://dtn01-dmz.chpc.utah.edu/pscheduler/tasks/8634e364-d813-4dfb-a8e8-3ea48d94e51a
+Running with tool 'traceroute'
+Fetching first run...
+
+Next scheduled run:
+https://dtn01-dmz.chpc.utah.edu/pscheduler/tasks/8634e364-d813-4dfb-a8e8-3ea48d94e51a/runs/9b1fda4d-b92b-49f6-a11f-2effac1ae6da
+Starts 2020-06-19T14:29:57-06 (~2 seconds)
+Ends   2020-06-19T14:30:05-06 (~7 seconds)
+Waiting for result...
+
+1       gw-ddc-science-dmz.chpc.utah.edu (204.99.128.1) AS17055 0.6 ms
+          UTAH, US
+2         140.197.247.138 AS210 0.7 ms
+            WEST-NET-WEST, US
+3           140.197.253.0 AS210 0.9 ms
+              WEST-NET-WEST, US
+4             No Response
+5             No Response
+6             lo-0.8.rtsw.wilc.net.internet2.edu (64.57.20.254) AS11537 13.5 ms
+                INTERNET2-RESEARCH-EDU, US
+7               162.252.69.189 13.6 ms
+8               108.170.247.225 AS15169 13.1 ms
+                  GOOGLE, US
+9                 209.85.245.229 AS15169 13.8 ms
+                    GOOGLE, US
+10                  lax17s38-in-f14.1e100.net (172.217.14.78) AS15169 13.1 ms
+                      GOOGLE, US
+
+No further runs scheduled.
