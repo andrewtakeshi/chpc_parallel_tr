@@ -8,5 +8,3 @@ async function loadData() {
 }
 
 loadData().then(createChart);
-
-// Get some basic visuals up (static graph viz method for entities)
