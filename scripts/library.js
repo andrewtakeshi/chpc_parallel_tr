@@ -1,10 +1,20 @@
-const getEsmondTraceroute = (esmond_server, esmond_key) => {
-  return d3.json(`http://${esmond_server}/esmond/perfsonar/archive/${esmond_key}/?format=json`).then(metadata => {
-    const [url_base, url_parameters] = metadata["url"].split("?");
-    return d3.json(url_base + "packet-trace/base" + "?" + url_parameters).then( traces => {
-      return ({metadata: metadata, traces: traces});
-    });
-  });
+// TODO: use API
+//const getEsmondTraceroute = (esmond_server, esmond_key) => {
+//  return d3.json(`http://${esmond_server}/esmond/perfsonar/archive/${esmond_key}/?format=json`).then(metadata => {
+//    const [url_base, url_parameters] = metadata["url"].split("?");
+//    return d3.json(url_base + "packet-trace/base" + "?" + url_parameters).then( traces => {
+//      return ({metadata: metadata, traces: traces});
+//    });
+//  });
+//};
+
+const api_server = "habanero.chpc.utah.edu:5000"
+const tr_api = "/api/v1/resources/traceroutes"
+const runTraceroute = async (dest) => {
+  const api_call = `http://${api_server}${tr_api}?dest=${dest}`;
+  console.log(api_call);
+  let result = await d3.json(api_call);
+  return result;
 };
 
 const inferNetworkGraph = (traces) => {

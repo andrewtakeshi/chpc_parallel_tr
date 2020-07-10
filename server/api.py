@@ -27,12 +27,16 @@ def traceroutes():
     # Python dictionaries to the JSON format.
     if source:
         if d3_conversion.check_pscheduler(source):
-            result = d3_conversion.pscheduler_to_d3(source, dest)
+            response = d3_conversion.pscheduler_to_d3(source, dest)
         else:
             return f"Error: pScheduler not found at {source}"
     else:
-        result = d3_conversion.system_to_d3(dest)
+        response = d3_conversion.system_to_d3(dest)
 
-    return jsonify(result)
+    response = jsonify(response)
+
+    # Something required for hosting tool and API on same box
+    response.headers.add('Access-Control-Allow-Origin', '*')
+    return response
 
 app.run(host='0.0.0.0')
