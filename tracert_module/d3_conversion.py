@@ -8,7 +8,23 @@ import urllib3
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-# ip_validation_regex = re.compile(r'((25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9][0-9]|[0-9])\.){3}(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9][0-9]|[0-9])')
+ip_validation_regex = re.compile(r'((25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9][0-9]|[0-9])\.)'
+                                 r'{3}(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9][0-9]|[0-9])')
+
+
+def ip_to_asn(ip):
+    if ip_validation_regex.match(ip):
+        return requests.get(f'https://api.iptoasn.com/v1/as/ip/{ip}').json()
+    else:
+        return None
+
+
+def rdap_org_lookup(ip):
+    if ip_validation_regex.match(ip):
+        return requests.get(f'https://rdap.arin.net/registry/ip/{ip}').json()['entities'][0]['vcardArray'][1][1][3]
+    else:
+        return None
+
 
 def check_pscheduler(endpoint):
     """
@@ -22,24 +38,34 @@ def check_pscheduler(endpoint):
     return response.__contains__('pScheduler API server')
 
 
-def get_source_info(source):
+def target_to_ip(target):
     """
-    Pings the source address to get an IP address.
-    Returns JSON formatted to match that returned by *_to_d3 defs.
-    :param source:
-    :return:
+    Pings the target to get an IP address.
+    :param target: Target; could be an IP, could be hostname.
+    :return: IP address if available, None otherwise.
     """
-    ping_process = subprocess.run(['ping', '-c', '1', source], stdout=subprocess.PIPE, universal_newlines=True)
+    ping_process = subprocess.run(['ping', '-c', '1', target], stdout=subprocess.PIPE, universal_newlines=True)
     line = ping_process.stdout.splitlines()[0]
     re_res = re.search(r'([0-9]{1,3}\.){3}[0-9]{1,3}', line)
-    ip = line[re_res.regs[0][0]:re_res.regs[0][1]]
-    return {
-        "success": 1,
-        "query": 1,
-        "ttl": 0,
-        "ip": ip,
-        "rtt": 0
-    }
+    try:
+        ip = line[re_res.regs[0][0]:re_res.regs[0][1]]
+        return ip
+    except:
+        return None
+
+
+def pscheduler_target_to_ip(source, dest):
+    ping_process = subprocess.run(['pscheduler', 'task', 'rtt', '-s', source, '-d', dest, '-c', '1'],
+                                  stdout=subprocess.PIPE, universal_newlines=True)
+    lines = ping_process.stdout.splitlines()
+    for line in lines:
+        if re.match(r'\d\s+\w+', line):
+            re_res = re.search(r'([0-9]{1,3}\.){3}[0-9]{1,3}', line)
+            try:
+                ip = line[re_res.regs[0][0]:re_res.regs[0][1]]
+                return ip
+            except:
+                return None
 
 
 def pscheduler_to_d3(source, dest, numRuns = 1):
@@ -69,7 +95,11 @@ def pscheduler_to_d3(source, dest, numRuns = 1):
     for process in processList:
         process.wait()
 
-    source_info = get_source_info(source)
+    # Consider optimizing by making these calls async, i.e. call before setting up processList and do processing on
+    # results after waiting for processes in processList. Would likely need to move outside of definitions to do so.
+    # Currently it takes forever because we have to wait for multiple calls to pscheduler.
+    source_ip = target_to_ip(source)
+    dest_ip = pscheduler_target_to_ip(source, dest)
 
     output = []
 
@@ -77,8 +107,14 @@ def pscheduler_to_d3(source, dest, numRuns = 1):
     for process in processList:
         output.append(dict())
         output[i]['ts'] = int(time.time())
-        output[i]['val'] = []
-        output[i]['val'].append(source_info)
+        output[i]['source_address'] = source_ip
+        output[i]['target_address'] = dest_ip
+        output[i]['packets'] = []
+        output[i]['packets'].append({
+            'ttl': 0,
+            'ip': source_ip,
+            'rtt': 0
+        })
         for line in process.communicate()[0].splitlines():
             # print(line)
             # Filter out for only lines that match the traceroute results.
@@ -86,13 +122,11 @@ def pscheduler_to_d3(source, dest, numRuns = 1):
                 split = line.split()
                 # Common to all hops
                 toAdd = {
-                    "success": 1,
-                    "query": 1,
                     "ttl": int(split[0])
                 }
                 # Server didn't respond. Only add the 'common' items.
                 if split[1] == "No" or split[1] == "*":
-                    output[i]['val'].append(toAdd)
+                    output[i]['packets'].append(toAdd)
                 # Server responded. Do some additional parsing.
                 else:
                     # Extract IP address
@@ -107,16 +141,11 @@ def pscheduler_to_d3(source, dest, numRuns = 1):
                     toAdd['ip'] = ip
                     toAdd['rtt'] = rtt
 
-                    output[i]['val'].append(toAdd)
+                    output[i]['packets'].append(toAdd)
         i += 1
         process.stdout.close()
         process.kill()
-
-    # Convert to an actual JSON (takes care of some formatting).
-    output = json.dumps(output)
-
-    # sys.stdout.write(output)
-    # print(output)
+    output = {'traceroutes': output}
 
     return output
 
@@ -133,9 +162,10 @@ def system_to_d3(dest, numRuns = 1):
     i = 0
     processList = []
 
-    source_process = subprocess.run(['curl', 'ifconfig.me'],
+    source_ip = subprocess.run(['curl', 'ifconfig.me'],
                                     stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
                                     universal_newlines=True).stdout.splitlines()[0]
+    dest_ip = target_to_ip(dest)
 
     # Schedule traceroute using pscheduler (allows for remote sources)
     for _ in range(numRuns):
@@ -149,20 +179,25 @@ def system_to_d3(dest, numRuns = 1):
     for process in processList:
         output.append(dict())
         output[i]['ts'] = int(time.time())
-        output[i]['val'] = []
+        output[i]['source_address'] = source_ip
+        output[i]['target_address'] = dest_ip
+        output[i]['packets'] = []
+        output[i]['packets'].append({
+            'ttl': 0,
+            'ip': source_ip,
+            'rtt': 0
+        })
         for line in process.communicate()[0].splitlines():
             if re.match(r'^\s*[0-9]+\s+', line):
                 split = line.split()
 
                 # Common to all items in the traceroute path.
                 toAdd = {
-                    "success": 1,
-                    "query": 1,
                     "ttl": int(split[0])
                 }
                 # Hop didn't reply
                 if re.match(r"No|\*", split[1]):
-                    output[i]["val"].append(toAdd)
+                    output[i]["packets"].append(toAdd)
                 # Hop replied; additional information available
                 else:
                     ip = ""
@@ -179,99 +214,105 @@ def system_to_d3(dest, numRuns = 1):
 
                     toAdd["ip"] = ip
                     toAdd["rtt"] = rtt.__round__(3)
-                    output[i]["val"].append(toAdd)
+                    output[i]["packets"].append(toAdd)
         i += 1
         process.stdout.close()
         process.kill()
 
-    output = json.dumps(output)
-    sys.stdout.write(output)
+    output = {'traceroutes': output}
 
-
-def system_copy_to_d3(dataIn):
-    """
-    Takes a previously run traceroute and creates the appropriate JSON.
-    Does not include source information (as source information is not provided by system traceroute).
-    Accepts both Linux and Windows traceroute formats.
-    The files tracert_examples/tracert_{linux, windows} were used as stdin to test this module.
-    :param dataIn: Copied traceroute information.
-    :return: JSON ingestible by the d3 visualisation.
-    """
-    output = []
-
-    i = -1
-
-    linux = True
-
-    for line in dataIn.splitlines():
-        # For processing multiple traceroutes (i.e. pasting multiple runs in at once)
-        if line.__contains__("Tracing") or line.__contains__("traceroute"):
-            i += 1
-            output.append(dict())
-            if not line.__contains__("traceroute"):
-                linux = False
-
-            output[i]["ts"] = int(time.time())
-            output[i]["val"] = []
-        if re.match('^\s*[0-9]+\s+', line):
-            split = line.split()
-
-            # Common to all items in the traceroute path.
-            toAdd = {
-                "success": 1,
-                "query": 1,
-                "ttl": int(split[0])
-            }
-            # Server didn't reply; same thing for both Linux and Windows
-            if re.match("No|\*", split[1]):
-                output[i]["val"].append(toAdd)
-
-            # Server replied; additional information available
-            else:
-                # Linux traceroute format
-                if linux:
-                    ip = ""
-                    if re.match('([0-9]{1,3}\.){3}[0-9]{1,3}', split[1]):
-                        ip = split[1]
-                    else:
-                        ip = re.sub("\(|\)", "", split[2])
-
-                    rttArr = re.findall("[0-9]+\.?[0-9]+ ms", line)
-                    rtt = 0
-                    for response in rttArr:
-                        rtt += float(re.sub("[ms]", "", response))
-                    rtt /= len(rttArr)
-
-                    toAdd["ip"] = ip
-                    toAdd["rtt"] = rtt.__round__(3)
-                    output[i]["val"].append(toAdd)
-
-                # Windows traceroute format
-                else:
-                    # Case where hostname is found
-                    if len(split) == 9:
-                        toAdd["ip"] = re.sub("\[|\]", "", split[8])
-                    # Case where only IP is used
-                    else:
-                        toAdd["ip"] = split[7]
-
-                    rttArr = re.findall("\<?[0-9]+ ms", line)
-                    rtt = 0
-                    for response in rttArr:
-                        response = re.sub("ms|<", "", response)
-                        rtt += float(response)
-                    rtt /= len(rttArr)
-
-                    toAdd["rtt"] = rtt.__round__(3)
-                    output[i]["val"].append(toAdd)
-
-    output = json.dumps(output)
     return output
 
-# Testing
+
+# Pausing development until later.
+# def system_copy_to_d3(dataIn):
+#     """
+#     Takes a previously run traceroute and creates the appropriate JSON.
+#     Does not include source information (as source information is not provided by system traceroute).
+#     Accepts both Linux and Windows traceroute formats.
+#     :param dataIn: Copied traceroute information.
+#     :return: JSON ingestible by the d3 visualisation.
+#     """
+#     output = []
+#
+#     i = -1
+#
+#     linux = True
+#
+#     for line in dataIn.splitlines():
+#         # For processing multiple traceroutes (i.e. pasting multiple runs in at once)
+#         if line.__contains__("Tracing") or line.__contains__("traceroute"):
+#             i += 1
+#             output.append(dict())
+#             if not line.__contains__("traceroute"):
+#                 linux = False
+#
+#             output[i]["ts"] = int(time.time())
+#             output[i]["val"] = []
+#         if re.match('^\s*[0-9]+\s+', line):
+#             split = line.split()
+#
+#             # Common to all items in the traceroute path.
+#             toAdd = {
+#                 "success": 1,
+#                 "query": 1,
+#                 "ttl": int(split[0])
+#             }
+#             # Server didn't reply; same thing for both Linux and Windows
+#             if re.match("No|\*", split[1]):
+#                 output[i]["val"].append(toAdd)
+#
+#             # Server replied; additional information available
+#             else:
+#                 # Linux traceroute format
+#                 if linux:
+#                     ip = ""
+#                     if re.match('([0-9]{1,3}\.){3}[0-9]{1,3}', split[1]):
+#                         ip = split[1]
+#                     else:
+#                         ip = re.sub("\(|\)", "", split[2])
+#
+#                     rttArr = re.findall("[0-9]+\.?[0-9]+ ms", line)
+#                     rtt = 0
+#                     for response in rttArr:
+#                         rtt += float(re.sub("[ms]", "", response))
+#                     rtt /= len(rttArr)
+#
+#                     toAdd["ip"] = ip
+#                     toAdd["rtt"] = rtt.__round__(3)
+#                     output[i]["val"].append(toAdd)
+#
+#                 # Windows traceroute format
+#                 else:
+#                     # Case where hostname is found
+#                     if len(split) == 9:
+#                         toAdd["ip"] = re.sub("\[|\]", "", split[8])
+#                     # Case where only IP is used
+#                     else:
+#                         toAdd["ip"] = split[7]
+#
+#                     rttArr = re.findall("\<?[0-9]+ ms", line)
+#                     rtt = 0
+#                     for response in rttArr:
+#                         response = re.sub("ms|<", "", response)
+#                         rtt += float(response)
+#                     rtt /= len(rttArr)
+#
+#                     toAdd["rtt"] = rtt.__round__(3)
+#                     output[i]["val"].append(toAdd)
+#
+#     output = json.dumps(output)
+#     return output
+
 # input = ""
+#
 # for line in sys.stdin.readlines():
 #     input += line
+#
+#
 # print(system_copy_to_d3(input))
-# print(system_to_d3('ccts-mon.chpc.utah.edu', 3))
-# print(pscheduler_to_d3('dtn01-dmz.chpc.utah.edu', 'ccts-mon.chpc.utah.edu', 10))
+
+
+print(ip_to_asn('155.101.8.18'))
+print(rdap_org_lookup('98.138.219.232'))
+
