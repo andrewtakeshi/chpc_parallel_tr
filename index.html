@@ -54,13 +54,17 @@
             <div id="esmond_div">
                 <form id="esmond_form" name="esmond_form" onsubmit="return false">
                     <div class="form-row">
-                        <div class="form-group col-md-6">
+                        <div class="form-group col-md-4">
                             <label for="esmond_ip_source">Source Host/IP:</label>
                             <input type="text" name="esmond_ip_source" id="esmond_ip_source" placeholder="ex. 1.1.1.1" class="form-control">
                         </div>
-                        <div class="form-group col-md-6">
+                        <div class="form-group col-md-4">
                             <label for="esmond_ip_dest">Destination Host/IP:</label>
                             <input type="text" name="esmond_ip_dest" id="esmond_ip_dest" placeholder="ex. 2.2.2.2" class="form-control">
+                        </div>
+                        <div class="form-group col-md-4">
+                            <label for="esmond_num_runs"># Traceroutes:</label>
+                            <input type="number" name="esmond_num_runs" id="esmond_num_runs" value="1" min="1" max="10" class="form-control">
                         </div>
                     </div>
                     <div class="form-row">
@@ -112,7 +116,7 @@
         </div>
 
 
-        <div id="current_run_table_area" class="container d-flex justify-content-center" style="margin-top: 25px; visibility: visible">
+        <div id="current_run_table_area" class="container d-flex justify-content-center" style="margin-top: 25px; visibility: hidden">
             <table id="cr_table" class="table table-bordered">
                 <thead>
                 <th>Traceroute Type</th>
@@ -123,14 +127,6 @@
                 <th>Selected</th>
                 </thead>
                 <tbody>
-                <tr>
-                    <td>Pscheduler</td>
-                    <td>dtn01-dmz.chpc.utah.edu</td>
-                    <td>google.com</td>
-                    <td>1</td>
-                    <td>Finished</td>
-                    <td style="text-align: center"><input type="checkbox" checked="checked"></td>
-                </tr>
                 </tbody>
             </table>
         </div>
