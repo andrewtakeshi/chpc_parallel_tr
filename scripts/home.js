@@ -52,3 +52,33 @@ function resetForms()
     }
 }
 
+function runTable()
+{
+    if (document.getElementById("esmond_ip_dest").value === "")
+        return;
+
+    let row = document.getElementById("cr_table").insertRow();
+    for (let i = 0; i < 6; i++)
+    {
+        row.insertCell(i);
+    }
+
+    let source = document.getElementById("esmond_ip_source").value;
+    let dest = document.getElementById("esmond_ip_dest").value;
+    let type = source ? "pScheduler" : "System";
+
+
+    row.cells[0].innerHTML = type;
+    row.cells[1].innerHTML = source ? source : "None";
+    row.cells[2].innerHTML = dest;
+    row.cells[3].innerHTML = "1";
+    row.cells[4].innerHTML = "Running"
+    row.cells[5].style.textAlign = "center";
+    row.cells[5].innerHTML = "<input type=\"checkbox\" checked=\"checked\">"
+}
+
+document.addEventListener("DOMContentLoaded", function()
+{
+   document.getElementById("esmond_btn").addEventListener("click", runTable);
+});
+
