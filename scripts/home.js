@@ -50,19 +50,31 @@ function resetForms()
     {
         warnings[i].hidden = true;
     }
+
+    // Hide the table on reset.
+    document.getElementById("current_run_table_area").style.visibility = "hidden";
+    // Clear the table on reset.
+    document.getElementById("cr_table").getElementsByTagName('tbody')[0].innerHTML = "";
+
 }
 
-function runTable()
+function addToCRTable()
 {
     if (document.getElementById("esmond_ip_dest").value === "")
         return;
 
     document.getElementById("current_run_table_area").style.visibility = "visible";
 
-    let row = document.getElementById("cr_table").insertRow();
+    let numRows = document.getElementById('cr_table').rows.length - 1;
+    let tbody = document.getElementById('cr_table').getElementsByTagName('tbody')[0];
+    let cell_ids = ['type', 'source', 'dest', 'numRuns', 'status', 'selected']
+
+    let row = tbody.insertRow();
+    row.id = `cr_table_r${numRows}`;
     for (let i = 0; i < 6; i++)
     {
         row.insertCell(i);
+        row.cells[i].id = `cr_table_r${numRows}_${cell_ids[i]}`
     }
 
     let source = document.getElementById("esmond_ip_source").value;
@@ -75,13 +87,15 @@ function runTable()
     row.cells[1].innerHTML = source ? source : "None";
     row.cells[2].innerHTML = dest;
     row.cells[3].innerHTML = numRuns;
-    row.cells[4].innerHTML = "Running"
+    // Need to hook into call to API to change from pending to finished.
+    row.cells[4].innerHTML = "Pending"
     row.cells[5].style.textAlign = "center";
     row.cells[5].innerHTML = "<input type=\"checkbox\" checked=\"checked\">"
 }
 
 document.addEventListener("DOMContentLoaded", function()
 {
-   document.getElementById("esmond_btn").addEventListener("click", runTable);
+   document.getElementById("esmond_btn").addEventListener("click", addToCRTable);
+   document.getElementById("pscheduler_button").addEventListener("click", addToCRTable);
 });
 
