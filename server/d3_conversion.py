@@ -11,6 +11,9 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 ip_validation_regex = re.compile(r'((25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9][0-9]|[0-9])\.)'
                                  r'{3}(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9][0-9]|[0-9])')
 
+my_ip = subprocess.run(['curl', 'ifconfig.me'],
+                                stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                                universal_newlines=True).stdout.splitlines()[0]
 
 def ip_to_asn(ip):
     if ip_validation_regex.match(ip):
@@ -18,13 +21,31 @@ def ip_to_asn(ip):
     else:
         return None
 
-
+rdap_cache = dict()
 def rdap_org_lookup(ip):
-    if ip_validation_regex.match(ip):
-        return requests.get(f'https://rdap.arin.net/registry/ip/{ip}').json()['entities'][0]['vcardArray'][1][1][3]
-    else:
-        return None
-
+    if ip not in rdap_cache:
+        if ip_validation_regex.match(ip):
+            print(f"Requesting Org of {ip}")
+            response = requests.get(f'https://rdap.arin.net/registry/ip/{ip}')
+            if response.url.__contains__('arin'):
+                for ntt in response.json()['entities']:
+                    try:
+                        rdap_cache[ip] = {"org": ntt['vcardArray'][1][1][3]}
+                        break
+                    except:
+                        pass
+            elif response.url.__contains__('ripe'):
+                for ntt in response.json()['entities']:
+                    try:
+                        rdap_cache[ip] = {"org" : ntt['handle']}
+                        break
+                    except:
+                        pass
+            else:
+                return {"org": "unknown"}
+        else:
+            return {"org": "unknown"}
+    return rdap_cache[ip]
 
 def check_pscheduler(endpoint):
     """
@@ -162,9 +183,6 @@ def system_to_d3(dest, numRuns = 1):
     i = 0
     processList = []
 
-    source_ip = subprocess.run(['curl', 'ifconfig.me'],
-                                    stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
-                                    universal_newlines=True).stdout.splitlines()[0]
     dest_ip = target_to_ip(dest)
 
     # Schedule traceroute using pscheduler (allows for remote sources)
@@ -179,12 +197,12 @@ def system_to_d3(dest, numRuns = 1):
     for process in processList:
         output.append(dict())
         output[i]['ts'] = int(time.time())
-        output[i]['source_address'] = source_ip
+        output[i]['source_address'] = my_ip
         output[i]['target_address'] = dest_ip
         output[i]['packets'] = []
         output[i]['packets'].append({
             'ttl': 0,
-            'ip': source_ip,
+            'ip': my_ip,
             'rtt': 0
         })
         for line in process.communicate()[0].splitlines():
@@ -311,8 +329,4 @@ def system_to_d3(dest, numRuns = 1):
 #
 #
 # print(system_copy_to_d3(input))
-
-
-print(ip_to_asn('155.101.8.18'))
-print(rdap_org_lookup('98.138.219.232'))
 
