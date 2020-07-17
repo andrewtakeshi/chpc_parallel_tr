@@ -1,12 +1,39 @@
 const width = 600;
 const height = 600;
 
+let entities;
+const demo = async (dest1, dest2) => {
+    const result1 = await d3.json(`http://habanero.chpc.utah.edu:5000/api/v1/resources/traceroutes?dest=${dest1}`);
+    const result2 = await d3.json(`http://habanero.chpc.utah.edu:5000/api/v1/resources/traceroutes?dest=${dest2}`);
+    let graph1 = await createInternetGraph(result1.traceroutes);
+    let graph2 = await createInternetGraph(result2.traceroutes);
+    let graph = mergeInternetGraphs(graph1, graph2);
+    let org_graph = clusterBy(graph,
+                              (entity) => entity.org,
+                              (entity) => new Set([...entity.source_ids, ...entity.target_ids]),
+                              "Org");
+    return org_graph;
+}
+
 async function loadData() {
     const metadata = await d3.json("data/esmond_examples/metadata.json");
     const packets = await d3.json("data/esmond_examples/packets.json");
     return ({metadata: metadata, traces: packets});
 }
 
-loadData().then(createChart);
+//loadData().then(createChart);
+//demo("8.8.8.8", "9.9.9.9").then(createChart);
+//demo("8.8.8.8").then(createChart);
 
-// Get some basic visuals up (static graph viz method for entities)
+ 
+//const thing = d3.xml("https://upload.wikimedia.org/wikipedia/commons/9/92/Utah_Utes_-_U_logo.svg", {
+//headers: [
+//    ["Content-Type", "image/svg+xml"], ["Access-Control-Allow-Origin", "*"]
+//]
+//})
+
+//console.log(thing);
+
+
+const viz = new Vizualization("#d3_vis");
+demo("8.8.8.8", "9.9.9.9").then(data => {viz.setData(data)});

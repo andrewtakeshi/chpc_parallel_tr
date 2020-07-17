@@ -1,0 +1,20 @@
+Tracing route to google.com [142.250.68.110]
+over a maximum of 30 hops:
+
+  1    <1 ms    <1 ms    <1 ms  192.168.1.1
+  2   228 ms   229 ms   237 ms  155-97-232-2.usahousing.utah.edu [155.97.232.2]
+  3   265 ms   287 ms   294 ms  172.29.255.5
+  4   288 ms   303 ms   299 ms  155.99.130.58
+  5   301 ms   129 ms    79 ms  199.104.93.101
+  6   264 ms   178 ms   140 ms  199.104.93.118
+  7   285 ms   251 ms   234 ms  140.197.253.138
+  8   194 ms   199 ms   190 ms  140.197.253.22
+  9     *        *        *     Request timed out.
+ 10     *        *        *     Request timed out.
+ 11   226 ms   286 ms   316 ms  ae-3.0.rtsw.wilc.net.internet2.edu [162.252.69.170]
+ 12   282 ms   297 ms   301 ms  162.252.69.171
+ 13   253 ms   254 ms   276 ms  108.170.247.161
+ 14   346 ms   335 ms   284 ms  142.250.226.51
+ 15   229 ms   248 ms   265 ms  lax31s12-in-f14.1e100.net [142.250.68.110]
+
+Trace complete.
