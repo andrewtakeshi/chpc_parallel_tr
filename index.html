@@ -53,13 +53,17 @@
             <div id="esmond_div">
                 <form id="esmond_form" name="esmond_form" onsubmit="return false">
                     <div class="form-row">
-                        <div class="form-group col-md-6">
+                        <div class="form-group col-md-4">
                             <label for="esmond_ip_source">Source Host/IP:</label>
-                            <input type="text" name="esmond_ip_source" id="esmond_ip_source" placeholder="1.1.1.1" class="form-control">
+                            <input type="text" name="esmond_ip_source" id="esmond_ip_source" placeholder="ex. 1.1.1.1" class="form-control">
                         </div>
-                        <div class="form-group col-md-6">
+                        <div class="form-group col-md-4">
                             <label for="esmond_ip_dest">Destination Host/IP:</label>
-                            <input type="text" name="esmond_ip_dest" id="esmond_ip_dest" placeholder="2.2.2.2" class="form-control">
+                            <input type="text" name="esmond_ip_dest" id="esmond_ip_dest" placeholder="ex. 2.2.2.2" class="form-control">
+                        </div>
+                        <div class="form-group col-md-4">
+                            <label for="esmond_num_runs"># Traceroutes:</label>
+                            <input type="number" name="esmond_num_runs" id="esmond_num_runs" value="1" min="1" max="10" class="form-control">
                         </div>
                     </div>
                     <div class="form-row">
@@ -76,6 +80,7 @@
                     <button id="esmond_btn" name="esmond_btn" onclick="formLogger(this.form)" type="submit" class="btn btn-primary">Esmond Traceroute</button>
                 </form>
             </div>
+
 
 <!--            <div class="d-flex justify-content-center" style="margin: 20px;">-->
 <!--                <h3>or</h3>-->
@@ -107,6 +112,22 @@
 <!--                </form>-->
 <!--            </div>-->
 
+        </div>
+
+
+        <div id="current_run_table_area" class="container d-flex justify-content-center" style="margin-top: 25px; visibility: hidden">
+            <table id="cr_table" class="table table-bordered">
+                <thead>
+                <th>Traceroute Type</th>
+                <th>Source</th>
+                <th>Destination</th>
+                <th># Traceroutes</th>
+                <th>Status</th>
+                <th>Selected</th>
+                </thead>
+                <tbody>
+                </tbody>
+            </table>
         </div>
 
         <div id="vis_area" style="margin-top: 25px;">

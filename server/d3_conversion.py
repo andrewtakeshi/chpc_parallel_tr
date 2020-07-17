@@ -27,21 +27,27 @@ def rdap_org_lookup(ip):
         if ip_validation_regex.match(ip):
             print(f"Requesting Org of {ip}")
             response = requests.get(f'https://rdap.arin.net/registry/ip/{ip}')
+            # ARIN managed networks
             if response.url.__contains__('arin'):
+                print('Received response from ARIN')
                 for ntt in response.json()['entities']:
                     try:
                         rdap_cache[ip] = {"org": ntt['vcardArray'][1][1][3]}
                         break
                     except:
                         pass
+            # RIPE managed networks
             elif response.url.__contains__('ripe'):
+                print('Received response from RIPE')
                 for ntt in response.json()['entities']:
                     try:
-                        rdap_cache[ip] = {"org" : ntt['handle']}
-                        break
+                        if 'registrant' in ntt['roles']:
+                            rdap_cache[ip] = {"org" : ntt['handle']}
+                            break
                     except:
                         pass
             else:
+                print(f'Received response from unknown NCC; {response.url}')
                 return {"org": "unknown"}
         else:
             return {"org": "unknown"}
@@ -322,6 +328,7 @@ def system_to_d3(dest, numRuns = 1):
 #     output = json.dumps(output)
 #     return output
 
+# Testing pt.1
 # input = ""
 #
 # for line in sys.stdin.readlines():
@@ -330,3 +337,10 @@ def system_to_d3(dest, numRuns = 1):
 #
 # print(system_copy_to_d3(input))
 
+# Testing pt.2
+# rdap_org_lookup('62.115.12.53')
+# rdap_org_lookup('54.225.206.152')
+# rdap_org_lookup('151.101.0.81')
+# rdap_org_lookup('147.67.34.45')
+#
+# print(rdap_cache)
