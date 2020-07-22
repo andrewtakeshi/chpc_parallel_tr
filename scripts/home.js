@@ -96,6 +96,6 @@ function addToCRTable()
 document.addEventListener("DOMContentLoaded", function()
 {
    document.getElementById("esmond_btn").addEventListener("click", addToCRTable);
-   document.getElementById("pscheduler_button").addEventListener("click", addToCRTable);
+   document.getElementById("e2e_btn").addEventListener("click", addToCRTable);
 });
 

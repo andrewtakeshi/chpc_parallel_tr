@@ -1,6 +1,7 @@
 const api_server = "habanero.chpc.utah.edu:5000"
 const tr_api = "/api/v1/resources/traceroutes"
-const runTraceroute = async (dest, source=undefined) => {
+
+const runTraceroute = async (source, dest) => {
   let api_call = `http://${api_server}${tr_api}?dest=${dest}`;
   if (source) {
     api_call += `&source=${source}`
@@ -467,8 +468,6 @@ class Vizualization {
         .attr("cx", d => d.x)
         .attr("cy", d => d.y);
     });
-
-    console.log(this.svg);
   }
 
   collapseNode(node) {

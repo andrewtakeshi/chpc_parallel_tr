@@ -76,7 +76,7 @@
                             Destination must have a value.
                         </span>
                     </div>
-                    <button id="e2e_btn" name="e2e_btn" onclick="runTraceroute(document.getElementById('esmond_ip_dest').value, document.getElementById('esmond_ip_source').value).then(result => {console.log(result)})" type="submit" class="btn btn-primary">End-to-end Traceroute</button>
+                <button id="e2e_btn" name="e2e_btn" onclick="btndemo(document.getElementById('esmond_ip_source').value, document.getElementById('esmond_ip_dest').value).then(data => {viz.setData(data)})" type="submit" class="btn btn-primary">End-to-end Traceroute</button>
                     <button id="esmond_btn" name="esmond_btn" onclick="formLogger(this.form)" type="submit" class="btn btn-primary">Esmond Traceroute</button>
                 </form>
             </div>
@@ -132,7 +132,7 @@
 
         <div id="vis_area" style="margin-top: 25px;">
             <span id="d3_placeholder" class="d-flex justify-content-center">
-                <h4>Enter information to view visualisation</h4>
+                <!--<h4>Enter information to view visualisation</h4>-->
             </span>
             <div id="d3_vis">
                 <!-- Placeholder for actual visualization -->
