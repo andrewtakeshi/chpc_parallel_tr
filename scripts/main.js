@@ -4,6 +4,7 @@ const height = 600;
 let entities = ({"traceroutes": []});
 
 const btndemo = async (source, dest) => {
+    console.log(source, dest);
     const result = await runTraceroute(source, dest);
     entities.traceroutes = entities.traceroutes.concat(result.traceroutes);
     let graph = await createInternetGraph(entities.traceroutes);
@@ -34,11 +35,12 @@ async function loadData() {
 }
 
 
-//d3.svg("resources/Utah_Utes_-_U_logo.svg").then(function(xml) {
-//    let xmlDoc = d3.select(xml.documentElement);
-//    let v = d3.select("#d3_vis").node().appendChild(xml.documentElement);
-//    console.log(xmlDoc);
-//}); 
+d3.svg("resources/Utah_Utes_-_U_logo.svg").then(function(xml) {
+    let xmlDoc = d3.select(xml.documentElement);
+    //xmlDoc.attr("width", 20);
+    let v = d3.select("#d3_vis").node().appendChild(xml.documentElement);
+    console.log(xmlDoc);
+}); 
 
 
 const viz = new Vizualization("#d3_vis");
