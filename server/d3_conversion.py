@@ -5,15 +5,18 @@ import time
 import subprocess
 import requests
 import urllib3
+import threading
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-
 ip_validation_regex = re.compile(r'((25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9][0-9]|[0-9])\.)'
                                  r'{3}(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9][0-9]|[0-9])')
-
 my_ip = subprocess.run(['curl', 'ifconfig.me'],
                                 stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
                                 universal_newlines=True).stdout.splitlines()[0]
+rdap_cache = dict()
+lock = threading.Lock()
+limiter = 0
+
 
 def ip_to_asn(ip):
     if ip_validation_regex.match(ip):
@@ -21,7 +24,7 @@ def ip_to_asn(ip):
     else:
         return None
 
-rdap_cache = dict()
+
 def rdap_org_lookup(ip):
     if ip not in rdap_cache:
         if ip_validation_regex.match(ip):
@@ -66,6 +69,7 @@ def rdap_org_lookup(ip):
         else:
             return {"org": "unknown", "domain": "unknown"}
     return rdap_cache[ip]
+
 
 def check_pscheduler(endpoint):
     """
@@ -127,8 +131,17 @@ def pscheduler_to_d3(source, dest, numRuns = 1):
 
     i = 0
     processList = []
+    global limiter
 
     # Schedule traceroute using pscheduler (allows for remote sources)
+    lock.acquire()
+    if limiter >= 10 or (limiter + numRuns) > 15:
+        print("Over the run limit. Please try again later.")
+        return None
+    else:
+        limiter += numRuns
+    lock.release()
+
     for _ in range(numRuns):
         processList.append(subprocess.Popen(['pscheduler', 'task', 'trace', '-s', source, '-d', dest],
                                             stdout=subprocess.PIPE, universal_newlines=True))
@@ -186,7 +199,12 @@ def pscheduler_to_d3(source, dest, numRuns = 1):
         i += 1
         process.stdout.close()
         process.kill()
+
     output = {'traceroutes': output}
+
+    lock.acquire()
+    limiter -= numRuns
+    lock.release()
 
     return output
 
@@ -202,8 +220,17 @@ def system_to_d3(dest, numRuns = 1):
 
     i = 0
     processList = []
+    global limiter
 
     dest_ip = target_to_ip(dest)
+
+    lock.acquire()
+    if limiter >= 10 or (limiter + numRuns) > 15:
+        print("Over the run limit. Please try again later.")
+        return None
+    else:
+        limiter += numRuns
+    lock.release()
 
     # Schedule traceroute using pscheduler (allows for remote sources)
     for _ in range(numRuns):
@@ -259,7 +286,94 @@ def system_to_d3(dest, numRuns = 1):
 
     output = {'traceroutes': output}
 
+    lock.acquire()
+    limiter -= numRuns
+    lock.release()
+
     return output
+
+
+def esmond_to_d3(source=None, dest=None, ts_min=None, ts_max=None,
+                 base_esmond_url="http://uofu-science-dmz-bandwidth.chpc.utah.edu"):
+    # Check for source or destination.
+    if source is None and dest is None:
+        print("Source or destination must be specified.")
+        return None
+
+    # Get information from Esmond
+    traceroutes = requests.get(
+        f"{base_esmond_url}/esmond/perfsonar/archive/?format=json&tool-name=pscheduler/traceroute").json()
+
+    # Change ts values if not specified. Changes min to 0 and max to current epoch time + 180 days.
+    if ts_min is None:
+        ts_min = 0
+    if ts_max is None:
+        ts_max = time.time() + (180 * 24 * 60 * 60)
+
+    urls = []
+    output = []
+
+    # Get source/destination specific URLs from original Esmond query. Store as tuple of url, source ip, and dest. ip
+    # in the urls array.
+    for traceroute in traceroutes:
+        if ((traceroute['destination'] == dest
+             and (source is None
+                  or traceroute['source'] == source))
+                or (traceroute['source'] == source
+                    and (dest is None
+                         or traceroute['destination'] == dest))):
+            for event in traceroute['event-types']:
+                if event['event-type'] == 'packet-trace':
+                    urls.append((event['base-uri'], traceroute['source'], traceroute['destination']))
+
+    # No matching urls found = no source/destination/both matches the values given. Return None.
+    if len(urls) == 0:
+        print("Unable to find any matching traceroutes")
+        return None
+
+    # Access URLs relevant to source/dest
+    for url in urls:
+        r = requests.get(f'{base_esmond_url}/{url[0]}/?format=json')
+        try:
+            for trace in r.json():
+                # Filter with ts info
+                if ts_min <= trace['ts'] <= ts_max:
+                    # Setup
+                    toAdd = dict()
+                    toAdd['ts'] = trace['ts']
+                    toAdd['source_address'] = url[1]
+                    toAdd['target_address'] = url[2]
+                    toAdd['packets'] = []
+
+                    # Add source to traceroute info.
+                    toAdd['packets'].append({
+                        'ttl': 0,
+                        'ip': url[1],
+                        'rtt': 0
+                    })
+
+                    # Get packet info from val array
+                    for packet in trace['val']:
+                        packetInfo = {
+                            'ttl': packet['ttl']
+                        }
+                        if 'ip' in packet:
+                            packetInfo['ip'] = packet['ip']
+                            packetInfo['rtt'] = packet['rtt']
+                        toAdd['packets'].append(packetInfo)
+                    output.append(toAdd)
+                # Skip traceroutes that fall outside of ts filter
+                else:
+                    continue
+        except json.decoder.JSONDecodeError:
+            print(f'JSON unavailable {url}')
+            continue
+
+    # Return output if captured. Return none otherwise.
+    if len(output) != 0:
+        return {'traceroutes': output}
+    else:
+        return None
 
 
 # Pausing development until later.

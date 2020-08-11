@@ -4,6 +4,7 @@ const height = 600;
 let entities = ({"traceroutes": []});
 
 const btndemo = async (source, dest) => {
+    console.log(source, dest);
     const result = await runTraceroute(source, dest);
     entities.traceroutes = entities.traceroutes.concat(result.traceroutes);
     let graph = await createInternetGraph(entities.traceroutes);

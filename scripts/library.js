@@ -1,4 +1,4 @@
-const api_server = "habanero.chpc.utah.edu:5000"
+const api_server = "localhost:5000"
 const tr_api = "/api/v1/resources/traceroutes"
 
 const runTraceroute = async (source, dest) => {
