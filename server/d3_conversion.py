@@ -36,21 +36,35 @@ def rdap_org_lookup(ip):
                         break
                     except:
                         pass
+                for ntt in response.json()['entities']:
+                    try:
+                        rdap_cache[ip]["domain"] = ntt['vcardArray'][1][5][3].split('@')[-1]
+                        print(rdap_cache[ip])
+                        break
+                    except:
+                        pass
+                if "domain" not in rdap_cache[ip]:
+                    for ntt in response.json()['entities'][0]['entities']:
+                        try:
+                            rdap_cache[ip]["domain"] = ntt['vcardArray'][1][5][3].split('@')[-1]
+                            break
+                        except:
+                            pass
             # RIPE managed networks
             elif response.url.__contains__('ripe'):
                 print('Received response from RIPE')
                 for ntt in response.json()['entities']:
                     try:
                         if 'registrant' in ntt['roles']:
-                            rdap_cache[ip] = {"org" : ntt['handle']}
+                            rdap_cache[ip] = {"org" : ntt['handle'], "domain": "unknown"}
                             break
                     except:
                         pass
             else:
                 print(f'Received response from unknown NCC; {response.url}')
-                return {"org": "unknown"}
+                return {"org": "unknown", "domain": "unknown"}
         else:
-            return {"org": "unknown"}
+            return {"org": "unknown", "domain": "unknown"}
     return rdap_cache[ip]
 
 def check_pscheduler(endpoint):

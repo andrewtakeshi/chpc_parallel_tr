@@ -34,7 +34,8 @@ async function loadData() {
 }
 
 
-//d3.svg("resources/Utah_Utes_-_U_logo.svg").then(function(xml) {
+//d3.svg("resources/Utah_Utes_-_U_logo.svg").then((xml) => {
+//    console.log(xml);
 //    let xmlDoc = d3.select(xml.documentElement);
 //    let v = d3.select("#d3_vis").node().appendChild(xml.documentElement);
 //    console.log(xmlDoc);
