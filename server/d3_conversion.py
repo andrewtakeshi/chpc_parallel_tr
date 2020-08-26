@@ -108,9 +108,9 @@ def pscheduler_to_d3(source, dest, numRuns = 1):
     :return: JSON ingestible by the d3 visualisation if the traceroute is successful. None otherwise.
     """
 
-    # Check the source
-    if not check_pscheduler(source):
-        return None
+    # # Check the source - no longer necessary as this is done client side.
+    # if not check_pscheduler(source):
+    #     return None
 
     i = 0
     processList = []

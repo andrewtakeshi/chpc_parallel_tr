@@ -3,9 +3,10 @@ const height = 600;
 
 let entities = ({"traceroutes": []});
 
-const btndemo = async (source, dest) => {
+const btndemo = async (source, dest, uuid) => {
     console.log(source, dest);
     const result = await runTraceroute(source, dest);
+    document.getElementById(`${uuid}_status`).innerHTML = "Finished";
     entities.traceroutes = entities.traceroutes.concat(result.traceroutes);
     let graph = await createInternetGraph(entities.traceroutes);
     let org_graph = clusterBy(graph,

@@ -58,7 +58,7 @@ function resetForms()
 
 }
 
-function addToCRTable()
+function addToCRTable(uuid)
 {
     if (document.getElementById("esmond_ip_dest").value === "")
         return;
@@ -70,11 +70,11 @@ function addToCRTable()
     let cell_ids = ['type', 'source', 'dest', 'numRuns', 'status', 'selected']
 
     let row = tbody.insertRow();
-    row.id = `cr_table_r${numRows}`;
+    row.id = `${uuid}`;
     for (let i = 0; i < 6; i++)
     {
         row.insertCell(i);
-        row.cells[i].id = `cr_table_r${numRows}_${cell_ids[i]}`
+        row.cells[i].id = `${uuid}_${cell_ids[i]}`
     }
 
     let source = document.getElementById("esmond_ip_source").value;
@@ -84,7 +84,7 @@ function addToCRTable()
 
 
     row.cells[0].innerHTML = type;
-    row.cells[1].innerHTML = source ? source : "None";
+    row.cells[1].innerHTML = source ? source : self.location.hostname;
     row.cells[2].innerHTML = dest;
     row.cells[3].innerHTML = numRuns;
     // Need to hook into call to API to change from pending to finished.
@@ -93,9 +93,9 @@ function addToCRTable()
     row.cells[5].innerHTML = "<input type=\"checkbox\" checked=\"checked\">"
 }
 
-document.addEventListener("DOMContentLoaded", function()
-{
-   document.getElementById("esmond_btn").addEventListener("click", addToCRTable);
-   document.getElementById("e2e_btn").addEventListener("click", addToCRTable);
-});
+// document.addEventListener("DOMContentLoaded", function()
+// {
+//    document.getElementById("esmond_btn").addEventListener("click", addToCRTable);
+//    document.getElementById("e2e_btn").addEventListener("click", addToCRTable);
+// });
 
