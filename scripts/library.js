@@ -19,6 +19,13 @@ const getOrgFromIP = async (ip) => {
   return result;
 }
 
+const getMaxBWFromGRNOCIP = async (ip) => {
+  let api_call = `https://snapp-portal.grnoc.iu.edu/tsds-cross-domain/query.cgi?method=query;query=get%20max_bandwidth%20between(now-10m,%20now)%20from%20interface%20where%20interface_address.value%20=%20%22${ip}%22`;
+  console.log(`Requesting ${api_call}`);
+  const result = await d3.json(api_call);
+  return result;
+}
+
 const getATRChartURL = (ip, start=1588478400000, end=1588564799000) => {
   if (ip.startsWith("198") || ip.startsWith("162") || ip.startsWith("192")) {
     return `https://snapp-portal.grnoc.iu.edu/grafana/d-solo/f_KR9xeZk/ip-address-lookup?orgId=2&from=${start}&to=${end}&var-ip_addr=${ip}&panelId=2`;
@@ -45,11 +52,18 @@ const createInternetGraph = async (traceroutes, existing = undefined) => {
       let entity = entities.get(entity_id);
       
       if (!entity) {
-        const result = await getOrgFromIP(packet.ip);
+        const orgResult = await getOrgFromIP(packet.ip);
+        const tsdsResult = await getMaxBWFromGRNOCIP(packet.ip);
+        let maxBW = undefined;
+        if (tsdsResult.results.length > 0) {
+          maxBW = tsdsResult.results[0].max_bandwidth;
+          console.log(packet.ip, maxBW);
+        }
         entity = ({id: entity_id,
                  ip: packet.ip,
-                 org: result.org,
-                 domain: result.domain,
+                 org: orgResult.org,
+                 domain: orgResult.domain,
+                 max_bandwidth: maxBW,
                  packets: new Array(),
                  source_ids: new Set(),
                  target_ids: new Set()
@@ -430,7 +444,7 @@ class Vizualization {
         .on("mouseover", (d) => {
             this.tooltip.transition().duration(200).style('opacity', 0.9);
             let packets = d.packets;
-            this.tooltip_stats.text(`${d.ip ? d.ip : ""} (${d.org}) | ${packets.length} packets | RTT (mean): ${d3.mean(packets, p => p.rtt)}`);
+            this.tooltip_stats.text(`${d.ip ? d.ip : ""} (${d.org}) | ${packets.length} packets | ${d.max_bandwidth ? "Max bandwidth: " + (d.max_bandwidth/1000000000.0) + "Gbps |": ""} RTT (mean): ${d3.mean(packets, p => p.rtt)}`);
             if (d.id.startsWith("ip") && this.atr_iframes.has(d.id)) {
                 this.atr_iframes.get(d.id).style("display", "block");
             }
