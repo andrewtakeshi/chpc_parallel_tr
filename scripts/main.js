@@ -3,10 +3,74 @@ const height = 600;
 
 let entities = ({"traceroutes": []});
 
+const netbeam_table = async (traceroutes) => {
+    document.getElementById('netbeam_table_area').style.visibility = "visible";
+    let tbody = document.getElementById('netbeam_table').getElementsByTagName('tbody')[0];
+    traceroutes.forEach(traceroute => {
+        traceroute.packets.forEach(packet => {
+            let ip = packet['ip']
+            if ("traffic" in packet) {
+                packet.traffic.forEach(hop => {
+                    let row = tbody.insertRow();
+                    for (let i = 0; i < 5; i++) {
+                        row.insertCell(i);
+                    }
+                    row.cells[0].innerHTML = ip;
+                    row.cells[1].innerHTML = "traffic";
+                    row.cells[2].innerHTML = hop[0];
+                    row.cells[3].innerHTML = hop[1];
+                    row.cells[4].innerHTML = hop[2];
+                })
+            }
+            if ("unicast_packets" in packet) {
+                packet.unicast_packets.forEach(hop => {
+                    let row = tbody.insertRow();
+                    row.style.backgroundColor = "#f2f2f2";
+                    for (let i = 0; i < 5; i++) {
+                        row.insertCell(i);
+                    }
+                    row.cells[0].innerHTML = ip;
+                    row.cells[1].innerHTML = "unicast_packets";
+                    row.cells[2].innerHTML = hop[0];
+                    row.cells[3].innerHTML = hop[1];
+                    row.cells[4].innerHTML = hop[2];
+                })
+            }
+            if ("discards" in packet) {
+                packet.discards.forEach(hop => {
+                    let row = tbody.insertRow();
+                    for (let i = 0; i < 5; i++) {
+                        row.insertCell(i);
+                    }
+                    row.cells[0].innerHTML = ip;
+                    row.cells[1].innerHTML = "discards";
+                    row.cells[2].innerHTML = hop[0];
+                    row.cells[3].innerHTML = hop[1];
+                    row.cells[4].innerHTML = hop[2];
+                })
+            }
+            if ("errors" in packet) {
+                packet.errors.forEach(hop => {
+                    let row = tbody.insertRow();
+                    row.style.backgroundColor = "#f2f2f2";
+                    for (let i = 0; i < 5; i++) { row.insertCell(i); }
+                    row.cells[0].innerHTML = ip;
+                    row.cells[1].innerHTML = "errors";
+                    row.cells[2].innerHTML = hop[0];
+                    row.cells[3].innerHTML = hop[1];
+                    row.cells[4].innerHTML = hop[2];
+                })
+            }
+        })
+    });
+}
+
 const btndemo = async (source, dest, uuid) => {
     console.log(source, dest);
     const result = await runTraceroute(source, dest);
+    console.log(result);
     document.getElementById(`${uuid}_status`).innerHTML = "Finished";
+    await netbeam_table(result.traceroutes);
     entities.traceroutes = entities.traceroutes.concat(result.traceroutes);
     let graph = await createInternetGraph(entities.traceroutes);
     let org_graph = clusterBy(graph,
@@ -17,8 +81,10 @@ const btndemo = async (source, dest, uuid) => {
 }
 
 const demo = async (dest1, dest2) => {
-    const result1 = await d3.json(`http://habanero.chpc.utah.edu:5000/api/v1/resources/traceroutes?dest=${dest1}`);
-    const result2 = await d3.json(`http://habanero.chpc.utah.edu:5000/api/v1/resources/traceroutes?dest=${dest2}`);
+    // const result1 = await d3.json(`http://habanero.chpc.utah.edu:5000/api/v1/resources/traceroutes?dest=${dest1}`);
+    // const result2 = await d3.json(`http://habanero.chpc.utah.edu:5000/api/v1/resources/traceroutes?dest=${dest2}`);
+    const result1 = await d3.json(`http://localhost:5000/api/v1/resources/traceroutes?dest=${dest1}`);
+    const result2 = await d3.json(`http://localhost:5000/api/v1/resources/traceroutes?dest=${dest2}`);
     let graph1 = await createInternetGraph(result1.traceroutes);
     let graph2 = await createInternetGraph(result2.traceroutes);
     let graph = mergeInternetGraphs(graph1, graph2);

@@ -87,7 +87,6 @@ function addToCRTable(uuid)
     row.cells[1].innerHTML = source ? source : self.location.hostname;
     row.cells[2].innerHTML = dest;
     row.cells[3].innerHTML = numRuns;
-    // Need to hook into call to API to change from pending to finished.
     row.cells[4].innerHTML = "Pending"
     row.cells[5].style.textAlign = "center";
     row.cells[5].innerHTML = "<input type=\"checkbox\" checked=\"checked\">"
