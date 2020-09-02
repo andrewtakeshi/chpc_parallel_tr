@@ -8,11 +8,12 @@ const netbeam_table = async (traceroutes) => {
     let tbody = document.getElementById('netbeam_table').getElementsByTagName('tbody')[0];
     traceroutes.forEach(traceroute => {
         traceroute.packets.forEach(packet => {
-            let ip = packet['ip']
+            let ip = packet.ip;
+            let speed = packet.speed;
             if ("traffic" in packet) {
                 packet.traffic.forEach(hop => {
                     let row = tbody.insertRow();
-                    for (let i = 0; i < 5; i++) {
+                    for (let i = 0; i < 6; i++) {
                         row.insertCell(i);
                     }
                     row.cells[0].innerHTML = ip;
@@ -20,13 +21,14 @@ const netbeam_table = async (traceroutes) => {
                     row.cells[2].innerHTML = hop[0];
                     row.cells[3].innerHTML = hop[1];
                     row.cells[4].innerHTML = hop[2];
+                    row.cells[5].innerHTML = speed;
                 })
             }
             if ("unicast_packets" in packet) {
                 packet.unicast_packets.forEach(hop => {
                     let row = tbody.insertRow();
                     row.style.backgroundColor = "#f2f2f2";
-                    for (let i = 0; i < 5; i++) {
+                    for (let i = 0; i < 6; i++) {
                         row.insertCell(i);
                     }
                     row.cells[0].innerHTML = ip;
@@ -34,12 +36,13 @@ const netbeam_table = async (traceroutes) => {
                     row.cells[2].innerHTML = hop[0];
                     row.cells[3].innerHTML = hop[1];
                     row.cells[4].innerHTML = hop[2];
+                    row.cells[5].innerHTML = speed;
                 })
             }
             if ("discards" in packet) {
                 packet.discards.forEach(hop => {
                     let row = tbody.insertRow();
-                    for (let i = 0; i < 5; i++) {
+                    for (let i = 0; i < 6; i++) {
                         row.insertCell(i);
                     }
                     row.cells[0].innerHTML = ip;
@@ -47,18 +50,20 @@ const netbeam_table = async (traceroutes) => {
                     row.cells[2].innerHTML = hop[0];
                     row.cells[3].innerHTML = hop[1];
                     row.cells[4].innerHTML = hop[2];
+                    row.cells[5].innerHTML = speed;
                 })
             }
             if ("errors" in packet) {
                 packet.errors.forEach(hop => {
                     let row = tbody.insertRow();
                     row.style.backgroundColor = "#f2f2f2";
-                    for (let i = 0; i < 5; i++) { row.insertCell(i); }
+                    for (let i = 0; i < 6; i++) { row.insertCell(i); }
                     row.cells[0].innerHTML = ip;
                     row.cells[1].innerHTML = "errors";
                     row.cells[2].innerHTML = hop[0];
                     row.cells[3].innerHTML = hop[1];
                     row.cells[4].innerHTML = hop[2];
+                    row.cells[5].innerHTML = speed;
                 })
             }
         })
