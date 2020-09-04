@@ -3,68 +3,73 @@ const height = 600;
 
 let entities = ({"traceroutes": []});
 
-const netbeam_table = async (traceroutes) => {
+let netbeamTableHelper = (ip, label, hops, speed) => {
+    if (!document.getElementById(`table_${ip}_${label}`))
+    {
+        let collapse_body = document.getElementById(`collapse_body_${ip}`);
+        collapse_body.innerHTML += `<table class="table table-bordered" id="table_${ip}_${label}">
+                                        <thead>
+                                            <tr>
+                                                <th colspan="4" style="text-align: center">${label}</th>
+                                            </tr>
+                                            <tr>
+                                                <th>TS</th>
+                                                <th>IN</th>
+                                                <th>OUT</th>
+                                                <th>SPEED</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="table_body_${ip}_${label}"></tbody>
+                                        </table>`;
+    }
+
+    let tbody = document.getElementById(`table_body_${ip}_${label}`);
+
+    hops.forEach(hop => {
+        let row = tbody.insertRow();
+        for (let i = 0; i < 4; i++) {
+            row.insertCell(i);
+        }
+        row.cells[0].innerHTML = hop[0];
+        row.cells[1].innerHTML = hop[1];
+        row.cells[2].innerHTML = hop[2];
+        row.cells[3].innerHTML = speed;
+    })
+}
+
+const netbeamTable = async (traceroutes) => {
+    let accordion_div = document.getElementById('netbeam_accordion');
     document.getElementById('netbeam_table_area').style.visibility = "visible";
-    let tbody = document.getElementById('netbeam_table').getElementsByTagName('tbody')[0];
     traceroutes.forEach(traceroute => {
         traceroute.packets.forEach(packet => {
             let ip = packet.ip;
             let speed = packet.speed;
             if ("traffic" in packet) {
-                packet.traffic.forEach(hop => {
-                    let row = tbody.insertRow();
-                    for (let i = 0; i < 6; i++) {
-                        row.insertCell(i);
-                    }
-                    row.cells[0].innerHTML = ip;
-                    row.cells[1].innerHTML = "traffic";
-                    row.cells[2].innerHTML = hop[0];
-                    row.cells[3].innerHTML = hop[1];
-                    row.cells[4].innerHTML = hop[2];
-                    row.cells[5].innerHTML = speed;
-                })
+                // Set up card for each individual IP address. Done in traffic because
+                // it's the first table generated.
+                if (!document.getElementById(`collapse_${ip}`)) {
+                    accordion_div.innerHTML +=
+                        `<div class="card">
+                            <div class="card-header">
+                                <a class="collapsed card-link" data-toggle="collapse" href="[id='collapse_${ip}']">
+                                    ${ip}
+                                </a>
+                            </div>
+                            <div id="collapse_${ip}" class="collapse" data-parent="#netbeam_accordion">
+                                <div class="card-body" id="collapse_body_${ip}"></div>
+                            </div>
+                        </div>`;
+                }
+                netbeamTableHelper(ip, 'Traffic', packet.traffic, speed);
             }
             if ("unicast_packets" in packet) {
-                packet.unicast_packets.forEach(hop => {
-                    let row = tbody.insertRow();
-                    row.style.backgroundColor = "#f2f2f2";
-                    for (let i = 0; i < 6; i++) {
-                        row.insertCell(i);
-                    }
-                    row.cells[0].innerHTML = ip;
-                    row.cells[1].innerHTML = "unicast_packets";
-                    row.cells[2].innerHTML = hop[0];
-                    row.cells[3].innerHTML = hop[1];
-                    row.cells[4].innerHTML = hop[2];
-                    row.cells[5].innerHTML = speed;
-                })
+                netbeamTableHelper(ip, "Unicast_packets", packet.unicast_packets, speed);
             }
             if ("discards" in packet) {
-                packet.discards.forEach(hop => {
-                    let row = tbody.insertRow();
-                    for (let i = 0; i < 6; i++) {
-                        row.insertCell(i);
-                    }
-                    row.cells[0].innerHTML = ip;
-                    row.cells[1].innerHTML = "discards";
-                    row.cells[2].innerHTML = hop[0];
-                    row.cells[3].innerHTML = hop[1];
-                    row.cells[4].innerHTML = hop[2];
-                    row.cells[5].innerHTML = speed;
-                })
+                netbeamTableHelper(ip, "Discards", packet.discards, speed);
             }
             if ("errors" in packet) {
-                packet.errors.forEach(hop => {
-                    let row = tbody.insertRow();
-                    row.style.backgroundColor = "#f2f2f2";
-                    for (let i = 0; i < 6; i++) { row.insertCell(i); }
-                    row.cells[0].innerHTML = ip;
-                    row.cells[1].innerHTML = "errors";
-                    row.cells[2].innerHTML = hop[0];
-                    row.cells[3].innerHTML = hop[1];
-                    row.cells[4].innerHTML = hop[2];
-                    row.cells[5].innerHTML = speed;
-                })
+                netbeamTableHelper(ip, "Errors", packet.errors, speed);
             }
         })
     });
@@ -75,13 +80,13 @@ const btndemo = async (source, dest, uuid) => {
     const result = await runTraceroute(source, dest);
     console.log(result);
     document.getElementById(`${uuid}_status`).innerHTML = "Finished";
-    await netbeam_table(result.traceroutes);
+    await netbeamTable(result.traceroutes);
     entities.traceroutes = entities.traceroutes.concat(result.traceroutes);
     let graph = await createInternetGraph(entities.traceroutes);
     let org_graph = clusterBy(graph,
-                              (entity) => entity.org,
-                              (entity) => new Set([...entity.source_ids, ...entity.target_ids]),
-                              "Org");
+        (entity) => entity.org,
+        (entity) => new Set([...entity.source_ids, ...entity.target_ids]),
+        "Org");
     return org_graph;
 }
 
@@ -94,9 +99,9 @@ const demo = async (dest1, dest2) => {
     let graph2 = await createInternetGraph(result2.traceroutes);
     let graph = mergeInternetGraphs(graph1, graph2);
     let org_graph = clusterBy(graph,
-                              (entity) => entity.org,
-                              (entity) => new Set([...entity.source_ids, ...entity.target_ids]),
-                              "Org");
+        (entity) => entity.org,
+        (entity) => new Set([...entity.source_ids, ...entity.target_ids]),
+        "Org");
     return org_graph;
 }
 

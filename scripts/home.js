@@ -51,10 +51,14 @@ function resetForms()
         warnings[i].hidden = true;
     }
 
-    // Hide the table on reset.
+    // Hide tables on reset.
     document.getElementById("current_run_table_area").style.visibility = "hidden";
-    // Clear the table on reset.
+    document.getElementById("netbeam_table_area").style.visibility = "hidden";
+    // Clear tables on reset.
     document.getElementById("cr_table").getElementsByTagName('tbody')[0].innerHTML = "";
+    document.getElementById("netbeam_table").getElementsByTagName("tbody")[0].innerHTML = "";
+
+
 
 }
 
