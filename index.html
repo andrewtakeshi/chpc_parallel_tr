@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
     <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
@@ -30,6 +30,13 @@
 
 
         <title>Parallel Traceroute</title>
+
+        <style>
+            .card-header {
+                text-align: center;
+                font-size: medium;
+            }
+        </style>
     </head>
 
     <body>
@@ -68,10 +75,10 @@
                         </div>
                     </div>
                     <div class="form-row">
-                        <span class="form-group col-md-4" id="esmond_ip_source_warn" hidden="true" style="color: #ff0000;" name="warn">
+                        <span class="form-group col-md-4" id="esmond_ip_source_warn" hidden style="color:red;" name="warn">
                             Source must have a value.
                         </span>
-                        <span class="form-group col-md-4" id="esmond_ip_dest_warn" hidden="true" style="color:red;" name="warn">
+                        <span class="form-group col-md-4" id="esmond_ip_dest_warn" hidden style="color:red;" name="warn">
                             Destination must have a value.
                         </span>
                     </div>
@@ -79,9 +86,10 @@
                     <div class="form-row btn-group">
                         <button id="e2e_btn" name="e2e_btn"
                                 onclick="let unique = uuid.v4();
-                                btndemo(document.getElementById('esmond_ip_source').value,
-                                document.getElementById('esmond_ip_dest').value, unique).then(data => {viz.setData(data)}),
-                                addToCRTable(unique)"
+                                let source = document.getElementById('esmond_ip_source').value;
+                                let dest = document.getElementById('esmond_ip_dest').value;
+                                addToCRTable(unique);
+                                btndemo(source, dest, unique).then(data => {viz.setData(data)});"
                                 type="submit"
                                 class="btn btn-outline-primary">End-to-end Traceroute</button>
                         <button id="esmond_btn" name="esmond_btn" onclick="formLogger(this.form)" type="submit" class="btn btn-outline-primary">Esmond Traceroute</button>
@@ -95,12 +103,14 @@
         <div id="current_run_table_area" class="container d-flex justify-content-center" style="margin-top: 25px; visibility: hidden">
             <table id="cr_table" class="table table-bordered">
                 <thead>
-                <th>Traceroute Type</th>
-                <th>Source</th>
-                <th>Destination</th>
-                <th># Traceroutes</th>
-                <th>Status</th>
-                <th>Selected</th>
+                    <tr>
+                        <th>Traceroute Type</th>
+                        <th>Source</th>
+                        <th>Destination</th>
+                        <th># Traceroutes</th>
+                        <th>Status</th>
+                        <th>Selected</th>
+                    </tr>
                 </thead>
                 <tbody>
                 </tbody>
@@ -118,20 +128,7 @@
 
         <div id="netbeam_table_area" style="margin-top: 25px; visibility: hidden" class="container d-flex justify-content-center">
             <div id="netbeam_accordion" class="accordion">
-
             </div>
-<!--            <table id="netbeam_table" class="table table-bordered">-->
-<!--                <thead>-->
-<!--                <th>IP</th>-->
-<!--                <th>TYPE</th>-->
-<!--                <th>TS</th>-->
-<!--                <th>IN</th>-->
-<!--                <th>OUT</th>-->
-<!--                <th>SPEED</th>-->
-<!--                </thead>-->
-<!--                <tbody>-->
-<!--                </tbody>-->
-<!--            </table>-->
         </div>
 
         <div id="config_area" style="margin-top: 25px; margin-bottom: 50px;" class="container">

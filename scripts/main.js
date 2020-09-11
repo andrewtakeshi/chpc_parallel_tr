@@ -13,7 +13,7 @@ let netbeamTableHelper = (ip, label, hops, speed) => {
                                                 <th colspan="4" style="text-align: center">${label}</th>
                                             </tr>
                                             <tr>
-                                                <th>TS</th>
+                                                <th>TIME</th>
                                                 <th>IN</th>
                                                 <th>OUT</th>
                                                 <th>SPEED</th>
@@ -25,15 +25,35 @@ let netbeamTableHelper = (ip, label, hops, speed) => {
 
     let tbody = document.getElementById(`table_body_${ip}_${label}`);
 
+    let normalizeUTCTime = (inDate) => {
+        let x = new Date(inDate);
+        return `${x.getMonth() + 1}/${x.getDate()}/${x.getFullYear()} ${x.getHours()}:${("0" + x.getMinutes()).substr(-2)}:${("0" + x.getSeconds()).substr(-2)}`
+    };
+
     hops.forEach(hop => {
-        let row = tbody.insertRow();
-        for (let i = 0; i < 4; i++) {
-            row.insertCell(i);
+        // Checks to see if value is in table already (using time)
+        let rows = tbody.getElementsByTagName('tr');
+        let hopExists = false;
+        for (let row of rows)
+        {
+            if (row.cells[0].innerHTML === normalizeUTCTime(hop[0]))
+            {
+                hopExists = true;
+                break;
+            }
         }
-        row.cells[0].innerHTML = hop[0];
-        row.cells[1].innerHTML = hop[1];
-        row.cells[2].innerHTML = hop[2];
-        row.cells[3].innerHTML = speed;
+
+        // If hop is not extant in table, adds to table
+        if (!hopExists) {
+            let row = tbody.insertRow();
+            for (let i = 0; i < 4; i++) {
+                row.insertCell(i);
+            }
+            row.cells[0].innerHTML = normalizeUTCTime(hop[0]);
+            row.cells[1].innerHTML = hop[1];
+            row.cells[2].innerHTML = hop[2];
+            row.cells[3].innerHTML = speed;
+        }
     })
 }
 
@@ -43,10 +63,14 @@ const netbeamTable = async (traceroutes) => {
     traceroutes.forEach(traceroute => {
         traceroute.packets.forEach(packet => {
             let ip = packet.ip;
-            let speed = packet.speed;
+            let speed = packet.speed ? packet.speed : "Unknown";
             if ("traffic" in packet) {
                 // Set up card for each individual IP address. Done in traffic because
                 // it's the first table generated.
+                if (accordion_div.getElementsByClassName('card').length === 0)
+                {
+                    accordion_div.innerHTML += `<div class="card"><div class="card-header">Netbeam Info</div></div>`;
+                }
                 if (!document.getElementById(`collapse_${ip}`)) {
                     accordion_div.innerHTML +=
                         `<div class="card">
