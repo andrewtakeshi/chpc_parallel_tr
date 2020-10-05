@@ -22,16 +22,20 @@ def traceroutes():
     if "source" in request.args:
         source = request.args["source"]
 
+    num_runs = 1
+
+    if "num_runs" in request.args:
+        num_runs = int(request.args["num_runs"])
 
     # Use the jsonify function from Flask to convert our list of
     # Python dictionaries to the JSON format.
     if source:
         if d3_conversion.check_pscheduler(source):
-            response = d3_conversion.pscheduler_to_d3(source, dest)
+            response = d3_conversion.pscheduler_to_d3(source, dest, num_runs)
         else:
             return f"Error: pScheduler not found at {source}"
     else:
-        response = d3_conversion.system_to_d3(dest)
+        response = d3_conversion.system_to_d3(dest, num_runs)
 
     response = jsonify(response)
 

@@ -4,7 +4,7 @@ import time
 import re
 from os import path
 
-url = "https://netbeam.es.net"
+url = "http://netbeam.es.net"
 
 
 def createIP2ResourceDict(filePath=None):
@@ -183,29 +183,23 @@ def getTrafficByTimeRange(resource: str = "devices/wash-cr5/interfaces/to_wash-b
 
     res = {}
 
+
+    # r = requests.get(f'http://netbeam.es.net/api/network/esnet/prod/devices/eqx-chi-cr5/interfaces/to_chic-cr55_ip-b/traffic?begin={begin}&end={end}')
+    # print(r.text)
+    # print(r.content)
+    # print(len(r.content) == 0)
+    # print(r.json())
+
     for rInfo in zip(requestTypes, units, properNames):
         r = requests.get(requestStr(rInfo[0]))
 
-        if r.status_code == 200:
+        if r.status_code == 200 and len(r.content) != 0:
             res[rInfo[0]] = r.json()
-            # print(r.json())
-            # print(rInfo[2])
-            # printTrafficData(r.json(), rInfo[1])
-            # print()
         else:
             # print(f"Error querying host: {r.status_code}")
             return None
 
     return res
-
-#
-# def convertTZJson(jIn):
-#     for k, v in jIn.items():
-#         if k == 'points':
-#             for trip in v:
-#                 trip = (trip[0], trip[1], trip[2], time.asctime(time.localtime(int(trip[0]) / 1000)))
-#
-#     return jIn
 
 
 def getTrafficByTimeRangeFlask(resource: str = "devices/wash-cr5/interfaces/to_wash-bert1_ip-a", interval: str = "15m"):
@@ -253,7 +247,6 @@ def getTrafficByTimeRangeMultiple(resource: list, interval: str = "15m"):
     :return: Void.
     """
     for r in resource:
-        print(r)
         getTrafficByTimeRange(resource=r, interval=interval)
 
 
@@ -271,6 +264,8 @@ def getInterfaceInformation(resource, filePath="interfaceList.csv"):
         if split[0] == resource:
             return split[0], split[1]
 
+
+print(getTrafficByTimeRange('devices/eqx-ash-cr5/interfaces/system'))
 
 # output = getTrafficByTimeRangeFlask()
 #

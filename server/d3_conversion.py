@@ -7,7 +7,7 @@ import urllib3
 import threading
 import socket
 from server import netbeam
-from os import path
+from os import path, stat
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 ip_validation_regex = re.compile(r'((25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9][0-9]|[0-9])\.)'
@@ -73,6 +73,9 @@ def add_netbeam_info(d3_json, source_path=None):
     if not path.exists(source_path):
         netbeam.createIP2ResourceDict(source_path)
 
+    if time.time() - stat(source_path).st_mtime > 60 * 60 * 24:
+        netbeam.createIP2ResourceDict(source_path)
+
     netbeam_cache = json.loads(open(source_path, 'r').read())
 
     for traceroute in d3_json['traceroutes']:
@@ -81,6 +84,7 @@ def add_netbeam_info(d3_json, source_path=None):
                 netbeam_item = netbeam_cache[packet['ip']]
                 packet['resource'] = netbeam_item['resource']
                 packet['speed'] = netbeam_item['speed']
+                print(netbeam_item['resource'])
                 res = netbeam.getTrafficByTimeRange(netbeam_item['resource'])
                 if res is not None:
                     packet['traffic'] = res['traffic']['points']

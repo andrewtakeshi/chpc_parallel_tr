@@ -99,9 +99,9 @@ const netbeamTable = async (traceroutes) => {
     });
 }
 
-const btndemo = async (source, dest, uuid) => {
-    console.log(source, dest);
-    const result = await runTraceroute(source, dest);
+const btndemo = async (source, dest, num_runs, uuid) => {
+    console.log(source, dest, num_runs);
+    const result = await runTraceroute(source, dest, num_runs);
     console.log(result);
     document.getElementById(`${uuid}_status`).innerHTML = "Finished";
     await netbeamTable(result.traceroutes);
