@@ -3,28 +3,129 @@ const height = 600;
 
 let entities = ({"traceroutes": []});
 
-const btndemo = async (source, dest) => {
-    console.log(source, dest);
-    const result = await runTraceroute(source, dest);
+let netbeamTableHelper = (ip, label, hops, speed) => {
+    if (!document.getElementById(`table_${ip}_${label}`))
+    {
+        let collapse_body = document.getElementById(`collapse_body_${ip}`);
+        collapse_body.innerHTML += `<table class="table table-bordered" id="table_${ip}_${label}">
+                                        <thead>
+                                            <tr>
+                                                <th colspan="4" style="text-align: center">${label}</th>
+                                            </tr>
+                                            <tr>
+                                                <th>TIME</th>
+                                                <th>IN</th>
+                                                <th>OUT</th>
+                                                <th>SPEED</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="table_body_${ip}_${label}"></tbody>
+                                        </table>`;
+    }
+
+    let tbody = document.getElementById(`table_body_${ip}_${label}`);
+
+    let normalizeUTCTime = (inDate) => {
+        let x = new Date(inDate);
+        return `${x.getMonth() + 1}/${x.getDate()}/${x.getFullYear()} ${x.getHours()}:${("0" + x.getMinutes()).substr(-2)}:${("0" + x.getSeconds()).substr(-2)}`
+    };
+
+    hops.forEach(hop => {
+        // Checks to see if value is in table already (using time)
+        let rows = tbody.getElementsByTagName('tr');
+        let hopExists = false;
+        for (let row of rows)
+        {
+            if (row.cells[0].innerHTML === normalizeUTCTime(hop[0]))
+            {
+                hopExists = true;
+                break;
+            }
+        }
+
+        // If hop is not extant in table, adds to table
+        if (!hopExists) {
+            let row = tbody.insertRow();
+            for (let i = 0; i < 4; i++) {
+                row.insertCell(i);
+            }
+            row.cells[0].innerHTML = normalizeUTCTime(hop[0]);
+            row.cells[1].innerHTML = hop[1];
+            row.cells[2].innerHTML = hop[2];
+            row.cells[3].innerHTML = speed;
+        }
+    })
+}
+
+const netbeamTable = async (traceroutes) => {
+    let accordion_div = document.getElementById('netbeam_accordion');
+    document.getElementById('netbeam_table_area').style.visibility = "visible";
+    traceroutes.forEach(traceroute => {
+        traceroute.packets.forEach(packet => {
+            let ip = packet.ip;
+            let speed = packet.speed ? packet.speed : "Unknown";
+            if ("traffic" in packet) {
+                // Set up card for each individual IP address. Done in traffic because
+                // it's the first table generated.
+                if (accordion_div.getElementsByClassName('card').length === 0)
+                {
+                    accordion_div.innerHTML += `<div class="card"><div class="card-header">Netbeam Info</div></div>`;
+                }
+                if (!document.getElementById(`collapse_${ip}`)) {
+                    accordion_div.innerHTML +=
+                        `<div class="card">
+                            <div class="card-header">
+                                <a class="collapsed card-link" data-toggle="collapse" href="[id='collapse_${ip}']">
+                                    ${ip}
+                                </a>
+                            </div>
+                            <div id="collapse_${ip}" class="collapse" data-parent="#netbeam_accordion">
+                                <div class="card-body" id="collapse_body_${ip}"></div>
+                            </div>
+                        </div>`;
+                }
+                netbeamTableHelper(ip, 'Traffic', packet.traffic, speed);
+            }
+            if ("unicast_packets" in packet) {
+                netbeamTableHelper(ip, "Unicast_packets", packet.unicast_packets, speed);
+            }
+            if ("discards" in packet) {
+                netbeamTableHelper(ip, "Discards", packet.discards, speed);
+            }
+            if ("errors" in packet) {
+                netbeamTableHelper(ip, "Errors", packet.errors, speed);
+            }
+        })
+    });
+}
+
+const btndemo = async (source, dest, num_runs, uuid) => {
+    console.log(source, dest, num_runs);
+    const result = await runTraceroute(source, dest, num_runs);
+    console.log(result);
+    document.getElementById(`${uuid}_status`).innerHTML = "Finished";
+    await netbeamTable(result.traceroutes);
     entities.traceroutes = entities.traceroutes.concat(result.traceroutes);
     let graph = await createInternetGraph(entities.traceroutes);
     let org_graph = clusterBy(graph,
-                              (entity) => entity.org,
-                              (entity) => new Set([...entity.source_ids, ...entity.target_ids]),
-                              "Org");
+        (entity) => entity.org,
+        (entity) => new Set([...entity.source_ids, ...entity.target_ids]),
+        "Org");
     return org_graph;
 }
 
 const demo = async (dest1, dest2) => {
-    const result1 = await d3.json(`http://habanero.chpc.utah.edu:5000/api/v1/resources/traceroutes?dest=${dest1}`);
-    const result2 = await d3.json(`http://habanero.chpc.utah.edu:5000/api/v1/resources/traceroutes?dest=${dest2}`);
+    // const result1 = await d3.json(`http://habanero.chpc.utah.edu:5000/api/v1/resources/traceroutes?dest=${dest1}`);
+    // const result2 = await d3.json(`http://habanero.chpc.utah.edu:5000/api/v1/resources/traceroutes?dest=${dest2}`);
+    const result1 = await d3.json(`http://localhost:5000/api/v1/resources/traceroutes?dest=${dest1}`);
+    const result2 = await d3.json(`http://localhost:5000/api/v1/resources/traceroutes?dest=${dest2}`);
     let graph1 = await createInternetGraph(result1.traceroutes);
     let graph2 = await createInternetGraph(result2.traceroutes);
     let graph = mergeInternetGraphs(graph1, graph2);
     let org_graph = clusterBy(graph,
-                              (entity) => entity.org,
-                              (entity) => new Set([...entity.source_ids, ...entity.target_ids]),
-                              "Org");
+        (entity) => entity.org,
+        (entity) => new Set([...entity.source_ids, ...entity.target_ids]),
+        "Org");
     return org_graph;
 }
 

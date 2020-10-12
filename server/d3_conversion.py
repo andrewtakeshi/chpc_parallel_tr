@@ -1,4 +1,3 @@
-import sys
 import re
 import json
 import time
@@ -6,6 +5,9 @@ import subprocess
 import requests
 import urllib3
 import threading
+import socket
+from server import netbeam
+from os import path, stat
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 ip_validation_regex = re.compile(r'((25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9][0-9]|[0-9])\.)'
@@ -23,6 +25,74 @@ def ip_to_asn(ip):
         return requests.get(f'https://api.iptoasn.com/v1/as/ip/{ip}').json()
     else:
         return None
+
+def timeInterval(interval="15m", startPoint=time.time()):
+    """
+    Takes a time interval and returns the unix time values (in ms) corresponding to the edges of the time interval.
+    Time intervals follow the standard format, i.e. a number followed by a single character signifying a unit of
+    measurement.
+    Units of measurements include s (seconds), m (minutes), h (hours), d (days), and w (weeks).
+    Other units (months, years, decades, etc.) could be added but I'm not sure if they're supported by the API,
+    and for the use case it seems unreasonably long.
+    :param interval: Relative time interval. Defaults to 15 minutes (15m).
+    :param startPoint: Starting? point for the relative time interval. Defaults to the current time. Without any
+    parameters, the function will return the current time and the time corresponding to 15 minutes before the current
+    time.
+    :return: Returns a tuple. The first value corresponds to the beginning time (i.e. 15 minutes before current time)
+    and the second value corresponds to the ending time (i.e. current time).
+    If an invalid time period is specified, it returns none.
+    """
+
+    end = startPoint * 1000
+    split = re.split('([a-zA-Z])', interval)
+    mult = 0
+
+    if split[1] == 's':
+        mult = 1
+    elif split[1] == 'm':
+        mult = 60
+    elif split[1] == 'h':
+        mult = 60 ** 2
+    elif split[1] == 'd':
+        mult = 60 ** 2 * 24
+    elif split[1] == 'w':
+        mult = 60 ** 2 * 24 * 7
+    else:
+        print("Unsupported time period.")
+        return None
+
+    if mult != 0:
+        end = time.time() * 1000
+        begin = end - (int(split[0]) * mult * 1000)
+        return begin, end
+
+
+def add_netbeam_info(d3_json, source_path=None):
+    if source_path is None:
+        source_path = 'interfaces.json'
+    if not path.exists(source_path):
+        netbeam.createIP2ResourceDict(source_path)
+
+    if time.time() - stat(source_path).st_mtime > 60 * 60 * 24:
+        netbeam.createIP2ResourceDict(source_path)
+
+    netbeam_cache = json.loads(open(source_path, 'r').read())
+
+    for traceroute in d3_json['traceroutes']:
+        for packet in traceroute['packets']:
+            if netbeam_cache.get(packet.get('ip')):
+                netbeam_item = netbeam_cache[packet['ip']]
+                packet['resource'] = netbeam_item['resource']
+                packet['speed'] = netbeam_item['speed']
+                print(netbeam_item['resource'])
+                res = netbeam.getTrafficByTimeRange(netbeam_item['resource'])
+                if res is not None:
+                    packet['traffic'] = res['traffic']['points']
+                    packet['unicast_packets'] = res['unicast_packets']['points']
+                    packet['discards'] = res['discards']['points']
+                    packet['errors'] = res['errors']['points']
+
+    return d3_json
 
 
 def rdap_org_lookup(ip):
@@ -85,35 +155,17 @@ def check_pscheduler(endpoint):
 
 def target_to_ip(target):
     """
-    Pings the target to get an IP address.
-    :param target: Target; could be an IP, could be hostname.
-    :return: IP address if available, None otherwise.
+    Gets the IP address of target.
+    :param target: Hostname (or IP address)
+    :return: IP address associated with target.
     """
-    ping_process = subprocess.run(['ping', '-c', '1', target], stdout=subprocess.PIPE, universal_newlines=True)
-    line = ping_process.stdout.splitlines()[0]
-    re_res = re.search(r'([0-9]{1,3}\.){3}[0-9]{1,3}', line)
     try:
-        ip = line[re_res.regs[0][0]:re_res.regs[0][1]]
-        return ip
+        return socket.gethostbyname(target)
     except:
         return None
 
 
-def pscheduler_target_to_ip(source, dest):
-    ping_process = subprocess.run(['pscheduler', 'task', 'rtt', '-s', source, '-d', dest, '-c', '1'],
-                                  stdout=subprocess.PIPE, universal_newlines=True)
-    lines = ping_process.stdout.splitlines()
-    for line in lines:
-        if re.match(r'\d\s+\w+', line):
-            re_res = re.search(r'([0-9]{1,3}\.){3}[0-9]{1,3}', line)
-            try:
-                ip = line[re_res.regs[0][0]:re_res.regs[0][1]]
-                return ip
-            except:
-                return None
-
-
-def pscheduler_to_d3(source, dest, numRuns = 1):
+def pscheduler_to_d3(source, dest, numRuns=1):
     """
     Tries to run a pScheduler traceroute from source to destination.
     The source must also be running pScheduler, as must the server/machine running this code.
@@ -125,9 +177,9 @@ def pscheduler_to_d3(source, dest, numRuns = 1):
     :return: JSON ingestible by the d3 visualisation if the traceroute is successful. None otherwise.
     """
 
-    # Check the source
-    if not check_pscheduler(source):
-        return None
+    # # Check the source - no longer necessary as this is done client side.
+    # if not check_pscheduler(source):
+    #     return None
 
     i = 0
     processList = []
@@ -153,16 +205,20 @@ def pscheduler_to_d3(source, dest, numRuns = 1):
     # results after waiting for processes in processList. Would likely need to move outside of definitions to do so.
     # Currently it takes forever because we have to wait for multiple calls to pscheduler.
     source_ip = target_to_ip(source)
-    dest_ip = pscheduler_target_to_ip(source, dest)
+    if source_ip is None:
+        print("Unable to resolve source to IP")
+        return None
+    # dest_ip = pscheduler_target_to_ip(source, dest)
 
     output = []
+    ip = ''
 
     # Process every line in the traceroute.
     for process in processList:
         output.append(dict())
         output[i]['ts'] = int(time.time())
         output[i]['source_address'] = source_ip
-        output[i]['target_address'] = dest_ip
+        # output[i]['target_address'] = dest_ip
         output[i]['packets'] = []
         output[i]['packets'].append({
             'ttl': 0,
@@ -186,7 +242,7 @@ def pscheduler_to_d3(source, dest, numRuns = 1):
                     # Extract IP address
                     ip = re.search(r'\(?([0-9]{1,3}\.){3}[0-9]{1,3}\)?', line)
                     ip = line[ip.regs[0][0]: ip.regs[0][1]]
-                    ip = re.sub(r'\(|\)', '', ip)
+                    ip = re.sub(r'[()]', '', ip)
 
                     # Extract RTT
                     rtt = re.findall(r'[0-9]+\.?[0-9]* ms', line)
@@ -196,6 +252,9 @@ def pscheduler_to_d3(source, dest, numRuns = 1):
                     toAdd['rtt'] = rtt
 
                     output[i]['packets'].append(toAdd)
+        # Gets target address from the last hop - this is much faster than running a separate
+        # pScheduler ping, and effectively cuts the runtime in half.
+        output[i]['target_address'] = ip
         i += 1
         process.stdout.close()
         process.kill()
@@ -206,10 +265,10 @@ def pscheduler_to_d3(source, dest, numRuns = 1):
     limiter -= numRuns
     lock.release()
 
-    return output
+    return add_netbeam_info(output)
 
 
-def system_to_d3(dest, numRuns = 1):
+def system_to_d3(dest, numRuns=1):
     """
     Runs a system traceroute (on linux systems) to the desired destination. RTT is calculated as the mean average of the
     three pings for each hop.
@@ -269,7 +328,7 @@ def system_to_d3(dest, numRuns = 1):
                     if re.match(r'([0-9]{1,3}\.){3}[0-9]{1,3}', split[1]):
                         ip = split[1]
                     else:
-                        ip = re.sub(r"\(|\)", "", split[2])
+                        ip = re.sub(r"[()]", "", split[2])
 
                     rttArr = re.findall(r"[0-9]+\.?[0-9]* ms", line)
                     rtt = 0
@@ -290,7 +349,7 @@ def system_to_d3(dest, numRuns = 1):
     limiter -= numRuns
     lock.release()
 
-    return output
+    return add_netbeam_info(output)
 
 
 def esmond_to_d3(source=None, dest=None, ts_min=None, ts_max=None,
@@ -371,90 +430,92 @@ def esmond_to_d3(source=None, dest=None, ts_min=None, ts_max=None,
 
     # Return output if captured. Return none otherwise.
     if len(output) != 0:
-        return {'traceroutes': output}
+        return add_netbeam_info({'traceroutes': output})
     else:
         return None
 
 
-# Pausing development until later.
-# def system_copy_to_d3(dataIn):
-#     """
-#     Takes a previously run traceroute and creates the appropriate JSON.
-#     Does not include source information (as source information is not provided by system traceroute).
-#     Accepts both Linux and Windows traceroute formats.
-#     :param dataIn: Copied traceroute information.
-#     :return: JSON ingestible by the d3 visualisation.
-#     """
-#     output = []
-#
-#     i = -1
-#
-#     linux = True
-#
-#     for line in dataIn.splitlines():
-#         # For processing multiple traceroutes (i.e. pasting multiple runs in at once)
-#         if line.__contains__("Tracing") or line.__contains__("traceroute"):
-#             i += 1
-#             output.append(dict())
-#             if not line.__contains__("traceroute"):
-#                 linux = False
-#
-#             output[i]["ts"] = int(time.time())
-#             output[i]["val"] = []
-#         if re.match('^\s*[0-9]+\s+', line):
-#             split = line.split()
-#
-#             # Common to all items in the traceroute path.
-#             toAdd = {
-#                 "success": 1,
-#                 "query": 1,
-#                 "ttl": int(split[0])
-#             }
-#             # Server didn't reply; same thing for both Linux and Windows
-#             if re.match("No|\*", split[1]):
-#                 output[i]["val"].append(toAdd)
-#
-#             # Server replied; additional information available
-#             else:
-#                 # Linux traceroute format
-#                 if linux:
-#                     ip = ""
-#                     if re.match('([0-9]{1,3}\.){3}[0-9]{1,3}', split[1]):
-#                         ip = split[1]
-#                     else:
-#                         ip = re.sub("\(|\)", "", split[2])
-#
-#                     rttArr = re.findall("[0-9]+\.?[0-9]+ ms", line)
-#                     rtt = 0
-#                     for response in rttArr:
-#                         rtt += float(re.sub("[ms]", "", response))
-#                     rtt /= len(rttArr)
-#
-#                     toAdd["ip"] = ip
-#                     toAdd["rtt"] = rtt.__round__(3)
-#                     output[i]["val"].append(toAdd)
-#
-#                 # Windows traceroute format
-#                 else:
-#                     # Case where hostname is found
-#                     if len(split) == 9:
-#                         toAdd["ip"] = re.sub("\[|\]", "", split[8])
-#                     # Case where only IP is used
-#                     else:
-#                         toAdd["ip"] = split[7]
-#
-#                     rttArr = re.findall("\<?[0-9]+ ms", line)
-#                     rtt = 0
-#                     for response in rttArr:
-#                         response = re.sub("ms|<", "", response)
-#                         rtt += float(response)
-#                     rtt /= len(rttArr)
-#
-#                     toAdd["rtt"] = rtt.__round__(3)
-#                     output[i]["val"].append(toAdd)
-#
-#     output = json.dumps(output)
-#     return output
+# No limiting in place, and quite possibly buggy. Just updated to work with the new schema.
+def system_copy_to_d3(dataIn):
+    """
+    Takes a previously run traceroute and creates the appropriate JSON.
+    Does not include source information (as source information is not provided by system traceroute).
+    Accepts both Linux and Windows traceroute formats.
+    :param dataIn: Copied traceroute information.
+    :return: JSON ingestible by the d3 visualisation.
+    """
+    output = []
+
+    i = -1
+
+    linux = True
+
+    for line in dataIn.splitlines():
+        # For processing multiple traceroutes (i.e. pasting multiple runs in at once)
+        if line.__contains__("Tracing") or line.__contains__("traceroute"):
+            i += 1
+            output.append(dict())
+            if not line.__contains__("traceroute"):
+                linux = False
+
+            output[i]["ts"] = int(time.time())
+            output[i]["source_address"] = None
+            output[i]["packets"] = []
+        if re.match('^\s*[0-9]+\s+', line):
+            split = line.split()
+            ip = ''
+            # Common to all items in the traceroute path.
+            toAdd = {
+                "ttl": int(split[0])
+            }
+            # Server didn't reply; same thing for both Linux and Windows
+            if re.match("No|\*", split[1]):
+                output[i]["packets"].append(toAdd)
+                ip = ''
+
+            # Server replied; additional information available
+            else:
+                # Linux traceroute format
+                if linux:
+                    if re.match('([0-9]{1,3}\.){3}[0-9]{1,3}', split[1]):
+                        ip = split[1]
+                    else:
+                        ip = re.sub("[()]", "", split[2])
+
+                    rttArr = re.findall("[0-9]+\.?[0-9]+ ms", line)
+                    rtt = 0
+                    for response in rttArr:
+                        rtt += float(re.sub("[ms]", "", response))
+                    rtt /= len(rttArr)
+
+                    toAdd["ip"] = ip
+                    toAdd["rtt"] = rtt.__round__(3)
+                    output[i]["packets"].append(toAdd)
+
+                # Windows traceroute format
+                else:
+                    # Case where hostname is found
+                    if len(split) == 9:
+                        ip = re.sub("[\[\]]", "", split[8])
+                    # Case where only IP is used
+                    else:
+                        ip = split[7]
+                    toAdd["ip"] = ip
+
+                    rttArr = re.findall("<?[0-9]+ ms", line)
+                    rtt = 0
+                    for response in rttArr:
+                        response = re.sub("ms|<", "", response)
+                        rtt += float(response)
+                    rtt /= len(rttArr)
+
+                    toAdd["rtt"] = rtt.__round__(3)
+                    output[i]["packets"].append(toAdd)
+            output[i]["target_address"] = ip
+    if len(output) != 0:
+        return add_netbeam_info({'traceroutes': output})
+    else:
+        return None
 
 # Testing pt.1
 # input = ""
@@ -465,10 +526,9 @@ def esmond_to_d3(source=None, dest=None, ts_min=None, ts_max=None,
 #
 # print(system_copy_to_d3(input))
 
-# Testing pt.2
-# rdap_org_lookup('62.115.12.53')
-# rdap_org_lookup('54.225.206.152')
-# rdap_org_lookup('151.101.0.81')
-# rdap_org_lookup('147.67.34.45')
-#
-# print(rdap_cache)
+# Testing add_netbeam_info, no writes to files.
+# print(json.dumps(pscheduler_to_d3('dtn01-dmz.chpc.utah.edu', '134.55.200.107')))
+# print(netbeam.getTrafficByTimeRange('devices/eqx-ash-cr5/interfaces/system'))
+# print(netbeam.getTrafficByTimeRange('devices/kans-cr5/interfaces/to_denv-cr5_ip-a'))
+# 'devices/pnwg-cr5/interfaces/to_pwave-sea-9k'
+
