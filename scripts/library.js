@@ -379,11 +379,11 @@ class Vizualization {
             .append('g')
             .attr('transform', `translate(${margin.left}, ${margin.top})`);
 
-
         let xScale = d3.scaleLinear()
             .domain(d3.extent([...trafficInfo.keys()]))
             .range([0, width]);
         trafficGraph.append('g')
+            .attr('id', 'xaxis')
             .attr('transform', `translate(0, ${height})`)
             .call(d3.axisBottom(xScale)
                 .ticks(10)
@@ -391,6 +391,20 @@ class Vizualization {
                     let date = new Date(d);
                     return `${date.getHours()}:${date.getMinutes()}:${date.getSeconds()}`;
                 }));
+
+        // let legend = trafficGraph.append('g')
+        //     .attr('transform', `translate(${width / 2}, ${height + 10})`)
+        //     .attr('id', 'lgLegend');
+        //
+        // let inLegend = legend.append('g')
+        // inLegend.append('line')
+        //     .attr('stroke', 'steelblue')
+        //     .attr('stroke-width', 1.5)
+        //     .attr('x1', 0)
+        //     .attr('x2', 3)
+        //     .attr('y1', 0)
+        //     .attr('y2', 0);
+
 
         let valsArr = [...trafficInfo.values()];
 
@@ -403,11 +417,13 @@ class Vizualization {
             .domain([min, max])
             .range([height, 0]);
         trafficGraph.append('g')
+            .attr('id', 'yaxis')
             .call(d3.axisLeft(yScale)
                 .ticks(6)
-                .tickFormat(d3.format('.0s')));
+                .tickFormat(d => d3.format('~s')(d)));
 
-        let inLine = trafficGraph.append('path')
+        // Append path for in values
+        trafficGraph.append('path')
             .attr('id', 'inLine')
             .datum(valsArr)
             .attr('fill', 'none')
@@ -418,19 +434,39 @@ class Vizualization {
                 .y(d => yScale(d.in))
                 .curve(d3.curveMonotoneX));
 
-        let outLine = trafficGraph.append('path')
+        // Append path for out values
+        trafficGraph.append('path')
             .attr('id', 'outLine')
-            .datum(Array.from(trafficInfo))
+            .datum(valsArr)
             .attr('fill', 'none')
             .attr('stroke', 'red')
             .attr('stroke-width', 1.5)
             .attr('d', d3.line()
-                .x(d => xScale(d[1].ts))
-                .y(d => yScale(d[1].out))
+                .x(d => xScale(d.ts))
+                .y(d => yScale(d.out))
                 .curve(d3.curveMonotoneX));
 
-        console.log('bp');
+        // Append dots for in values
+        trafficGraph.append('g')
+            .attr('id', 'inCircs')
+            .selectAll('circle')
+            .data(valsArr)
+            .join('circle')
+            .attr('r', 1.5)
+            .attr('fill', 'steelblue')
+            .attr('cx', d => xScale(d.ts))
+            .attr('cy', d => yScale(d.in));
 
+        // Append dots for out values
+        trafficGraph.append('g')
+            .attr('id', 'outCircs')
+            .selectAll('circle')
+            .data(valsArr)
+            .join('circle')
+            .attr('r', 1.5)
+            .attr('fill', 'red')
+            .attr('cx', d => xScale(d.ts))
+            .attr('cy', d => yScale(d.out));
     }
 
 
@@ -462,9 +498,12 @@ class Vizualization {
         // Preload ATR Grafana iFrames for rendered IP nodes
         for (let d of this.vNodes) {
             if (d.id.startsWith("ip") && !this.atr_iframes.has(d.id)) {
-                const iframe = this.tooltip.append("iframe").attr("width", 450).attr("height", 200).style("display", "none");
                 const URL = getATRChartURL(d.ip);
                 if (URL.length > 0) {
+                    const iframe = this.tooltip.append("iframe")
+                        .attr("width", 450)
+                        .attr("height", 200)
+                        .style("display", "none");
                     iframe.attr("src", getATRChartURL(d.ip));
                     this.atr_iframes.set(d.id, iframe);
                 }
@@ -505,7 +544,7 @@ class Vizualization {
                 this.expandNode(d);
                 this.update();
             })
-            .on("mouseover", (d) => {
+            .on("mouseover", d => {
                 this.tooltip.transition().duration(200).style('opacity', 0.9);
                 let packets = d.packets;
 
@@ -524,62 +563,6 @@ class Vizualization {
                     this.atr_iframes.get(d.id).style("display", "block");
                 } else if (d.id.startsWith("ip") && trafficInfo.size > 0) {
                     this.netbeamGraph(trafficInfo);
-                    // let margin = {top: 10, right: 30, bottom: 30, left: 60};
-                    //
-                    // let overallDim = 450;
-                    //
-                    // let width = overallDim - margin.left - margin.right;
-                    // let height = overallDim - margin.top - margin.bottom;
-                    //
-                    // let trafficGraph = this.tooltip.append('svg')
-                    //     .attr('width', overallDim)
-                    //     .attr('height', overallDim)
-                    //     .append('g')
-                    //     .attr('transform', `translate(${margin.left}, ${margin.top})`);
-                    //
-                    // let xScale = d3.scaleLinear()
-                    //     .domain(d3.extent([...trafficInfo.keys()]))
-                    //     .range([0, width]);
-                    // trafficGraph.append('g')
-                    //     .attr('transform', `translate(0, ${height})`)
-                    //     .call(d3.axisBottom(xScale).ticks(6));
-                    //
-                    // let minObj = d3.min([...trafficInfo.values()]);
-                    // let maxObj = d3.max([...trafficInfo.values()]);
-                    //
-                    // let yScale = d3.scaleLinear()
-                    //     .domain([Math.min(minObj.in, minObj.out),
-                    //         Math.max(maxObj.in, maxObj.out)])
-                    //     .range([height, 0]);
-                    // trafficGraph.append('g')
-                    //     .call(d3.axisLeft(yScale).ticks(6));
-                    //
-                    // trafficGraph.append('path')
-                    //     .data(trafficInfo)
-                    //     .attr('fill', 'none')
-                    //     .attr('stroke', 'steelblue')
-                    //     .attr('stroke-width', 1.5)
-                    //     .attr('d', d3.line()
-                    //         .x(d => xScale(d.ts))
-                    //         .y(d => yScale(d.in)));
-
-                    // trafficGraph.selectAll('path')
-                    //     .datum(trafficInfo)
-                    //     .attr('fill', 'none')
-                    //     .attr('stroke', 'steelblue')
-                    //     .attr('stroke-width', 1.5)
-                    //     .attr('d', d3.line()
-                    //         .x(d => xScale(d.ts))
-                    //         .y(d => yScale(d.in)));
-                    //
-                    // trafficGraph.selectAll('path')
-                    //     .datum(trafficInfo)
-                    //     .attr('fill', 'none')
-                    //     .attr('stroke', 'red')
-                    //     .attr('stroke-width', 1.5)
-                    //     .attr('d', d3.line()
-                    //         .x(d => xScale(d.ts))
-                    //         .y(d => yScale(d.out)));
                 }
 
             })

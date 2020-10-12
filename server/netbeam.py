@@ -183,13 +183,6 @@ def getTrafficByTimeRange(resource: str = "devices/wash-cr5/interfaces/to_wash-b
 
     res = {}
 
-
-    # r = requests.get(f'http://netbeam.es.net/api/network/esnet/prod/devices/eqx-chi-cr5/interfaces/to_chic-cr55_ip-b/traffic?begin={begin}&end={end}')
-    # print(r.text)
-    # print(r.content)
-    # print(len(r.content) == 0)
-    # print(r.json())
-
     for rInfo in zip(requestTypes, units, properNames):
         r = requests.get(requestStr(rInfo[0]))
 
@@ -263,39 +256,3 @@ def getInterfaceInformation(resource, filePath="interfaceList.csv"):
         split = line.strip().split(",")
         if split[0] == resource:
             return split[0], split[1]
-
-
-print(getTrafficByTimeRange('devices/eqx-ash-cr5/interfaces/system'))
-
-# output = getTrafficByTimeRangeFlask()
-#
-# print(output)
-
-
-# def unixtolocaltimereduced(s):
-#     return time.strftime("%H:%M:%S", time.localtime(int(s) / 1000))
-
-#
-# retVal = set()
-# for item in output.items():
-#     for k, v in item[1].items():
-#         if k == 'points':
-#             for point in v:
-#                 retVal.add(unixtolocaltimereduced(point[0]))
-#
-# print(retVal)
-# print(len(retVal))
-#
-# retVal = []
-# for item in output.items():
-#     if item[0] == "Traffic":
-#         for k, v in item[1].items():
-#             if k == 'points':
-#                 for point in v:
-#                     if point[1] is None:
-#                         retVal.append(f'{{x: {point[0]}, y: 0}}')
-#                     else:
-#                         retVal.append(f'{{x: {point[0]}, y: {point[1]}}}')
-#
-# print(retVal)
-# print(len(retVal))
