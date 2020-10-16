@@ -1,12 +1,13 @@
-const api_server = "localhost:5000"
-const tr_api = "/api/v1/resources/traceroutes"
+const api_server = "network-viz.chpc.utah.edu:5000"
+//const api_server = 'localhost:5000';
+const tr_api = "/api/v1/resources/traceroutes";
 
 const runTraceroute = async (source, dest, num_runs) => {
     let api_call = `http://${api_server}${tr_api}?dest=${dest}`;
     if (source) {
-        api_call += `&source=${source}`
+        api_call += `&source=${source}`;
     }
-    api_call += `&num_runs=${num_runs}`
+    api_call += `&num_runs=${num_runs}`;
     console.log(`Requesting ${api_call}`);
     let result = await d3.json(api_call);
     return result;
@@ -21,17 +22,23 @@ const getOrgFromIP = async (ip) => {
 }
 
 const getMaxBWFromGRNOCIP = async (ip) => {
-  let api_call = `https://snapp-portal.grnoc.iu.edu/tsds-cross-domain/query.cgi?method=query;query=get%20max_bandwidth%20between(now-10m,%20now)%20from%20interface%20where%20interface_address.value%20=%20%22${ip}%22`;
-  console.log(`Requesting ${api_call}`);
-  const result = await d3.json(api_call);
-  return result;
+    if (ip.startsWith("198") || ip.startsWith("162") || ip.startsWith("192")) {
+        console.log(`startswith ${ip}`);
+        let api_call = `https://snapp-portal.grnoc.iu.edu/tsds-cross-domain/query.cgi?method=query;query=get%20max_bandwidth%20between(now-10m,%20now)%20from%20interface%20where%20interface_address.value%20=%20%22${ip}%22`;
+        console.log(`Requesting ${api_call}`);
+        const result = await d3.json(api_call);
+        return result;
+    } else {
+        return {'results' : []};
+    }
+
 }
 
-const getATRChartURL = (ip, start=1588478400000, end=1588564799000) => {
-  if (ip.startsWith("198") || ip.startsWith("162") || ip.startsWith("192")) {
-    return `https://snapp-portal.grnoc.iu.edu/grafana/d-solo/f_KR9xeZk/ip-address-lookup?orgId=2&from=${start}&to=${end}&var-ip_addr=${ip}&panelId=2`;
-  }
-  return "";
+const getATRChartURL = (ip, start = 1588478400000, end = 1588564799000) => {
+    if (ip.startsWith("198") || ip.startsWith("162") || ip.startsWith("192")) {
+        return `https://snapp-portal.grnoc.iu.edu/grafana/d-solo/f_KR9xeZk/ip-address-lookup?orgId=2&from=${start}&to=${end}&var-ip_addr=${ip}&panelId=2`;
+    }
+    return "";
 }
 
 const createInternetGraph = async (traceroutes, existing = undefined) => {
@@ -39,28 +46,36 @@ const createInternetGraph = async (traceroutes, existing = undefined) => {
     if (entities == undefined) {
         entities = new Map();
     }
-    for (let i = 0; i < packets.length; i++) {
-      const packet = packets[i];
-      packet.ts = trace.ts;
-      const entity_id = `ip(${packet.ip})`;
-      let entity = entities.get(entity_id);
-      
-      if (!entity) {
-        const orgResult = await getOrgFromIP(packet.ip);
-        const tsdsResult = await getMaxBWFromGRNOCIP(packet.ip);
-        let maxBW = undefined;
-        if (tsdsResult.results.length > 0) {
-          maxBW = tsdsResult.results[0].max_bandwidth;
-          console.log(packet.ip, maxBW);
+
+    for (var trace of traceroutes) {
+        const packets = trace.packets;
+        for (let i = 0; i < packets.length; i++) {
+            if (packets[i].ip == undefined)
+                packets[i].ip = "unknown";
         }
-        entity = ({id: entity_id,
-                 ip: packet.ip,
-                 org: orgResult.org,
-                 domain: orgResult.domain,
-                 max_bandwidth: maxBW,
-                 packets: new Array(),
-                 source_ids: new Set(),
-                 target_ids: new Set()
+        for (let i = 0; i < packets.length; i++) {
+            const packet = packets[i];
+            packet.ts = trace.ts;
+            const entity_id = `ip(${packet.ip})`;
+            let entity = entities.get(entity_id);
+
+            if (!entity) {
+                const orgResult = await getOrgFromIP(packet.ip);
+                const tsdsResult = await getMaxBWFromGRNOCIP(packet.ip);
+                let maxBW = undefined;
+                if (tsdsResult.results.length > 0) {
+                    maxBW = tsdsResult.results[0].max_bandwidth;
+                    console.log(packet.ip, maxBW);
+                }
+                entity = ({
+                    id: entity_id,
+                    ip: packet.ip,
+                    org: orgResult.org,
+                    domain: orgResult.domain,
+                    max_bandwidth: packet.speed ? packet.speed: maxBW,
+                    packets: new Array(),
+                    source_ids: new Set(),
+                    target_ids: new Set()
                 });
                 entities.set(entity_id, entity);
             }
@@ -369,33 +384,177 @@ class Vizualization {
         this.update();
     }
 
-    this.node = this.node
-      .data(this.vNodes, d => d.id)
-      .join(enter => enter.append("g"));
+    netbeamGraph(trafficInfo) {
+        let margin = {top: 10, right: 30, bottom: 30, left: 60};
 
-    this.node.append("image")
-        .attr("xlink:href", d => d.domain != "unknown" ? `http://icons.duckduckgo.com/ip2/${d.domain}.ico` : "")
-        .attr("draggable", false)
-        .attr("width", d => this.getNodeRadiusPackets(d))
-        .attr("height", d => this.getNodeRadiusPackets(d))
-        .attr("x", d => -1*this.getNodeRadiusPackets(d) / 2 )
-        .attr("y", d => -1*this.getNodeRadiusPackets(d) / 2 );
+        let oWidth = 600;
+        let oHeight = 300;
 
-    this.node.append("circle")
-        .attr("r", d => this.getNodeRadiusPackets(d) / 2)
-        .attr("fill", d => this.getNodeColorOrg(d))
-        .attr("opacity", d => d.domain != "unknown" ? 0.0 : 1.0)
-        .on("dblclick", d => {
-            d3.event.preventDefault();
-            this.expandNode(d);
-            this.update();
-            })
-        .on("mouseover", (d) => {
-            this.tooltip.transition().duration(200).style('opacity', 0.9);
-            let packets = d.packets;
-            this.tooltip_stats.text(`${d.ip ? d.ip : ""} (${d.org}) | ${packets.length} packets | ${d.max_bandwidth ? "Max bandwidth: " + (d.max_bandwidth/1000000000.0) + "Gbps |": ""} RTT (mean): ${d3.mean(packets, p => p.rtt)}`);
-            if (d.id.startsWith("ip") && this.atr_iframes.has(d.id)) {
-                this.atr_iframes.get(d.id).style("display", "block");
+        let width = oWidth - margin.left - margin.right;
+        let height = oHeight - margin.top - margin.bottom;
+
+        let trafficGraph = d3.select('#tooltip')
+            .append('svg')
+            .attr('width', oWidth)
+            .attr('height', oHeight)
+            .append('g')
+            .attr('transform', `translate(${margin.left}, ${margin.top})`);
+
+        let xScale = d3.scaleLinear()
+            .domain(d3.extent([...trafficInfo.keys()]))
+            .range([0, width]);
+        trafficGraph.append('g')
+            .attr('id', 'xaxis')
+            .attr('transform', `translate(0, ${height})`)
+            .call(d3.axisBottom(xScale)
+                .ticks(10)
+                .tickFormat(d => {
+                    let date = new Date(d);
+                    return `${date.getHours()}:${date.getMinutes()}:${date.getSeconds()}`;
+                }));
+
+        let valsArr = [...trafficInfo.values()];
+
+        let min = d3.min(valsArr.map(d => Math.min(d.in, d.out)));
+        let max = d3.max(valsArr.map(d => Math.max(d.in, d.out)));
+
+        console.log(`Min: ${min}, Max: ${max}`);
+
+        let yScale = d3.scaleLinear()
+            .domain([min, max])
+            .range([height, 0]);
+        trafficGraph.append('g')
+            .attr('id', 'yaxis')
+            .call(d3.axisLeft(yScale)
+                .ticks(6)
+                .tickFormat(d => d3.format('~s')(d)));
+
+        // Set up legend
+        let inLegend = trafficGraph.append('g')
+            .attr('id', 'inLegend')
+            .attr('transform', `translate(${width - 50}, 10)`);
+        inLegend.append('text')
+            .attr('style', 'font: 12px sans-serif;')
+            .attr('opacity', 0.75)
+            .text('in:');
+        inLegend.append('line')
+            .attr('x1', 0)
+            .attr('x2', 20)
+            .attr('y1', 0)
+            .attr('y2', 0)
+            .attr('stroke', 'steelblue')
+            .attr('stroke-width', '1.5px')
+            .attr('transform', `translate(30, -5)`);
+        inLegend.append('circle')
+            .attr('cx', 40)
+            .attr('cy', -5)
+            .attr('fill', 'steelblue')
+            .attr('r', 1.5);
+
+        let outLegend = trafficGraph.append('g')
+            .attr('id', 'outLegend')
+            .attr('transform', `translate(${width - 50}, 20)`);
+        outLegend.append('text')
+            .attr('style', 'font: 12px sans-serif;')
+            .attr('opacity', 0.75)
+            .text('out:');
+        outLegend.append('line')
+            .attr('x1', 0)
+            .attr('x2', 20)
+            .attr('y1', 0)
+            .attr('y2', 0)
+            .attr('stroke', 'red')
+            .attr('stroke-width', '1.5px')
+            .attr('transform', `translate(30, -5)`);
+        outLegend.append('circle')
+            .attr('cx', 40)
+            .attr('cy', -5)
+            .attr('fill', 'red')
+            .attr('r', 1.5);
+
+        // Append path for in values
+        trafficGraph.append('path')
+            .attr('id', 'inLine')
+            .datum(valsArr)
+            .attr('fill', 'none')
+            .attr('stroke', 'steelblue')
+            .attr('stroke-width', 1.5)
+            .attr('d', d3.line()
+                .x(d => xScale(d.ts))
+                .y(d => yScale(d.in))
+                .curve(d3.curveMonotoneX));
+
+        // Append path for out values
+        trafficGraph.append('path')
+            .attr('id', 'outLine')
+            .datum(valsArr)
+            .attr('fill', 'none')
+            .attr('stroke', 'red')
+            .attr('stroke-width', 1.5)
+            .attr('d', d3.line()
+                .x(d => xScale(d.ts))
+                .y(d => yScale(d.out))
+                .curve(d3.curveMonotoneX));
+
+        // Append dots for in values
+        trafficGraph.append('g')
+            .attr('id', 'inCircs')
+            .selectAll('circle')
+            .data(valsArr)
+            .join('circle')
+            .attr('r', 1.5)
+            .attr('fill', 'steelblue')
+            .attr('cx', d => xScale(d.ts))
+            .attr('cy', d => yScale(d.in));
+
+        // Append dots for out values
+        trafficGraph.append('g')
+            .attr('id', 'outCircs')
+            .selectAll('circle')
+            .data(valsArr)
+            .join('circle')
+            .attr('r', 1.5)
+            .attr('fill', 'red')
+            .attr('cx', d => xScale(d.ts))
+            .attr('cy', d => yScale(d.out));
+    }
+
+    update() {
+        this.simulation.stop()
+        this.vNodes = Array.from(this.node_data.values());
+        this.vLinks = new Array();
+
+        let i = 0;
+        while (i < this.vNodes.length) {
+            if (this.vNodes[i].expanded && this.vNodes[i].children) {
+                for (let child of this.vNodes[i].children.values()) {
+                    // Inherit cluster's position in graph to avoid visual chaos
+                    if (child.x == undefined) {
+                        child.x = this.vNodes[i].x;
+                        child.y = this.vNodes[i].y;
+                        child.vx = this.vNodes[i].vx;
+                        child.vy = this.vNodes[i].vy;
+                    }
+                    this.vNodes.push(child);
+                }
+                this.vNodes.splice(i, 1);
+            } else {
+                i += 1;
+            }
+        }
+
+        // Preload ATR Grafana iFrames for rendered IP nodes
+        for (let d of this.vNodes) {
+            if (d.id.startsWith("ip") && !this.atr_iframes.has(d.id)) {
+                const URL = getATRChartURL(d.ip);
+                if (URL.length > 0) {
+                    const iframe = this.tooltip.append("iframe")
+                        .attr("width", 450)
+                        .attr("height", 200)
+                        .style("display", "none");
+                    iframe.attr("src", getATRChartURL(d.ip));
+                    this.atr_iframes.set(d.id, iframe);
+                }
             }
         }
 
@@ -433,7 +592,7 @@ class Vizualization {
                 this.expandNode(d);
                 this.update();
             })
-            .on("mouseover", d => {
+            .on("mouseover", (d) => {
                 this.tooltip.transition().duration(200).style('opacity', 0.9);
                 let packets = d.packets;
 
@@ -447,7 +606,9 @@ class Vizualization {
                     }
                 }
 
-                this.tooltip_stats.text(`${d.ip ? d.ip : ""} (${d.org}) | ${packets.length} packets | RTT (mean): ${d3.mean(packets, p => p.rtt)}`);
+                // (d.max_bandwidth / 1000000000.) + "Gbps |"
+
+                this.tooltip_stats.text(`${d.ip ? d.ip : ""} (${d.org}) | ${packets.length} packets | ${d.max_bandwidth ? "Max bandwidth: " + d3.format('s')(d.max_bandwidth) + "bps |": ""} RTT (mean): ${d3.mean(packets, p => p.rtt)}`);
                 if (d.id.startsWith("ip") && this.atr_iframes.has(d.id)) {
                     this.atr_iframes.get(d.id).style("display", "block");
                 } else if (d.id.startsWith("ip") && trafficInfo.size > 0) {

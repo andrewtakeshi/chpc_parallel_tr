@@ -26,6 +26,10 @@ def createIP2ResourceDict(filePath=None):
                         'speed': item['speed']
                     }
 
+    for key in res.keys():
+        if res.get(key)['speed'] is not None:
+            res.get(key)['speed'] = res.get(key)['speed'] * 1000000
+
     f.write(json.dumps(res))
     return
 
