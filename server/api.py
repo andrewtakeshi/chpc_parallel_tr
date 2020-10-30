@@ -1,6 +1,6 @@
 import flask
 from flask import request, jsonify
-import d3_conversion
+from server import d3_conversion
 
 app = flask.Flask(__name__)
 app.config["DEBUG"] = True

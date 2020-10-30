@@ -1,11 +1,14 @@
+import random
 import re
 import json
 import time
 import subprocess
 import requests
 import urllib3
-import threading
 import socket
+import threading
+from icmplib import traceroute
+
 from server import netbeam
 from os import path, stat
 
@@ -13,8 +16,8 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 ip_validation_regex = re.compile(r'((25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9][0-9]|[0-9])\.)'
                                  r'{3}(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9][0-9]|[0-9])')
 my_ip = subprocess.run(['curl', 'ifconfig.me'],
-                                stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
-                                universal_newlines=True).stdout.splitlines()[0]
+                       stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                       universal_newlines=True).stdout.splitlines()[0]
 rdap_cache = dict()
 lock = threading.Lock()
 limiter = 0
@@ -25,6 +28,7 @@ def ip_to_asn(ip):
         return requests.get(f'https://api.iptoasn.com/v1/as/ip/{ip}').json()
     else:
         return None
+
 
 def timeInterval(interval="15m", startPoint=time.time()):
     """
@@ -129,7 +133,7 @@ def rdap_org_lookup(ip):
                 for ntt in response.json()['entities']:
                     try:
                         if 'registrant' in ntt['roles']:
-                            rdap_cache[ip] = {"org" : ntt['handle'], "domain": "unknown"}
+                            rdap_cache[ip] = {"org": ntt['handle'], "domain": "unknown"}
                             break
                     except:
                         pass
@@ -268,88 +272,50 @@ def pscheduler_to_d3(source, dest, numRuns=1):
     return add_netbeam_info(output)
 
 
-def system_to_d3(dest, numRuns=1):
-    """
-    Runs a system traceroute (on linux systems) to the desired destination. RTT is calculated as the mean average of the
-    three pings for each hop.
-    :param dest: Destination for traceroute.
-    :param numRuns: Number of runs to do.
-    :return: JSON ingestible by the d3 visualisation if the traceroute is successful. None otherwise.
-    """
-
-    i = 0
-    processList = []
-    global limiter
-
+def system_to_d3_threaded(dest, returnArray, id):
     dest_ip = target_to_ip(dest)
+    hops = traceroute(address=dest, count=1, id=id)
+    res = {
+        'ts': int(time.time()),
+        'source_address': my_ip,
+        'target_address': dest_ip,
+        'packets': []
+    }
+    res['packets'].append({
+        'ttl': 0,
+        'ip': my_ip,
+        'rtt': 0
+    })
+    for hop in hops:
+        res['packets'].append(
+            {
+                'ttl': hop.distance,
+                'ip': hop.address,
+                'rtt': hop.avg_rtt
+            })
+    # system_traceroute_lock.acquire()
+    returnArray.append(res)
+    # system_traceroute_lock.release()
 
-    lock.acquire()
-    if limiter >= 10 or (limiter + numRuns) > 15:
-        print("Over the run limit. Please try again later.")
-        return None
+
+def system_to_d3(dest, numRuns):
+    threads = []
+    returnArray = []
+    system_traceroute_lock = threading.Lock()
+
+    if numRuns > 1:
+        for i in range(numRuns):
+            threads.append(threading.Thread(target=system_to_d3_threaded, args=(dest, returnArray, random.randrange(1000000))))
+            threads[i].start()
+
+        for i in range(numRuns):
+            threads[i].join()
     else:
-        limiter += numRuns
-    lock.release()
+        system_to_d3_threaded(dest, system_traceroute_lock, returnArray)
 
-    # Schedule traceroute using pscheduler (allows for remote sources)
-    for _ in range(numRuns):
-        processList.append(subprocess.Popen(['traceroute', dest], stdout=subprocess.PIPE, universal_newlines=True))
-
-    for process in processList:
-        process.wait()
-
-    output = []
-
-    for process in processList:
-        output.append(dict())
-        output[i]['ts'] = int(time.time())
-        output[i]['source_address'] = my_ip
-        output[i]['target_address'] = dest_ip
-        output[i]['packets'] = []
-        output[i]['packets'].append({
-            'ttl': 0,
-            'ip': my_ip,
-            'rtt': 0
-        })
-        for line in process.communicate()[0].splitlines():
-            if re.match(r'^\s*[0-9]+\s+', line):
-                split = line.split()
-
-                # Common to all items in the traceroute path.
-                toAdd = {
-                    "ttl": int(split[0])
-                }
-                # Hop didn't reply
-                if re.match(r"No|\*", split[1]):
-                    output[i]["packets"].append(toAdd)
-                # Hop replied; additional information available
-                else:
-                    ip = ""
-                    if re.match(r'([0-9]{1,3}\.){3}[0-9]{1,3}', split[1]):
-                        ip = split[1]
-                    else:
-                        ip = re.sub(r"[()]", "", split[2])
-
-                    rttArr = re.findall(r"[0-9]+\.?[0-9]* ms", line)
-                    rtt = 0
-                    for response in rttArr:
-                        rtt += float(re.sub(r"[ms]", "", response))
-                    rtt /= len(rttArr)
-
-                    toAdd["ip"] = ip
-                    toAdd["rtt"] = rtt.__round__(3)
-                    output[i]["packets"].append(toAdd)
-        i += 1
-        process.stdout.close()
-        process.kill()
-
-    output = {'traceroutes': output}
-
-    lock.acquire()
-    limiter -= numRuns
-    lock.release()
-
+    output = {'traceroutes': returnArray}
     return add_netbeam_info(output)
+    # return output
 
 
 def esmond_to_d3(source=None, dest=None, ts_min=None, ts_max=None,
@@ -517,18 +483,94 @@ def system_copy_to_d3(dataIn):
     else:
         return None
 
-# Testing pt.1
-# input = ""
-#
-# for line in sys.stdin.readlines():
-#     input += line
-#
-#
-# print(system_copy_to_d3(input))
 
-# Testing add_netbeam_info, no writes to files.
-# print(json.dumps(pscheduler_to_d3('dtn01-dmz.chpc.utah.edu', '134.55.200.107')))
-# print(netbeam.getTrafficByTimeRange('devices/eqx-ash-cr5/interfaces/system'))
-# print(netbeam.getTrafficByTimeRange('devices/kans-cr5/interfaces/to_denv-cr5_ip-a'))
-# 'devices/pnwg-cr5/interfaces/to_pwave-sea-9k'
+def system_to_d3_old(dest, numRuns=1):
+    """
+    Runs a system traceroute (on linux systems) to the desired destination. RTT is calculated as the mean average of the
+    three pings for each hop.
+    :param dest: Destination for traceroute.
+    :param numRuns: Number of runs to do.
+    :return: JSON ingestible by the d3 visualisation if the traceroute is successful. None otherwise.
+    """
 
+    i = 0
+    processList = []
+    global limiter
+
+    dest_ip = target_to_ip(dest)
+
+    lock.acquire()
+    if limiter >= 10 or (limiter + numRuns) > 15:
+        print("Over the run limit. Please try again later.")
+        return None
+    else:
+        limiter += numRuns
+    lock.release()
+
+    # Schedule traceroute using pscheduler (allows for remote sources)
+    for _ in range(numRuns):
+        processList.append(subprocess.Popen(['traceroute', dest], stdout=subprocess.PIPE, universal_newlines=True))
+
+    for process in processList:
+        process.wait()
+
+    output = []
+
+    for process in processList:
+        output.append(dict())
+        output[i]['ts'] = int(time.time())
+        output[i]['source_address'] = my_ip
+        output[i]['target_address'] = dest_ip
+        output[i]['packets'] = []
+        output[i]['packets'].append({
+            'ttl': 0,
+            'ip': my_ip,
+            'rtt': 0
+        })
+        for line in process.communicate()[0].splitlines():
+            if re.match(r'^\s*[0-9]+\s+', line):
+                split = line.split()
+
+                # Common to all items in the traceroute path.
+                toAdd = {
+                    "ttl": int(split[0])
+                }
+                # Hop didn't reply
+                if re.match(r"No|\*", split[1]):
+                    output[i]["packets"].append(toAdd)
+                # Hop replied; additional information available
+                else:
+                    ip = ""
+                    if re.match(r'([0-9]{1,3}\.){3}[0-9]{1,3}', split[1]):
+                        ip = split[1]
+                    else:
+                        ip = re.sub(r"[()]", "", split[2])
+
+                    rttArr = re.findall(r"[0-9]+\.?[0-9]* ms", line)
+                    rtt = 0
+                    for response in rttArr:
+                        rtt += float(re.sub(r"[ms]", "", response))
+                    rtt /= len(rttArr)
+
+                    toAdd["ip"] = ip
+                    toAdd["rtt"] = rtt.__round__(3)
+                    output[i]["packets"].append(toAdd)
+        i += 1
+        process.stdout.close()
+        process.kill()
+
+    output = {'traceroutes': output}
+
+    lock.acquire()
+    limiter -= numRuns
+    lock.release()
+    return add_netbeam_info(output)
+
+# start_time = time.time()
+# print('first')
+# print(json.dumps(system_to_d3_old('8.8.8.8', 1)))
+# print(time.time() - start_time)
+# start_time = time.time()
+# print('second')
+# print(json.dumps(system_to_d3('8.8.8.8', 2)))
+# print(time.time() - start_time)

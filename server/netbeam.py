@@ -15,23 +15,27 @@ def createIP2ResourceDict(filePath=None):
 
     res = {}
 
-    r = requests.get(f"{url}/api/network/esnet/prod/interfaces")
+    try:
+        r = requests.get(f"{url}/api/network/esnet/prod/interfaces", timeout=5)
 
-    if r.status_code == 200:
-        for item in r.json():
-            if item['ipv4'] is not None:
-                res[item['ipv4']] = \
-                    {
-                        'resource': item['resource'],
-                        'speed': item['speed']
-                    }
+        if r.status_code == 200:
+            for item in r.json():
+                if item['ipv4'] is not None:
+                    res[item['ipv4']] = \
+                        {
+                            'resource': item['resource'],
+                            'speed': item['speed']
+                        }
 
-    for key in res.keys():
-        if res.get(key)['speed'] is not None:
-            res.get(key)['speed'] = res.get(key)['speed'] * 1000000
+        for key in res.keys():
+            if res.get(key)['speed'] is not None:
+                res.get(key)['speed'] = res.get(key)['speed'] * 1000000
 
-    f.write(json.dumps(res))
-    return
+        f.write(json.dumps(res))
+        return
+    except requests.exceptions.Timeout:
+        return
+
 
 
 def timeInterval(interval="15m", startPoint=time.time()):
@@ -188,12 +192,15 @@ def getTrafficByTimeRange(resource: str = "devices/wash-cr5/interfaces/to_wash-b
     res = {}
 
     for rInfo in zip(requestTypes, units, properNames):
-        r = requests.get(requestStr(rInfo[0]))
+        try:
+            r = requests.get(requestStr(rInfo[0]), timeout=4)
 
-        if r.status_code == 200 and len(r.content) != 0:
-            res[rInfo[0]] = r.json()
-        else:
-            # print(f"Error querying host: {r.status_code}")
+            if r.status_code == 200 and len(r.content) != 0:
+                res[rInfo[0]] = r.json()
+            else:
+                return None
+        except requests.exceptions.Timeout:
+            print(f'{resource} timed out')
             return None
 
     return res
