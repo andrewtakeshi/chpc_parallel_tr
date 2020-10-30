@@ -71,6 +71,45 @@ def timeInterval(interval="15m", startPoint=time.time()):
         return begin, end
 
 
+def add_netbeam_info_tw(packet, netbeam_item):
+    packet['resource'] = netbeam_item['resource']
+    packet['speed'] = netbeam_item['speed']
+    print(netbeam_item['resource'])
+    res = netbeam.getTrafficByTimeRange(netbeam_item['resource'])
+    if res is not None:
+        packet['traffic'] = res['traffic']['points']
+        packet['unicast_packets'] = res['unicast_packets']['points']
+        packet['discards'] = res['discards']['points']
+        packet['errors'] = res['errors']['points']
+
+
+
+def add_netbeam_info_threaded(d3_json, source_path=None):
+    threads = []
+
+    if source_path is None:
+        source_path = 'interfaces.json'
+    if not path.exists(source_path):
+        netbeam.createIP2ResourceDict(source_path)
+
+    if time.time() - stat(source_path).st_mtime > 60 * 60 * 24:
+        netbeam.createIP2ResourceDict(source_path)
+
+    netbeam_cache = json.loads(open(source_path, 'r').read())
+
+    for tr in d3_json['traceroutes']:
+        for packet in tr['packets']:
+            if netbeam_cache.get(packet.get('ip')):
+                thread = threading.Thread(target=add_netbeam_info_tw, args=(packet, netbeam_cache[packet['ip']]))
+                threads.append(thread)
+                thread.start()
+
+    for thread in threads:
+        thread.join()
+
+    return d3_json
+
+
 def add_netbeam_info(d3_json, source_path=None):
     if source_path is None:
         source_path = 'interfaces.json'
@@ -82,8 +121,8 @@ def add_netbeam_info(d3_json, source_path=None):
 
     netbeam_cache = json.loads(open(source_path, 'r').read())
 
-    for traceroute in d3_json['traceroutes']:
-        for packet in traceroute['packets']:
+    for tr in d3_json['traceroutes']:
+        for packet in tr['packets']:
             if netbeam_cache.get(packet.get('ip')):
                 netbeam_item = netbeam_cache[packet['ip']]
                 packet['resource'] = netbeam_item['resource']
@@ -271,8 +310,8 @@ def pscheduler_to_d3(source, dest, numRuns=1):
 
     return add_netbeam_info(output)
 
-
-def system_to_d3_threaded(dest, returnArray, id):
+# Thread specific work
+def system_to_d3_tw(dest, returnArray, id):
     dest_ip = target_to_ip(dest)
     hops = traceroute(address=dest, count=1, id=id)
     res = {
@@ -298,23 +337,24 @@ def system_to_d3_threaded(dest, returnArray, id):
     # system_traceroute_lock.release()
 
 
-def system_to_d3(dest, numRuns):
+# Creates threads for system_to_d3
+def system_to_d3_threaded(dest, numRuns):
     threads = []
     returnArray = []
     system_traceroute_lock = threading.Lock()
 
     if numRuns > 1:
         for i in range(numRuns):
-            threads.append(threading.Thread(target=system_to_d3_threaded, args=(dest, returnArray, random.randrange(1000000))))
+            threads.append(threading.Thread(target=system_to_d3_tw, args=(dest, returnArray, random.randrange(1000000),)))
             threads[i].start()
 
         for i in range(numRuns):
             threads[i].join()
     else:
-        system_to_d3_threaded(dest, system_traceroute_lock, returnArray)
+        system_to_d3_tw(dest, returnArray, random.randrange(1000000))
 
     output = {'traceroutes': returnArray}
-    return add_netbeam_info(output)
+    return add_netbeam_info_threaded(output)
     # return output
 
 
@@ -566,11 +606,11 @@ def system_to_d3_old(dest, numRuns=1):
     lock.release()
     return add_netbeam_info(output)
 
-# start_time = time.time()
-# print('first')
-# print(json.dumps(system_to_d3_old('8.8.8.8', 1)))
-# print(time.time() - start_time)
-# start_time = time.time()
-# print('second')
-# print(json.dumps(system_to_d3('8.8.8.8', 2)))
-# print(time.time() - start_time)
+start_time = time.time()
+print('first')
+print(json.dumps(system_to_d3_old('134.55.42.38', 1)))
+print(time.time() - start_time)
+start_time = time.time()
+print('second')
+print(json.dumps(system_to_d3_threaded('134.55.42.38', 7)))
+print(time.time() - start_time)
