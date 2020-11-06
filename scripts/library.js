@@ -29,7 +29,7 @@ const getMaxBWFromGRNOCIP = async (ip) => {
         const result = await d3.json(api_call);
         return result;
     } else {
-        return {'results' : []};
+        return {'results': []};
     }
 
 }
@@ -72,7 +72,7 @@ const createInternetGraph = async (traceroutes, existing = undefined) => {
                     ip: packet.ip,
                     org: orgResult.org,
                     domain: orgResult.domain,
-                    max_bandwidth: packet.speed ? packet.speed: maxBW,
+                    max_bandwidth: packet.speed ? packet.speed : maxBW,
                     packets: new Array(),
                     source_ids: new Set(),
                     target_ids: new Set()
@@ -403,7 +403,7 @@ class Vizualization {
         let xScale = d3.scaleLinear()
             .domain(d3.extent([...trafficInfo.keys()]))
             .range([0, width]);
-        trafficGraph.append('g')
+        let xaxis = trafficGraph.append('g')
             .attr('id', 'xaxis')
             .attr('transform', `translate(0, ${height})`)
             .call(d3.axisBottom(xScale)
@@ -413,21 +413,31 @@ class Vizualization {
                     return `${date.getHours()}:${date.getMinutes()}:${date.getSeconds()}`;
                 }));
 
+        xaxis.append('text')
+            .classed('axis-label-text', true)
+            .attr('transform', `translate(${width / 2}, 25)`)
+            .attr('text-anchor', 'middle')
+            .text('time');
+
         let valsArr = [...trafficInfo.values()];
 
         let min = d3.min(valsArr.map(d => Math.min(d.in, d.out)));
         let max = d3.max(valsArr.map(d => Math.max(d.in, d.out)));
 
-        console.log(`Min: ${min}, Max: ${max}`);
-
         let yScale = d3.scaleLinear()
             .domain([min, max])
             .range([height, 0]);
-        trafficGraph.append('g')
+        let yAxis = trafficGraph.append('g')
             .attr('id', 'yaxis')
             .call(d3.axisLeft(yScale)
                 .ticks(6)
                 .tickFormat(d => d3.format('~s')(d)));
+
+        yAxis.append('text')
+            .classed('axis-label-text', true)
+            .attr('transform', `translate(-25, ${yScale((max - min) / 2)}) rotate(-90)`)
+            .attr('text-anchor', 'middle')
+            .text('bps');
 
         // Set up legend
         let inLegend = trafficGraph.append('g')
@@ -612,9 +622,7 @@ class Vizualization {
                     }
                 }
 
-                // (d.max_bandwidth / 1000000000.) + "Gbps |"
-
-                this.tooltip_stats.text(`${d.ip ? d.ip : ""} (${d.org}) | ${packets.length} packets | ${d.max_bandwidth ? "Max bandwidth: " + d3.format('s')(d.max_bandwidth) + "bps |": ""} RTT (mean): ${d3.mean(packets, p => p.rtt)}`);
+                this.tooltip_stats.text(`${d.ip ? d.ip : ""} (${d.org}) | ${packets.length} packets | ${d.max_bandwidth ? "Max bandwidth: " + d3.format('s')(d.max_bandwidth) + "bps |" : ""} RTT (mean): ${d3.mean(packets, p => p.rtt)}`);
                 if (d.id.startsWith("ip") && this.atr_iframes.has(d.id)) {
                     this.atr_iframes.get(d.id).style("display", "block");
                 } else if (d.id.startsWith("ip") && trafficInfo.size > 0) {
