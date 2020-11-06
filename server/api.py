@@ -11,6 +11,7 @@ def home():
     return '''<h1>Internet analysis</h1>
 <p>A prototype API for IP-layer datasets.</p>'''
 
+
 @app.route('/api/v1/resources/traceroutes', methods=['GET'])
 def traceroutes():
     if "dest" in request.args:
@@ -35,13 +36,14 @@ def traceroutes():
         else:
             return f"Error: pScheduler not found at {source}"
     else:
-        response = d3_conversion.system_to_d3(dest, num_runs)
+        response = d3_conversion.system_to_d3_threaded(dest, num_runs)
 
     response = jsonify(response)
 
     # Something required for hosting tool and API on same box
     response.headers.add('Access-Control-Allow-Origin', '*')
     return response
+
 
 @app.route('/api/v1/resources/iporgs', methods=['GET'])
 def iporgs():

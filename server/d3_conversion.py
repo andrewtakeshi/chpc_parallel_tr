@@ -74,7 +74,7 @@ def timeInterval(interval="15m", startPoint=time.time()):
 def add_netbeam_info_tw(packet, netbeam_item):
     packet['resource'] = netbeam_item['resource']
     packet['speed'] = netbeam_item['speed']
-    print(netbeam_item['resource'])
+    # print(netbeam_item['resource'])
     res = netbeam.getTrafficByTimeRange(netbeam_item['resource'])
     if res is not None:
         packet['traffic'] = res['traffic']['points']
@@ -281,6 +281,7 @@ def pscheduler_to_d3(source, dest, numRuns=1):
 
     return add_netbeam_info_threaded(output)
 
+
 # Thread specific work
 def system_to_d3_tw(dest, returnArray, id):
     dest_ip = target_to_ip(dest)
@@ -314,9 +315,12 @@ def system_to_d3_threaded(dest, numRuns):
     returnArray = []
     system_traceroute_lock = threading.Lock()
 
+    # print(f'Running traceroute to {dest} from source')
+
     if numRuns > 1:
         for i in range(numRuns):
-            threads.append(threading.Thread(target=system_to_d3_tw, args=(dest, returnArray, random.randrange(1000000),)))
+            threads.append(
+                threading.Thread(target=system_to_d3_tw, args=(dest, returnArray, random.randrange(1000000),)))
             threads[i].start()
 
         for i in range(numRuns):
@@ -495,6 +499,34 @@ def system_copy_to_d3(dataIn):
         return None
 
 
+def add_netbeam_info_old(d3_json, source_path=None):
+    if source_path is None:
+        source_path = 'interfaces.json'
+    if not path.exists(source_path):
+        netbeam.createIP2ResourceDict(source_path)
+
+    if time.time() - stat(source_path).st_mtime > 60 * 60 * 24:
+        netbeam.createIP2ResourceDict(source_path)
+
+    netbeam_cache = json.loads(open(source_path, 'r').read())
+
+    for traceroute in d3_json['traceroutes']:
+        for packet in traceroute['packets']:
+            if netbeam_cache.get(packet.get('ip')):
+                netbeam_item = netbeam_cache[packet['ip']]
+                packet['resource'] = netbeam_item['resource']
+                packet['speed'] = netbeam_item['speed']
+                # print(netbeam_item['resource'])
+                res = netbeam.getTrafficByTimeRange(netbeam_item['resource'])
+                if res is not None:
+                    packet['traffic'] = res['traffic']['points']
+                    packet['unicast_packets'] = res['unicast_packets']['points']
+                    packet['discards'] = res['discards']['points']
+                    packet['errors'] = res['errors']['points']
+
+    return d3_json
+
+
 def system_to_d3_old(dest, numRuns=1):
     """
     Runs a system traceroute (on linux systems) to the desired destination. RTT is calculated as the mean average of the
@@ -575,13 +607,20 @@ def system_to_d3_old(dest, numRuns=1):
     lock.acquire()
     limiter -= numRuns
     lock.release()
-    return add_netbeam_info_threaded(output)
+    return add_netbeam_info_old(output)  # add_netbeam_info_threaded(output)
 
-# start_time = time.time()
-# print('first')
-# print(json.dumps(system_to_d3_old('134.55.42.38', 1)))
-# print(time.time() - start_time)
-# start_time = time.time()
-# print('second')
-# print(json.dumps(system_to_d3_threaded('134.55.42.38', 7)))
-# print(time.time() - start_time)
+
+# dest = '134.55.42.38'
+#
+# for i in range(1,5):
+#     print(f'Running {i} system traceroute(s) to {dest}:')
+#     start_time = time.time()
+#     print('\tNo threading of netbeam, subprocess traceroute')
+#     system_to_d3_old(dest, i)
+#     print(f'\tTook {time.time() - start_time} seconds')
+#     start_time = time.time()
+#     print('\tThreaded netbeam, icmplib traceroute')
+#     system_to_d3_threaded(dest, i)
+#     print(f'\tTook {time.time() - start_time} seconds')
+
+

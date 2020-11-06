@@ -1,5 +1,5 @@
-const api_server = "network-viz.chpc.utah.edu:5000"
-//const api_server = 'localhost:5000';
+//const api_server = "network-viz.chpc.utah.edu:5000"
+const api_server = 'localhost:5000';
 const tr_api = "/api/v1/resources/traceroutes";
 
 const runTraceroute = async (source, dest, num_runs) => {
@@ -522,6 +522,12 @@ class Vizualization {
     update() {
         this.simulation.stop()
         this.vNodes = Array.from(this.node_data.values());
+        // for (let node of this.vNodes)
+        // {
+        //     this.expandNode(node);
+        // }
+
+        //this.vNodes = Array.from(this.all_nodes.values());
         this.vLinks = new Array();
 
         let i = 0;
