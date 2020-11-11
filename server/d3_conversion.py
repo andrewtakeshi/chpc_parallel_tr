@@ -607,7 +607,7 @@ def system_to_d3_old(dest, numRuns=1):
     lock.acquire()
     limiter -= numRuns
     lock.release()
-    return add_netbeam_info_old(output)  # add_netbeam_info_threaded(output)
+    return add_netbeam_info_threaded(output) #add_netbeam_info_old(output)
 
 
 # dest = '134.55.42.38'

@@ -36,7 +36,7 @@ def traceroutes():
         else:
             return f"Error: pScheduler not found at {source}"
     else:
-        response = d3_conversion.system_to_d3_threaded(dest, num_runs)
+        response = d3_conversion.system_to_d3_old(dest, num_runs)
 
     response = jsonify(response)
 

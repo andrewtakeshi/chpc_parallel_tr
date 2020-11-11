@@ -6,20 +6,20 @@ from server import netbeam
 import time
 import threading
 
-resource_array = ["devices/bnl-lsw5/interfaces/irb.2"]#["devices/bnl-lsw1/interfaces/vlan.2", "devices/bnl-lsw5/interfaces/irb.2", "devices/bois-cr1/interfaces/xe-7%2F3%2F0.911"]
+resource_array = [
+    "devices/bnl-lsw5/interfaces/irb.2"]  # ["devices/bnl-lsw1/interfaces/vlan.2", "devices/bnl-lsw5/interfaces/irb.2", "devices/bois-cr1/interfaces/xe-7%2F3%2F0.911"]
+
 
 def run_traceroute(dest, returnArray, id):
     hops = traceroute(dest, count=1, id=id)
     returnArray.append(hops)
+
 
 def netbeam_info(returnArray, resource):
     print(f'Getting {resource}')
     res = netbeam.getTrafficByTimeRange(resource)
     if res is not None:
         returnArray.append(res)
-
-
-
 
 
 def main():
