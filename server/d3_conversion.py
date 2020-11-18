@@ -526,6 +526,7 @@ def add_netbeam_info_old(d3_json, source_path=None):
     return d3_json
 
 
+"""
 def system_to_d3_old_tw(dest, returnArray):
     dest_ip = target_to_ip(dest)
 
@@ -588,6 +589,7 @@ def system_to_d3_old_threaded(dest, numRuns=1):
 
     output = {'traceroutes': returnArray}
     return add_netbeam_info_threaded(output)
+"""
 
 
 def system_to_d3_old(dest, numRuns=1):
