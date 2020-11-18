@@ -37,7 +37,7 @@ function validate(form)
     return accepted;
 }
 
-function resetForms()
+async function resetForms()
 {
     let forms = $("form");
     for (let i = 0; i < forms.length; i++)
@@ -56,10 +56,12 @@ function resetForms()
     document.getElementById("netbeam_table_area").style.visibility = "hidden";
     // Clear tables on reset.
     document.getElementById("cr_table").getElementsByTagName('tbody')[0].innerHTML = "";
-    document.getElementById("netbeam_table").getElementsByTagName("tbody")[0].innerHTML = "";
+    document.getElementById("netbeam_accordion").innerHTML = "";
 
+    entities.traceroutes = [];
+    hiddenNTTs.traceroutes = [];
 
-
+    return await updateViz();
 }
 
 function addToCRTable(uuid)
@@ -93,7 +95,17 @@ function addToCRTable(uuid)
     row.cells[3].innerHTML = numRuns;
     row.cells[4].innerHTML = "Pending"
     row.cells[5].style.textAlign = "center";
-    row.cells[5].innerHTML = "<input type=\"checkbox\" checked=\"checked\">"
+
+    let checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.checked = true;
+    checkbox.onchange = function()
+    {
+        checkHandler(uuid, checkbox.checked).then(data => viz.setData(data));
+//        console.log(this.parentElement.parentElement.id);
+    }
+    row.cells[5].appendChild(checkbox);
+    //row.cells[5].innerHTML = `<input type="checkbox" checked="checked">`;
 }
 
 // document.addEventListener("DOMContentLoaded", function()

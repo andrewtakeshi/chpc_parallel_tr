@@ -23,7 +23,6 @@ const getOrgFromIP = async (ip) => {
 
 const getMaxBWFromGRNOCIP = async (ip) => {
     if (ip.startsWith("198") || ip.startsWith("162") || ip.startsWith("192")) {
-        console.log(`startswith ${ip}`);
         let api_call = `https://snapp-portal.grnoc.iu.edu/tsds-cross-domain/query.cgi?method=query;query=get%20max_bandwidth%20between(now-10m,%20now)%20from%20interface%20where%20interface_address.value%20=%20%22${ip}%22`;
         console.log(`Requesting ${api_call}`);
         const result = await d3.json(api_call);
@@ -65,7 +64,6 @@ const createInternetGraph = async (traceroutes, existing = undefined) => {
                 let maxBW = undefined;
                 if (tsdsResult.results.length > 0) {
                     maxBW = tsdsResult.results[0].max_bandwidth;
-                    console.log(packet.ip, maxBW);
                 }
                 entity = ({
                     id: entity_id,
@@ -289,6 +287,8 @@ class Vizualization {
                 return "translate(" + d.x + "," + d.y + ")";
             });
         });
+
+        this.maxBW = this.svg.append('g');
     }
 
     collapseNode(node) {
@@ -368,6 +368,7 @@ class Vizualization {
 
     setData(data) {
         this.node_data = data;
+
         this.all_nodes = this.flattenNodeData();
 
         for (var [k, v] of this.node_data) {
@@ -431,13 +432,14 @@ class Vizualization {
             .attr('id', 'yaxis')
             .call(d3.axisLeft(yScale)
                 .ticks(6)
-                .tickFormat(d => d3.format('~s')(d)));
+                .tickFormat(d => d3.format('~s')(d) + 'bps'));
 
-        yAxis.append('text')
-            .classed('axis-label-text', true)
-            .attr('transform', `translate(-25, ${yScale((max - min) / 2)}) rotate(-90)`)
-            .attr('text-anchor', 'middle')
-            .text('bps');
+        // No longer append bps label because it's implied by the axis ticks.
+        // yAxis.append('text')
+        //     .classed('axis-label-text', true)
+        //     .attr('transform', `translate(-25, ${yScale((max - min) / 2)}) rotate(-90)`)
+        //     .attr('text-anchor', 'middle')
+        //     .text('bps');
 
         // Set up legend
         let inLegend = trafficGraph.append('g')
@@ -529,8 +531,52 @@ class Vizualization {
             .attr('cy', d => yScale(d.out));
     }
 
+    getOverallMaxBW()
+    {
+        let bw = Number.MAX_SAFE_INTEGER;
+        let ip = null;
+        let nodes = Array.from(this.all_nodes.values()).filter(d => d.id.startsWith('ip'));
+
+        for (let node of nodes)
+        {
+            console.log(node.max_bandwidth);
+            if (node.max_bandwidth && node.max_bandwidth < bw)
+            {
+                bw = node.max_bandwidth;
+                ip = node.ip;
+                //console.log('BW updated to ' + bw);
+            }
+        }
+
+        this.maxBW.selectAll('text')
+            .data([bw, ip])
+            .join('text')
+            .attr('fill', 'lightgrey')
+            .attr('x', 25)
+            .attr('y', (_, i) => (i + 1) * 25)
+            .text((d, i) => {
+                if (d === null || d === Number.MAX_SAFE_INTEGER)
+                {
+                    return '';
+                }
+
+                if (i === 0)
+                {
+                    return `Max Known Bandwidth: ${d3.format('~s')(d)}bps`;
+                } else
+                {
+                    return `Limited by node at IP: ${d}`;
+                }
+            });
+
+        console.log(nodes);
+    }
+
     update() {
-        this.simulation.stop()
+        this.simulation.stop();
+
+        this.getOverallMaxBW();
+
         this.vNodes = Array.from(this.node_data.values());
         // for (let node of this.vNodes)
         // {

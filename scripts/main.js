@@ -2,6 +2,7 @@ const width = 600;
 const height = 600;
 
 let entities = ({"traceroutes": []});
+let hiddenNTTs = ({"traceroutes" : []});
 
 let netbeamTableHelper = (ip, label, hops, speed) => {
     if (!document.getElementById(`table_${ip}_${label}`))
@@ -99,19 +100,76 @@ const netbeamTable = async (traceroutes) => {
     });
 }
 
-const btndemo = async (source, dest, num_runs, uuid) => {
-    console.log(source, dest, num_runs);
-    const result = await runTraceroute(source, dest, num_runs);
-    console.log(result);
-    document.getElementById(`${uuid}_status`).innerHTML = "Finished";
-    await netbeamTable(result.traceroutes);
-    entities.traceroutes = entities.traceroutes.concat(result.traceroutes);
+const updateViz = async() =>
+{
     let graph = await createInternetGraph(entities.traceroutes);
     let org_graph = clusterBy(graph,
         (entity) => entity.org,
         (entity) => new Set([...entity.source_ids, ...entity.target_ids]),
         "Org");
     return org_graph;
+}
+
+const checkHandler= async (id, shown) => {
+    console.log(id, shown);
+
+    let searchNTTs = null;
+    let addNTTs = null;
+
+    if (shown)
+    {
+        searchNTTs = hiddenNTTs;
+        addNTTs = entities;
+    } else
+    {
+        searchNTTs = entities;
+        addNTTs = hiddenNTTs;
+    }
+
+    let foundObj = null;
+    let foundIter = 0;
+
+    for (let i = 0; i < searchNTTs.traceroutes.length; i++)
+    {
+        if (searchNTTs.traceroutes[i].id === id)
+        {
+            foundObj = searchNTTs.traceroutes[i];
+            foundIter = i;
+            break;
+        }
+    }
+
+    searchNTTs.traceroutes.splice(foundIter, 1);
+    addNTTs.traceroutes.push(foundObj);
+
+    return await updateViz();
+}
+
+
+const btndemo = async (source, dest, num_runs, uuid) => {
+    console.log(source, dest, num_runs);
+    const result = await runTraceroute(source, dest, num_runs);
+
+
+    document.getElementById(`${uuid}_status`).innerHTML = "Finished";
+    for (let traceroute of result.traceroutes)
+    {
+        traceroute.id = uuid;
+    }
+
+    console.log(result);
+
+    await netbeamTable(result.traceroutes);
+
+    entities.traceroutes = entities.traceroutes.concat(result.traceroutes);
+    //console.log(entities.traceroutes);
+    // let graph = await createInternetGraph(entities.traceroutes);
+    // let org_graph = clusterBy(graph,
+    //     (entity) => entity.org,
+    //     (entity) => new Set([...entity.source_ids, ...entity.target_ids]),
+    //     "Org");
+    // return org_graph;
+    return await updateViz();
 }
 
 const demo = async (dest1, dest2) => {

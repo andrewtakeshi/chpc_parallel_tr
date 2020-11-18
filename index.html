@@ -98,8 +98,8 @@
                                 btndemo(source, dest, num_runs, unique).then(data => {viz.setData(data)});"
                                 type="submit"
                                 class="btn btn-outline-primary">End-to-end Traceroute</button>
-                        <button id="esmond_btn" name="esmond_btn" onclick="formLogger(this.form)" type="submit" class="btn btn-outline-primary">Esmond Traceroute</button>
-                        <button id="refresh_vis_btn" class="btn btn-outline-dark" onclick="formLogger(this.form)">Refresh Visualisation</button>
+                        <button id="esmond_btn" name="esmond_btn" onclick="formLogger(this.form)" type="submit" class="btn btn-outline-primary" disabled>Esmond Traceroute</button>
+                        <button id="refresh_vis_btn" class="btn btn-outline-dark" onclick="updateViz().then(data => viz.setData(data));">Refresh Visualisation</button>
                     </div>
                 </form>
             </div>
@@ -141,7 +141,7 @@
             <div class="d-flex justify-content-center">
                 <form id="configuration_form" name="configuration_form" onsubmit="return false">
                     <div class="form-row btn-group" style="margin-top: 10px;">
-                        <button id="reset_config_btn" class="btn btn-danger" onclick="resetForms()">Reset Page</button>
+                        <button id="reset_config_btn" class="btn btn-danger" onclick="resetForms().then(data => viz.setData(data));">Reset Page</button>
                     </div>
                 </form>
             </div>

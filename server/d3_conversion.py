@@ -8,8 +8,7 @@ import urllib3
 import socket
 import threading
 from icmplib import traceroute
-
-from server import netbeam
+import netbeam
 from os import path, stat
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -310,7 +309,7 @@ def system_to_d3_tw(dest, returnArray, id):
 
 
 # Creates threads for system_to_d3
-def system_to_d3_threaded(dest, numRuns):
+def system_to_d3_threaded(dest, numRuns=1):
     threads = []
     returnArray = []
     system_traceroute_lock = threading.Lock()
@@ -527,6 +526,70 @@ def add_netbeam_info_old(d3_json, source_path=None):
     return d3_json
 
 
+def system_to_d3_old_tw(dest, returnArray):
+    dest_ip = target_to_ip(dest)
+
+    sp_stdout = subprocess.run(['traceroute', dest, '-q', '1'], stdout=subprocess.PIPE, universal_newlines=True).stdout
+
+    res = {
+        'ts': int(time.time()),
+        'source_address': my_ip,
+        'target_address': dest_ip,
+        'packets': []
+    }
+
+    res['packets'].append({
+        'ttl': 0,
+        'ip': my_ip,
+        'rtt': 0
+    })
+
+    for line in sp_stdout.splitlines():
+        if re.match(r'^\s*[0-9]+\s+', line):
+            split = line.split()
+
+            # Common to all items in the traceroute path.
+            toAdd = {
+                "ttl": int(split[0])
+            }
+            # Hop didn't reply
+            if re.match(r"No|\*", split[1]):
+                res['packets'].append(toAdd)
+            # Hop replied; additional information available
+            else:
+                ip = ""
+                if re.match(r'([0-9]{1,3}\.){3}[0-9]{1,3}', split[1]):
+                    ip = split[1]
+                else:
+                    ip = re.sub(r"[()]", "", split[2])
+
+                rttArr = re.findall(r"[0-9]+\.?[0-9]* ms", line)
+                rtt = 0
+                for response in rttArr:
+                    rtt += float(re.sub(r"[ms]", "", response))
+                rtt /= len(rttArr)
+
+                toAdd["ip"] = ip
+                toAdd["rtt"] = rtt.__round__(3)
+                res['packets'].append(toAdd)
+    returnArray.append(res)
+
+
+def system_to_d3_old_threaded(dest, numRuns=1):
+    threads = []
+    returnArray = []
+
+    for i in range(numRuns):
+        threads.append(threading.Thread(target=system_to_d3_old_tw, args=(dest, returnArray,)))
+        threads[i].start()
+
+    for i in range(numRuns):
+        threads[i].join()
+
+    output = {'traceroutes': returnArray}
+    return add_netbeam_info_threaded(output)
+
+
 def system_to_d3_old(dest, numRuns=1):
     """
     Runs a system traceroute (on linux systems) to the desired destination. RTT is calculated as the mean average of the
@@ -607,8 +670,7 @@ def system_to_d3_old(dest, numRuns=1):
     lock.acquire()
     limiter -= numRuns
     lock.release()
-    return add_netbeam_info_old(output)  # add_netbeam_info_threaded(output)
-
+    return add_netbeam_info_threaded(output)
 
 # dest = '134.55.42.38'
 #
@@ -622,5 +684,3 @@ def system_to_d3_old(dest, numRuns=1):
 #     print('\tThreaded netbeam, icmplib traceroute')
 #     system_to_d3_threaded(dest, i)
 #     print(f'\tTook {time.time() - start_time} seconds')
-
-
