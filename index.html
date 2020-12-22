@@ -1,152 +1,168 @@
 <!DOCTYPE html>
 <html lang="en">
-    <head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-        <link
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <link
             rel="stylesheet"
             href="https://stackpath.bootstrapcdn.com/bootstrap/4.2.1/css/bootstrap.min.css"
             integrity="sha384-GJzZqFGwb1QTTN6wy59ffF1BuGJpLSa9DkKMp0DgiMDm4iYMj70gZWKYbI706tWS"
             crossorigin="anonymous">
-        <script
+    <script
             src="https://code.jquery.com/jquery-3.3.1.slim.min.js"
             integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo"
             crossorigin="anonymous"></script>
-        <script
+    <script
             src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.6/umd/popper.min.js"
             integrity="sha384-wHAiFfRlMFy6i5SRaxvfOCifBUQy1xHdJ/yoi7FRNXMRBu5WHdZYu1hA6ZOblgut"
             crossorigin="anonymous"></script>
-        <script
+    <script
             src="https://stackpath.bootstrapcdn.com/bootstrap/4.2.1/js/bootstrap.min.js"
             integrity="sha384-B0UglyR+jN6CkvvICOB2joaf5I4l3gm9GU6Hc1og6Ls7i6U/mkkaduKaBhlAXv9k"
             crossorigin="anonymous"></script>
-        <script
+    <script
             src="https://cdnjs.cloudflare.com/ajax/libs/node-uuid/1.4.8/uuid.min.js"
             integrity="sha512-rV0Q1QWodkoLjts/qP2XHtjvUPTmN46k4eH0lzOR3mDui8a0YnL/uqydipXA9mQ2wG6J4imL0BO6/26rcFho7Q=="
             crossorigin="anonymous"></script>
-        <script src="scripts/home.js"></script>
-        <script src="external/d3/d3.js"></script>
-        <script src="scripts/library.js"></script>
+    <script src="scripts/home.js"></script>
+    <script src="external/d3/d3.js"></script>
+    <script src="scripts/library.js"></script>
 
 
-        <title>Parallel Traceroute</title>
+    <title>Parallel Traceroute</title>
 
-        <style>
-            .card-header {
-                text-align: center;
-                font-size: medium;
-            }
-            .axis-label-text
-            {
-                fill: black;
-                font-size: x-small;
-            }
-        </style>
-    </head>
+    <style>
+        .card-header {
+            text-align: center;
+            font-size: medium;
+        }
 
-    <body>
-        <div id="navbar_area">
-            <nav class="navbar navbar-expand-lg navbar-light bg-light">
-                <a class="navbar-brand" href="./index.html">Parallel Traceroute</a>
-                <div class="collapse navbar-collapse">
-                    <ul class="navbar-nav mr-auto">
-<!--                        <li class="nav-item">-->
-<!--                            <a class="nav-link" href="./netbeam.html">Netbeam Test</a>-->
-<!--                        </li>-->
-                        <li class="nav-item">
-                            <a class="nav-link" href="./about.html">About</a>
-                        </li>
-                    </ul>
-                </div>
-            </nav>
+        .axis-label-text {
+            fill: black;
+            font-size: x-small;
+        }
+    </style>
+</head>
+
+<body>
+<div id="navbar_area">
+    <nav class="navbar navbar-expand-lg navbar-light bg-light">
+        <a class="navbar-brand" href="./index.html">Parallel Traceroute</a>
+        <div class="collapse navbar-collapse">
+            <ul class="navbar-nav mr-auto">
+                <!--                        <li class="nav-item">-->
+                <!--                            <a class="nav-link" href="./netbeam.html">Netbeam Test</a>-->
+                <!--                        </li>-->
+                <li class="nav-item">
+                    <a class="nav-link" href="./about.html">About</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="./alternateViz.html">Alternative Visualisation</a>
+                </li>
+            </ul>
         </div>
+    </nav>
+</div>
 
-        <div id="input_area" class="container" style="margin-top: 25px;">
+<div id="input_area" class="container" style="margin-top: 25px;">
 
-            <div id="esmond_div">
-                <form id="esmond_form" name="esmond_form" onsubmit="return false">
-                    <div class="form-row">
-                        <div class="form-group col-md-4">
-                            <label for="esmond_ip_source">Source Host/IP:</label>
-                            <input type="text" name="esmond_ip_source" id="esmond_ip_source" placeholder="ex. 1.1.1.1" class="form-control">
-                        </div>
-                        <div class="form-group col-md-4">
-                            <label for="esmond_ip_dest">Destination Host/IP:</label>
-                            <input type="text" name="esmond_ip_dest" id="esmond_ip_dest" placeholder="ex. 2.2.2.2" class="form-control">
-                        </div>
-                        <div class="form-group col-md-4">
-                            <label for="esmond_num_runs"># Traceroutes:</label>
-                            <input type="number" name="esmond_num_runs" id="esmond_num_runs" value="1" min="1" max="10" class="form-control">
-                        </div>
-                    </div>
-                    <div class="form-row">
-                        <span class="form-group col-md-4" id="esmond_ip_source_warn" hidden style="color:red;" name="warn">
+    <div id="esmond_div">
+        <form id="esmond_form" name="esmond_form" onsubmit="return false">
+            <div class="form-row">
+                <div class="form-group col-md-4">
+                    <label for="esmond_ip_source">Source Host/IP:</label>
+                    <input type="text" name="esmond_ip_source" id="esmond_ip_source" placeholder="ex. 1.1.1.1"
+                           class="form-control">
+                </div>
+                <div class="form-group col-md-4">
+                    <label for="esmond_ip_dest">Destination Host/IP:</label>
+                    <input type="text" name="esmond_ip_dest" id="esmond_ip_dest" placeholder="ex. 2.2.2.2"
+                           class="form-control">
+                </div>
+                <div class="form-group col-md-4">
+                    <label for="esmond_num_runs"># Traceroutes:</label>
+                    <input type="number" name="esmond_num_runs" id="esmond_num_runs" value="1" min="1" max="10"
+                           class="form-control">
+                </div>
+            </div>
+            <div class="form-row">
+                        <span class="form-group col-md-4" id="esmond_ip_source_warn" hidden style="color:red;"
+                              name="warn">
                             Source must have a value.
                         </span>
-                        <span class="form-group col-md-4" id="esmond_ip_dest_warn" hidden style="color:red;" name="warn">
+                <span class="form-group col-md-4" id="esmond_ip_dest_warn" hidden style="color:red;" name="warn">
                             Destination must have a value.
                         </span>
-                    </div>
+            </div>
 
-                    <div class="form-row btn-group">
-                        <button id="e2e_btn" name="e2e_btn"
-                                onclick="let unique = uuid.v4();
+            <div class="form-row btn-group">
+                <button id="e2e_btn" name="e2e_btn"
+                        onclick="let unique = uuid.v4();
                                 let source = document.getElementById('esmond_ip_source').value;
                                 let dest = document.getElementById('esmond_ip_dest').value;
                                 let num_runs = document.getElementById('esmond_num_runs').value;
                                 addToCRTable(unique);
                                 btndemo(source, dest, num_runs, unique).then(data => {viz.setData(data)});"
-                                type="submit"
-                                class="btn btn-outline-primary">End-to-end Traceroute</button>
-                        <button id="esmond_btn" name="esmond_btn" onclick="formLogger(this.form)" type="submit" class="btn btn-outline-primary" disabled>Esmond Traceroute</button>
-                        <button id="refresh_vis_btn" class="btn btn-outline-dark" onclick="updateViz().then(data => viz.setData(data));">Refresh Visualisation</button>
-                    </div>
-                </form>
+                        type="submit"
+                        class="btn btn-outline-primary">End-to-end Traceroute
+                </button>
+                <button id="esmond_btn" name="esmond_btn" onclick="formLogger(this.form)" type="submit"
+                        class="btn btn-outline-primary" disabled>Esmond Traceroute
+                </button>
+                <button id="refresh_vis_btn" class="btn btn-outline-dark"
+                        onclick="updateViz().then(data => viz.setData(data));">Refresh Visualisation
+                </button>
             </div>
-        </div>
+        </form>
+    </div>
+</div>
 
 
-        <div id="current_run_table_area" class="container d-flex justify-content-center" style="margin-top: 25px; visibility: hidden">
-            <table id="cr_table" class="table table-bordered">
-                <thead>
-                    <tr>
-                        <th>Traceroute Type</th>
-                        <th>Source</th>
-                        <th>Destination</th>
-                        <th># Traceroutes</th>
-                        <th>Status</th>
-                        <th>Selected</th>
-                    </tr>
-                </thead>
-                <tbody>
-                </tbody>
-            </table>
-        </div>
+<div id="current_run_table_area" class="container d-flex justify-content-center"
+     style="margin-top: 25px; visibility: hidden">
+    <table id="cr_table" class="table table-bordered">
+        <thead>
+        <tr>
+            <th>Traceroute Type</th>
+            <th>Source</th>
+            <th>Destination</th>
+            <th># Traceroutes</th>
+            <th>Status</th>
+            <th>Selected</th>
+        </tr>
+        </thead>
+        <tbody>
+        </tbody>
+    </table>
+</div>
 
-        <div id="vis_area" style="margin-top: 25px;">
+<div id="vis_area" style="margin-top: 25px;">
             <span id="d3_placeholder" class="d-flex justify-content-center">
                 <!--<h4>Enter information to view visualisation</h4>-->
             </span>
-            <div id="d3_vis">
-                <!-- Placeholder for actual visualization -->
-            </div>
-        </div>
+    <div id="d3_vis">
+        <!-- Placeholder for actual visualization -->
+    </div>
+</div>
 
-        <div id="netbeam_table_area" style="margin-top: 25px; visibility: hidden" class="container d-flex justify-content-center">
-            <div id="netbeam_accordion" class="accordion">
-            </div>
-        </div>
+<div id="netbeam_table_area" style="margin-top: 25px; visibility: hidden"
+     class="container d-flex justify-content-center">
+    <div id="netbeam_accordion" class="accordion">
+    </div>
+</div>
 
-        <div id="config_area" style="margin-top: 25px; margin-bottom: 50px;" class="container">
-            <div class="d-flex justify-content-center">
-                <form id="configuration_form" name="configuration_form" onsubmit="return false">
-                    <div class="form-row btn-group" style="margin-top: 10px;">
-                        <button id="reset_config_btn" class="btn btn-danger" onclick="resetForms().then(data => viz.setData(data));">Reset Page</button>
-                    </div>
-                </form>
+<div id="config_area" style="margin-top: 25px; margin-bottom: 50px;" class="container">
+    <div class="d-flex justify-content-center">
+        <form id="configuration_form" name="configuration_form" onsubmit="return false">
+            <div class="form-row btn-group" style="margin-top: 10px;">
+                <button id="reset_config_btn" class="btn btn-danger"
+                        onclick="resetForms().then(data => viz.setData(data));">Reset Page
+                </button>
             </div>
-        </div>
+        </form>
+    </div>
+</div>
 
-        <script src="scripts/main.js"></script>
-    </body>
+<script src="scripts/main.js"></script>
+</body>
 </html>

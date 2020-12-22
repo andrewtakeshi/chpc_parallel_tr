@@ -110,7 +110,7 @@ const updateViz = async() =>
     return org_graph;
 }
 
-const checkHandler= async (id, shown) => {
+const checkHandler = async (id, shown) => {
     console.log(id, shown);
 
     let searchNTTs = null;
@@ -202,5 +202,6 @@ async function loadData() {
 //}); 
 
 
-const viz = new Vizualization("#d3_vis");
+//const viz = new Vizualization("#d3_vis");
+let altViz = new NetworkGraph(null, '#d3_vis');
 //demo("8.8.8.8", "9.9.9.9").then(data => {viz.setData(data)});

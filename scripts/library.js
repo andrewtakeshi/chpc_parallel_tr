@@ -320,7 +320,9 @@ class Vizualization {
     }
 
     getNodeRadiusPackets(node) {
-        const scale = d3.scaleLinear().domain([1, d3.max([...this.node_data.values()], v => v.packets.length)]).range([16, 24]);
+        let scale = d3.scaleSqrt().domain([1, d3.max([...this.node_data.values()], v => v.packets.length)]).range([20, 30]);
+
+        //const scale = d3.scaleLinear().domain([1, d3.max([...this.node_data.values()], v => v.packets.length)]).range([24, 32]);
         return scale(node.packets.length)
     }
 
@@ -668,7 +670,7 @@ class Vizualization {
                     }
                 }
 
-                this.tooltip_stats.text(`${d.ip ? d.ip : ""} (${d.org}) | ${packets.length} packets | ${d.max_bandwidth ? "Max bandwidth: " + d3.format('s')(d.max_bandwidth) + "bps |" : ""} RTT (mean): ${d3.mean(packets, p => p.rtt)}`);
+                this.tooltip_stats.text(`${d.ip ? d.ip : ""} (${d.org}) | ${packets.length} packets | Max bandwidth: ${d.max_bandwidth ? d3.format('s')(d.max_bandwidth) + "bps |" : "Unknown |"} RTT (mean): ${d3.mean(packets, p => p.rtt)}`);
                 if (d.id.startsWith("ip") && this.atr_iframes.has(d.id)) {
                     this.atr_iframes.get(d.id).style("display", "block");
                 } else if (d.id.startsWith("ip") && trafficInfo.size > 0) {
