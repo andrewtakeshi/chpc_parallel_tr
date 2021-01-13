@@ -686,88 +686,61 @@ class Vizualization {
             })
             .on('dblclick', (d) => {
 
-                let uuid = uuidv4();
+                // Make sure this isn't already pinned
+                if (d3.select(`#tooltip${CSS.escape(d.id)}`).node() !== null) return;
 
-                console.log(d);
+                // Create the tooltip div
+                let tooltip = d3.select(this.root_element)
+                    .append('div')
+                    .attr('id', `tooltip${d.id}`)
+                    .classed('tooltip removable', true)
+                    .attr("style", "position: absolute; opacity: 0.9;");
 
-                // let tooltip = this.svg.append('div')
-                //     .attr('id', `tooltip${d.id}`)
-                //     .classed('tooltip removable', true);
-                //
-                // tooltip.style(`position: absolute; opacity: 0; left: ${d3.event.pageX + 10}px; top ${d3.event.pageY + 10}px`);
+                tooltip.append('div')
+                    .append('text')
+                    .attr('transform', 'translate(15, 15)')
+                    .text(d.ip);
 
+                let draggable = false;
+                let initialX = 0;
+                let initialY = 0;
+                let updatedX = 0;
+                let updatedY = 0;
 
-                if (d3.select(`#tooltip${CSS.escape(d.id)}`).node() === null || d3.select(`#tooltip${CSS.escape(d.id)}`).node() === undefined) {
+                tooltip.on('mousedown', function () {
+                    d3.event.preventDefault();
+                    draggable = true;
+                    initialX = d3.event.clientX;
+                    initialY = d3.event.clientY;
+                });
 
-                    let tooltip = d3.select(this.root_element)
-                        .append('div')
-                        .attr('id', `tooltip${d.id}`)
-                        .classed('tooltip removable', true)
-                        .attr("style", "position: absolute; opacity: 0.9;");
+                tooltip.on('mouseup', function () {
+                    draggable = false;
+                    initialX = 0;
+                    initialY = 0;
+                });
 
-                    tooltip.append('div')
-                        .classed('draggableHeader', true)
-                        .attr('width', '100%')
-                        .attr('height', '10px')
-                        .append('text')
-                        .text('Drag');
+                tooltip.on('mousemove', function () {
+                    d3.event.preventDefault();
 
-                    let tt_header = d3.select(`#tooltip${CSS.escape(d.id)}`)
-                        .select('div');
-
-                    let draggable = false;
-                    let initialX = 0;
-                    let initialY = 0;
-                    let updatedX = 0;
-                    let updatedY = 0;
-
-
-                    tooltip.on('mousedown', function () {
-                        d3.event.preventDefault();
-                        draggable = true;
+                    if (draggable) {
+                        updatedX = initialX - d3.event.clientX;
+                        updatedY = initialY - d3.event.clientY;
                         initialX = d3.event.clientX;
                         initialY = d3.event.clientY;
-                    });
 
-                    tooltip.on('mouseup', function () {
-                        draggable = false;
-                        initialX = 0;
-                        initialY = 0;
-                    });
+                        let thisElement = d3.select(this).node();
+                        thisElement.style.top = (thisElement.offsetTop - updatedY) + 'px';
+                        thisElement.style.left = (thisElement.offsetLeft - updatedX) + 'px';
+                    }
+                });
 
-                    tooltip.on('mousemove', function () {
-                        d3.event.preventDefault();
+                tooltip.on('dblclick', function () {
+                    d3.select(this).remove();
+                });
 
-                        if (draggable) {
-                            updatedX = initialX - d3.event.clientX;
-                            updatedY = initialY - d3.event.clientY;
-                            initialX = d3.event.clientX;
-                            initialY = d3.event.clientY;
-
-                            let thisElement = d3.select(this).node();
-                            thisElement.style.top = (thisElement.offsetTop - updatedY) + 'px';
-                            thisElement.style.left = (thisElement.offsetLeft - updatedX) + 'px';
-                        }
-                    });
-
-                    tooltip.on('dblclick', function() {
-                        d3.select(this).remove();
-                    });
-
-
-                    tooltip.style('left', (d3.event.pageX + 10) + 'px')
-                        .style('top', (d3.event.pageY + 10) + 'px');
-
-                    //
-                    // tooltip.attr('position', 'absolute')
-                    //     .attr('opacity', 1)
-                    //     .attr('left', `${d3.event.pageX + 10}px`)
-                    //     .attr('top', `${d3.event.pageY + 10}px`);
-                    //
-                    // tooltip.style(`position: absolute; opacity: 1; left: ${d3.event.pageX + 10}px; top: ${d3.event.pageY + 10}px;`);
-                }
-
-                let tooltip = d3.select(`#tooltip${CSS.escape(d.id)}`);
+                tooltip.style('left', (d3.event.pageX + 10) + 'px')
+                    .style('top', (d3.event.pageY + 10) + 'px');
 
                 let packets = d.packets;
 
@@ -780,9 +753,6 @@ class Vizualization {
                         }
                     }
                 }
-
-                console.log('tooltip');
-                console.log(tooltip);
 
                 if (d.id.startsWith("ip") && this.atr_iframes.has(d.id)) {
                     this.atr_iframes.get(d.id).style("display", "block");
