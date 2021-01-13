@@ -8,7 +8,7 @@ import urllib3
 import socket
 import threading
 from icmplib import traceroute
-import netbeam
+from server import netbeam
 from os import path, stat
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)

@@ -2,6 +2,7 @@
 const api_server = 'localhost:5000';
 const tr_api = "/api/v1/resources/traceroutes";
 
+
 const runTraceroute = async (source, dest, num_runs) => {
     let api_call = `http://${api_server}${tr_api}?dest=${dest}`;
     if (source) {
@@ -22,21 +23,23 @@ const getOrgFromIP = async (ip) => {
 }
 
 const getMaxBWFromGRNOCIP = async (ip) => {
-    if (ip.startsWith("198") || ip.startsWith("162") || ip.startsWith("192")) {
-        let api_call = `https://snapp-portal.grnoc.iu.edu/tsds-cross-domain/query.cgi?method=query;query=get%20max_bandwidth%20between(now-10m,%20now)%20from%20interface%20where%20interface_address.value%20=%20%22${ip}%22`;
-        console.log(`Requesting ${api_call}`);
-        const result = await d3.json(api_call);
-        return result;
-    } else {
-        return {'results': []};
-    }
+    // if (ip.startsWith("198") || ip.startsWith("162") || ip.startsWith("192")) {
+    //     let api_call = `https://snapp-portal.grnoc.iu.edu/tsds-cross-domain/query.cgi?method=query;query=get%20max_bandwidth%20between(now-10m,%20now)%20from%20interface%20where%20interface_address.value%20=%20%22${ip}%22`;
+    //     console.log(`Requesting ${api_call}`);
+    //     const result = await d3.json(api_call);
+    //     return result;
+    // } else {
+    //     return {'results': []};
+    // }
+    return {'results': []};
 
 }
 
 const getATRChartURL = (ip, start = 1588478400000, end = 1588564799000) => {
-    if (ip.startsWith("198") || ip.startsWith("162") || ip.startsWith("192")) {
-        return `https://snapp-portal.grnoc.iu.edu/grafana/d-solo/f_KR9xeZk/ip-address-lookup?orgId=2&from=${start}&to=${end}&var-ip_addr=${ip}&panelId=2`;
-    }
+    // if (ip.startsWith("198") || ip.startsWith("162") || ip.startsWith("192")) {
+    //     return `https://snapp-portal.grnoc.iu.edu/grafana/d-solo/f_KR9xeZk/ip-address-lookup?orgId=2&from=${start}&to=${end}&var-ip_addr=${ip}&panelId=2`;
+    // }
+    // return "";
     return "";
 }
 
@@ -231,6 +234,7 @@ class Vizualization {
         this.node_data = new Map();
         this.node_visual_alias = new Map();
         this.atr_iframes = new Map();
+        this.root_element = root_element;
         // Initialize DOM elements
         this.svg = d3.select(root_element).append("svg")
             .attr("width", width)
@@ -242,6 +246,7 @@ class Vizualization {
 
         this.tooltip = d3.select(root_element).append("div")
             .attr("id", "tooltip")
+            .classed('tooltip', true)
             .attr("style", "position: absolute; opacity: 0;");
 
         this.tooltip_stats = this.tooltip.append("div");
@@ -385,7 +390,7 @@ class Vizualization {
         this.update();
     }
 
-    netbeamGraph(trafficInfo) {
+    netbeamGraph(trafficInfo, div) {
         let margin = {top: 10, right: 30, bottom: 30, left: 60};
 
         let oWidth = 600;
@@ -394,8 +399,7 @@ class Vizualization {
         let width = oWidth - margin.left - margin.right;
         let height = oHeight - margin.top - margin.bottom;
 
-        let trafficGraph = d3.select('#tooltip')
-            .append('svg')
+        let trafficGraph = div.append('svg')
             .attr('width', oWidth)
             .attr('height', oHeight)
             .append('g')
@@ -531,17 +535,14 @@ class Vizualization {
             .attr('cy', d => yScale(d.out));
     }
 
-    getOverallMaxBW()
-    {
+    getOverallMaxBW() {
         let bw = Number.MAX_SAFE_INTEGER;
         let ip = null;
         let nodes = Array.from(this.all_nodes.values()).filter(d => d.id.startsWith('ip'));
 
-        for (let node of nodes)
-        {
+        for (let node of nodes) {
             console.log(node.max_bandwidth);
-            if (node.max_bandwidth && node.max_bandwidth < bw)
-            {
+            if (node.max_bandwidth && node.max_bandwidth < bw) {
                 bw = node.max_bandwidth;
                 ip = node.ip;
                 //console.log('BW updated to ' + bw);
@@ -555,16 +556,13 @@ class Vizualization {
             .attr('x', 25)
             .attr('y', (_, i) => (i + 1) * 25)
             .text((d, i) => {
-                if (d === null || d === Number.MAX_SAFE_INTEGER)
-                {
+                if (d === null || d === Number.MAX_SAFE_INTEGER) {
                     return '';
                 }
 
-                if (i === 0)
-                {
+                if (i === 0) {
                     return `Max Known Bandwidth: ${d3.format('~s')(d)}bps`;
-                } else
-                {
+                } else {
                     return `Limited by node at IP: ${d}`;
                 }
             });
@@ -649,7 +647,7 @@ class Vizualization {
             .attr("r", d => this.getNodeRadiusPackets(d) / 2)
             .attr("fill", d => this.getNodeColorOrg(d))
             .attr("opacity", d => d.domain != "unknown" ? 0.0 : 1.0)
-            .on("dblclick", d => {
+            .on("click", d => {
                 d3.event.preventDefault();
                 this.expandNode(d);
                 this.update();
@@ -672,7 +670,7 @@ class Vizualization {
                 if (d.id.startsWith("ip") && this.atr_iframes.has(d.id)) {
                     this.atr_iframes.get(d.id).style("display", "block");
                 } else if (d.id.startsWith("ip") && trafficInfo.size > 0) {
-                    this.netbeamGraph(trafficInfo);
+                    this.netbeamGraph(trafficInfo, this.tooltip);
                 }
 
             })
@@ -685,6 +683,112 @@ class Vizualization {
             })
             .on('mousemove', () => {
                 this.tooltip.style('left', (d3.event.pageX + 10) + 'px').style('top', (d3.event.pageY + 10) + 'px')
+            })
+            .on('dblclick', (d) => {
+
+                let uuid = uuidv4();
+
+                console.log(d);
+
+                // let tooltip = this.svg.append('div')
+                //     .attr('id', `tooltip${d.id}`)
+                //     .classed('tooltip removable', true);
+                //
+                // tooltip.style(`position: absolute; opacity: 0; left: ${d3.event.pageX + 10}px; top ${d3.event.pageY + 10}px`);
+
+
+                if (d3.select(`#tooltip${CSS.escape(d.id)}`).node() === null || d3.select(`#tooltip${CSS.escape(d.id)}`).node() === undefined) {
+
+                    let tooltip = d3.select(this.root_element)
+                        .append('div')
+                        .attr('id', `tooltip${d.id}`)
+                        .classed('tooltip removable', true)
+                        .attr("style", "position: absolute; opacity: 0.9;");
+
+                    tooltip.append('div')
+                        .classed('draggableHeader', true)
+                        .attr('width', '100%')
+                        .attr('height', '10px')
+                        .append('text')
+                        .text('Drag');
+
+                    let tt_header = d3.select(`#tooltip${CSS.escape(d.id)}`)
+                        .select('div');
+
+                    let draggable = false;
+                    let initialX = 0;
+                    let initialY = 0;
+                    let updatedX = 0;
+                    let updatedY = 0;
+
+
+                    tooltip.on('mousedown', function () {
+                        d3.event.preventDefault();
+                        draggable = true;
+                        initialX = d3.event.clientX;
+                        initialY = d3.event.clientY;
+                    });
+
+                    tooltip.on('mouseup', function () {
+                        draggable = false;
+                        initialX = 0;
+                        initialY = 0;
+                    });
+
+                    tooltip.on('mousemove', function () {
+                        d3.event.preventDefault();
+
+                        if (draggable) {
+                            updatedX = initialX - d3.event.clientX;
+                            updatedY = initialY - d3.event.clientY;
+                            initialX = d3.event.clientX;
+                            initialY = d3.event.clientY;
+
+                            let thisElement = d3.select(this).node();
+                            thisElement.style.top = (thisElement.offsetTop - updatedY) + 'px';
+                            thisElement.style.left = (thisElement.offsetLeft - updatedX) + 'px';
+                        }
+                    });
+
+                    tooltip.on('dblclick', function() {
+                        d3.select(this).remove();
+                    });
+
+
+                    tooltip.style('left', (d3.event.pageX + 10) + 'px')
+                        .style('top', (d3.event.pageY + 10) + 'px');
+
+                    //
+                    // tooltip.attr('position', 'absolute')
+                    //     .attr('opacity', 1)
+                    //     .attr('left', `${d3.event.pageX + 10}px`)
+                    //     .attr('top', `${d3.event.pageY + 10}px`);
+                    //
+                    // tooltip.style(`position: absolute; opacity: 1; left: ${d3.event.pageX + 10}px; top: ${d3.event.pageY + 10}px;`);
+                }
+
+                let tooltip = d3.select(`#tooltip${CSS.escape(d.id)}`);
+
+                let packets = d.packets;
+
+                let trafficInfo = new Map();
+
+                for (let packet of packets) {
+                    if (packet.resource) {
+                        for (let traffic of packet.traffic) {
+                            trafficInfo.set(traffic[0], {'ts': traffic[0], 'in': traffic[1], 'out': traffic[2]});
+                        }
+                    }
+                }
+
+                console.log('tooltip');
+                console.log(tooltip);
+
+                if (d.id.startsWith("ip") && this.atr_iframes.has(d.id)) {
+                    this.atr_iframes.get(d.id).style("display", "block");
+                } else if (d.id.startsWith("ip") && trafficInfo.size > 0) {
+                    this.netbeamGraph(trafficInfo, tooltip);
+                }
             })
             .call(this._drag());
 
