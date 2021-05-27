@@ -106,7 +106,7 @@
                                 let dest = document.getElementById('esmond_ip_dest').value;
                                 let num_runs = document.getElementById('esmond_num_runs').value;
                                 addToCRTable(unique);
-                                e2eBtnHandler(source, dest, num_runs, unique).then(data => {viz.setData(data)});"
+                                e2eBtnHandler(source, dest, num_runs, unique); //.then(data => {viz.setData(data)});"
                                 type="submit"
                                 class="btn btn-outline-primary">End-to-end Traceroute</button>
                         <button id="esmond_btn" name="esmond_btn" onclick="formLogger(this.form)" type="submit" class="btn btn-outline-primary" disabled>Esmond Traceroute</button>

@@ -6,7 +6,11 @@ let hiddenNTTs = ({"traceroutes": []});
 // Timeout values - pscheduler is 40 sec, system is 20 sec
 const pscheduler_timeout = 40000;
 const system_timeout = 20000;
-const timeout = (prom, time) => Promise.race([prom, new Promise((_r, rej) => setTimeout(rej, time))]);
+
+// Adds a timeout to the API calls - this can be adjusted above
+const timeout = (prom, time) => Promise.race([prom, new Promise((res) => setTimeout(
+    () => res({'error': 'Timed out'}),
+    time))]);
 
 let netbeamTableHelper = (ip, label, hops, speed) => {
     if (!document.getElementById(`table_${ip}_${label}`)) {
@@ -157,13 +161,13 @@ const e2eBtnHandler = async (source, dest, num_runs, uuid) => {
                     document.getElementById(`${uuid}_status`).innerHTML = value.error;
                     return null;
                 } else {
-                    document.getElementById(`${uuid}_status`).innerHTML = "Finished";
+                    document.getElementById(`${uuid}_status`).innerHTML = 'Finished';
                     return value;
                 }
             },
             // OnRejection
             _ => {
-                document.getElementById(`${uuid}_status`).innerHTML = "Timed Out";
+                document.getElementById(`${uuid}_status`).innerHTML = 'Unknown Error';
                 return null;
             }
         );
@@ -174,7 +178,7 @@ const e2eBtnHandler = async (source, dest, num_runs, uuid) => {
         let checkbox = document.getElementById(`${uuid}_selected`).children[0];
         checkbox.checked = false;
         checkbox.disabled = true;
-        return [];
+        return;
     }
 
     // Every traceroute from this run is given the same ID to enable/disable them later
@@ -187,7 +191,10 @@ const e2eBtnHandler = async (source, dest, num_runs, uuid) => {
 
     // Update the visualization
     entities.traceroutes = entities.traceroutes.concat(result.traceroutes);
-    return await updateViz();
+
+    let data = await updateViz();
+
+    viz.setData(data);
 }
 
 const viz = new Vizualization("#d3_vis");
