@@ -673,16 +673,3 @@ def system_to_d3_old(dest, numRuns=1):
     limiter -= numRuns
     lock.release()
     return add_netbeam_info_threaded(output)
-
-# dest = '134.55.42.38'
-#
-# for i in range(1,5):
-#     print(f'Running {i} system traceroute(s) to {dest}:')
-#     start_time = time.time()
-#     print('\tNo threading of netbeam, subprocess traceroute')
-#     system_to_d3_old(dest, i)
-#     print(f'\tTook {time.time() - start_time} seconds')
-#     start_time = time.time()
-#     print('\tThreaded netbeam, icmplib traceroute')
-#     system_to_d3_threaded(dest, i)
-#     print(f'\tTook {time.time() - start_time} seconds')

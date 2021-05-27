@@ -79,11 +79,11 @@
                     <div class="form-row">
                         <div class="form-group col-md-4">
                             <label for="esmond_ip_source">Source Host/IP:</label>
-                            <input type="text" name="esmond_ip_source" id="esmond_ip_source" placeholder="ex. 1.1.1.1" class="form-control">
+                            <input type="text" name="esmond_ip_source" id="esmond_ip_source" placeholder="ex. 1.1.1.1 or cloudflare.com" class="form-control">
                         </div>
                         <div class="form-group col-md-4">
                             <label for="esmond_ip_dest">Destination Host/IP:</label>
-                            <input type="text" name="esmond_ip_dest" id="esmond_ip_dest" placeholder="ex. 2.2.2.2" class="form-control">
+                            <input type="text" name="esmond_ip_dest" id="esmond_ip_dest" placeholder="ex. 8.8.8.8 or google.com" class="form-control">
                         </div>
                         <div class="form-group col-md-4">
                             <label for="esmond_num_runs"># Traceroutes:</label>
@@ -106,7 +106,7 @@
                                 let dest = document.getElementById('esmond_ip_dest').value;
                                 let num_runs = document.getElementById('esmond_num_runs').value;
                                 addToCRTable(unique);
-                                btndemo(source, dest, num_runs, unique).then(data => {viz.setData(data)});"
+                                e2eBtnHandler(source, dest, num_runs, unique).then(data => {viz.setData(data)});"
                                 type="submit"
                                 class="btn btn-outline-primary">End-to-end Traceroute</button>
                         <button id="esmond_btn" name="esmond_btn" onclick="formLogger(this.form)" type="submit" class="btn btn-outline-primary" disabled>Esmond Traceroute</button>

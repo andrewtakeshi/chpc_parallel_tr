@@ -1,6 +1,7 @@
 //const api_server = "network-viz.chpc.utah.edu:5000"
-const api_server = 'localhost:5000';
+const api_server = '127.0.0.1:8081';
 const tr_api = "/api/v1/resources/traceroutes";
+const rdap_api = "/api/v1/resources/iporgs"
 
 const runTraceroute = async (source, dest, num_runs) => {
     let api_call = `http://${api_server}${tr_api}?dest=${dest}`;
@@ -10,10 +11,10 @@ const runTraceroute = async (source, dest, num_runs) => {
     api_call += `&num_runs=${num_runs}`;
     console.log(`Requesting ${api_call}`);
     let result = await d3.json(api_call);
+    console.log(result);
     return result;
 };
 
-const rdap_api = "/api/v1/resources/iporgs"
 const getOrgFromIP = async (ip) => {
     let api_call = `http://${api_server}${rdap_api}?ip=${ip}`;
     console.log(`Requesting ${api_call}`);
@@ -30,7 +31,6 @@ const getMaxBWFromGRNOCIP = async (ip) => {
     } else {
         return {'results': []};
     }
-    // return {'results': []};
 }
 
 const getATRChartURL = (ip, start = 1588478400000, end = 1588564799000) => {
@@ -50,7 +50,8 @@ const createInternetGraph = async (traceroutes, existing = undefined) => {
         const packets = trace.packets;
         for (let i = 0; i < packets.length; i++) {
             if (packets[i].ip == undefined)
-                packets[i].ip = "unknown";
+                // TODO: Find better way of differentiating between "unknown"
+                packets[i].ip = `hop_${i}_${trace.id.substring(0, 5)}`;
         }
         for (let i = 0; i < packets.length; i++) {
             const packet = packets[i];
@@ -536,7 +537,6 @@ class Vizualization {
         let nodes = Array.from(this.all_nodes.values()).filter(d => d.id.startsWith('ip'));
 
         for (let node of nodes) {
-            console.log(node.max_bandwidth);
             if (node.max_bandwidth && node.max_bandwidth < bw) {
                 bw = node.max_bandwidth;
                 ip = node.ip;
@@ -555,7 +555,7 @@ class Vizualization {
                 }
 
                 if (i === 0) {
-                    return `Max Known Bandwidth: ${d3.format('~s')(d)}bps`;
+                    return `Known Bandwidth Limit: ${d3.format('~s')(d)}bps`;
                 } else {
                     return `Limited by node at IP: ${d}`;
                 }
