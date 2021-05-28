@@ -13,8 +13,8 @@ from server import netbeam
 from os import path, stat
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-ip_validation_regex = re.compile(r'((25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9][0-9]|[0-9])\.)'
-                                 r'{3}(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9][0-9]|[0-9])')
+ip_validation_regex = re.compile(r'^((25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9][0-9]|[0-9])\.)'
+                                 r'{3}(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9][0-9]|[0-9])$')
 my_ip = subprocess.run(['curl', 'ifconfig.me'],
                        stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
                        universal_newlines=True).stdout.splitlines()[0]
@@ -110,6 +110,8 @@ def add_netbeam_info_threaded(d3_json, source_path=None):
 
 
 def rdap_org_lookup(ip):
+    retError = {"org": "unknown", "domain": "unknown"}
+
     if ip not in rdap_cache:
         if ip_validation_regex.match(ip):
             print(f"Requesting Org of {ip}")
@@ -149,9 +151,9 @@ def rdap_org_lookup(ip):
                         pass
             else:
                 print(f'Received response from unknown NCC; {response.url}')
-                return {"org": "unknown", "domain": "unknown"}
+                return retError
         else:
-            return {"org": "unknown", "domain": "unknown"}
+            return retError
     return rdap_cache[ip]
 
 
