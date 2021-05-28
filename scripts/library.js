@@ -274,7 +274,22 @@ class Vizualization {
         this.simulation = d3.forceSimulation()
             .force("link", d3.forceLink().id())
             .force("charge", d3.forceManyBody())
-            .force("center", d3.forceCenter(width / 2, height / 2));
+            .force("center", d3.forceCenter(width / 2, height / 2))
+            .force("collision", d3.forceCollide(10))
+            // .force("collision", d3.forceCollide(24).radius(function(d) {
+            //     if (d.radius)
+            //     {
+            //         return d.radius;
+            //     } else if (d.height)
+            //     {
+            //         return d.height;
+            //     }
+            //     else
+            //     {
+            //         return 5;
+            //     }
+            // }))
+            .force("forceY", d3.forceY(height/2));
 
         this.simulation.on("tick", () => {
             this.link

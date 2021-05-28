@@ -33,6 +33,7 @@ def traceroutes():
     # TODO : MOVE TIMEOUT TO HERE AND RETURN AS ERROR
     if source:
         if d3_conversion.check_pscheduler(source):
+            print(f'{source} accepted as pScheduler source')
             response = d3_conversion.pscheduler_to_d3(source, dest, num_runs)
         else:
             response = {'error': 'pScheduler Error'}

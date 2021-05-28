@@ -120,31 +120,32 @@ const updateViz = async () => {
  * @returns {Promise<void>}
  */
 const checkHandler = async (id, shown) => {
+    // List of entities to search and add to respectively
     let searchNTTs = null;
     let addNTTs = null;
 
+    // If we are re-showing something, we want searchNTTs to be the list of currently hidden entities,
+    // and we want to add our "found" entity to the list to show
     if (shown) {
         searchNTTs = hiddenNTTs;
         addNTTs = entities;
+    // Similarly, if we are hiding something we want searchNTTs to be the list of currently shown entities,
+    // and we want to add our "found" entity to the list to hide
     } else {
         searchNTTs = entities;
         addNTTs = hiddenNTTs;
     }
 
-    let foundObj = null;
-    let foundIter = 0;
-
-    for (let i = 0; i < searchNTTs.traceroutes.length; i++) {
+    // Find all traceroutes with matching IDs and move them between the two lists accordingly.
+    for (let i = 0; i < searchNTTs.traceroutes.length; ++i) {
         if (searchNTTs.traceroutes[i].id === id) {
-            foundObj = searchNTTs.traceroutes[i];
-            foundIter = i;
-            break;
+            addNTTs.traceroutes.push(searchNTTs.traceroutes[i]);
+            searchNTTs.traceroutes.splice(i, 1);
+            --i;
         }
     }
 
-    searchNTTs.traceroutes.splice(foundIter, 1);
-    addNTTs.traceroutes.push(foundObj);
-
+    // Update the visualization - the checkhandler sets the data after this update.
     return await updateViz();
 }
 
@@ -158,6 +159,7 @@ const e2eBtnHandler = async (source, dest, num_runs, uuid) => {
             // OnFulfillment
             (value) => {
                 if (value.error) {
+                    // This will be timeout or pScheduler
                     document.getElementById(`${uuid}_status`).innerHTML = value.error;
                     return null;
                 } else {
@@ -165,7 +167,7 @@ const e2eBtnHandler = async (source, dest, num_runs, uuid) => {
                     return value;
                 }
             },
-            // OnRejection
+            // If rejected we ran into an unknown error
             _ => {
                 document.getElementById(`${uuid}_status`).innerHTML = 'Unknown Error';
                 return null;

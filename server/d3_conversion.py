@@ -7,6 +7,7 @@ import requests
 import urllib3
 import socket
 import threading
+import sys
 from icmplib import traceroute
 from server import netbeam
 from os import path, stat
@@ -162,8 +163,12 @@ def check_pscheduler(endpoint):
     """
     if not endpoint.__contains__('https'):
         endpoint = 'https://' + endpoint
-    response = requests.get(f'{endpoint}/pscheduler', verify=False).content.decode('utf8')
-    return response.__contains__('pScheduler API server')
+    try:
+        response = requests.get(f'{endpoint}/pscheduler', verify=False, timeout=6).content.decode('utf8')
+        return response.__contains__('pScheduler API server')
+    except:
+        pass
+    return False
 
 
 def target_to_ip(target):
@@ -526,7 +531,6 @@ def add_netbeam_info_old(d3_json, source_path=None):
     return d3_json
 
 
-"""
 def system_to_d3_old_tw(dest, returnArray):
     dest_ip = target_to_ip(dest)
 
@@ -589,7 +593,6 @@ def system_to_d3_old_threaded(dest, numRuns=1):
 
     output = {'traceroutes': returnArray}
     return add_netbeam_info_threaded(output)
-"""
 
 
 def system_to_d3_old(dest, numRuns=1):

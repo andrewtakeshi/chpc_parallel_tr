@@ -1,0 +1,19 @@
+
+from server import d3_conversion as d3c
+import time
+import difflib
+
+diff = difflib.Differ()
+
+dest = '8.8.8.8'
+dest = '155.101.8.18'
+
+st = time.time()
+old = d3c.system_to_d3_old(dest, 10)
+print(time.time() - st)
+st = time.time()
+new = d3c.system_to_d3_old_threaded(dest, 10)
+print(time.time() - st)
+
+print(old)
+print(new)
