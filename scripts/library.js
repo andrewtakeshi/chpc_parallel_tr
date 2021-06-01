@@ -1,6 +1,7 @@
 //const api_server = "network-viz.chpc.utah.edu:5000"
-const api_server = 'localhost:5000';
+const api_server = '127.0.0.1:8081';
 const tr_api = "/api/v1/resources/traceroutes";
+const rdap_api = "/api/v1/resources/iporgs"
 
 const runTraceroute = async (source, dest, num_runs) => {
     let api_call = `http://${api_server}${tr_api}?dest=${dest}`;
@@ -10,10 +11,10 @@ const runTraceroute = async (source, dest, num_runs) => {
     api_call += `&num_runs=${num_runs}`;
     console.log(`Requesting ${api_call}`);
     let result = await d3.json(api_call);
+    console.log(result);
     return result;
 };
 
-const rdap_api = "/api/v1/resources/iporgs"
 const getOrgFromIP = async (ip) => {
     let api_call = `http://${api_server}${rdap_api}?ip=${ip}`;
     console.log(`Requesting ${api_call}`);
@@ -30,7 +31,6 @@ const getMaxBWFromGRNOCIP = async (ip) => {
     } else {
         return {'results': []};
     }
-
 }
 
 const getATRChartURL = (ip, start = 1588478400000, end = 1588564799000) => {
@@ -50,7 +50,8 @@ const createInternetGraph = async (traceroutes, existing = undefined) => {
         const packets = trace.packets;
         for (let i = 0; i < packets.length; i++) {
             if (packets[i].ip == undefined)
-                packets[i].ip = "unknown";
+                // TODO: Find better way of differentiating between "unknown"
+                packets[i].ip = `hop_${i}_${trace.id.substring(0, 5)}`;
         }
         for (let i = 0; i < packets.length; i++) {
             const packet = packets[i];
@@ -223,7 +224,6 @@ const handler = ({
             : undefined)
 })
 
-
 class Vizualization {
     constructor(root_element, width = 800, height = 800) {
         this.width = width;
@@ -231,17 +231,17 @@ class Vizualization {
         this.node_data = new Map();
         this.node_visual_alias = new Map();
         this.atr_iframes = new Map();
+        this.root_element = root_element;
         // Initialize DOM elements
         this.svg = d3.select(root_element).append("svg")
             .attr("width", width)
             .attr("height", height)
             .style('display', 'block')
             .style('margin', 'auto');
-        // .style('transform', 'translate(100%, 0)')
-        // .attr("align", "center");
 
         this.tooltip = d3.select(root_element).append("div")
             .attr("id", "tooltip")
+            .classed('tooltip', true)
             .attr("style", "position: absolute; opacity: 0;");
 
         this.tooltip_stats = this.tooltip.append("div");
@@ -274,7 +274,22 @@ class Vizualization {
         this.simulation = d3.forceSimulation()
             .force("link", d3.forceLink().id())
             .force("charge", d3.forceManyBody())
-            .force("center", d3.forceCenter(width / 2, height / 2));
+            .force("center", d3.forceCenter(width / 2, height / 2))
+            .force("collision", d3.forceCollide(10))
+            // .force("collision", d3.forceCollide(24).radius(function(d) {
+            //     if (d.radius)
+            //     {
+            //         return d.radius;
+            //     } else if (d.height)
+            //     {
+            //         return d.height;
+            //     }
+            //     else
+            //     {
+            //         return 5;
+            //     }
+            // }))
+            .force("forceY", d3.forceY(height/2));
 
         this.simulation.on("tick", () => {
             this.link
@@ -320,9 +335,7 @@ class Vizualization {
     }
 
     getNodeRadiusPackets(node) {
-        let scale = d3.scaleSqrt().domain([1, d3.max([...this.node_data.values()], v => v.packets.length)]).range([20, 30]);
-
-        //const scale = d3.scaleLinear().domain([1, d3.max([...this.node_data.values()], v => v.packets.length)]).range([24, 32]);
+        const scale = d3.scaleLinear().domain([1, d3.max([...this.node_data.values()], v => v.packets.length)]).range([16, 24]);
         return scale(node.packets.length)
     }
 
@@ -387,7 +400,8 @@ class Vizualization {
         this.update();
     }
 
-    netbeamGraph(trafficInfo) {
+    // Creates traffic graph using info scraped through Netbeam API.
+    netbeamGraph(trafficInfo, div) {
         let margin = {top: 10, right: 30, bottom: 30, left: 60};
 
         let oWidth = 600;
@@ -396,13 +410,14 @@ class Vizualization {
         let width = oWidth - margin.left - margin.right;
         let height = oHeight - margin.top - margin.bottom;
 
-        let trafficGraph = d3.select('#tooltip')
-            .append('svg')
+        let trafficGraph = div.append('svg')
             .attr('width', oWidth)
             .attr('height', oHeight)
             .append('g')
             .attr('transform', `translate(${margin.left}, ${margin.top})`);
 
+        // Set up scales
+        // xScale is time, yScale is bandwidth
         let xScale = d3.scaleLinear()
             .domain(d3.extent([...trafficInfo.keys()]))
             .range([0, width]);
@@ -411,11 +426,13 @@ class Vizualization {
             .attr('transform', `translate(0, ${height})`)
             .call(d3.axisBottom(xScale)
                 .ticks(10)
+                // Use d3 built in tickFormat to make this pretty
                 .tickFormat(d => {
                     let date = new Date(d);
                     return `${date.getHours()}:${date.getMinutes()}:${date.getSeconds()}`;
                 }));
 
+        // Axis label
         xaxis.append('text')
             .classed('axis-label-text', true)
             .attr('transform', `translate(${width / 2}, 25)`)
@@ -436,55 +453,50 @@ class Vizualization {
                 .ticks(6)
                 .tickFormat(d => d3.format('~s')(d) + 'bps'));
 
-        // No longer append bps label because it's implied by the axis ticks.
-        // yAxis.append('text')
-        //     .classed('axis-label-text', true)
-        //     .attr('transform', `translate(-25, ${yScale((max - min) / 2)}) rotate(-90)`)
-        //     .attr('text-anchor', 'middle')
-        //     .text('bps');
-
         // Set up legend
-        let inLegend = trafficGraph.append('g')
-            .attr('id', 'inLegend')
-            .attr('transform', `translate(${width - 50}, 10)`);
-        inLegend.append('text')
-            .attr('style', 'font: 12px sans-serif;')
-            .attr('opacity', 0.75)
-            .text('in:');
-        inLegend.append('line')
-            .attr('x1', 0)
-            .attr('x2', 20)
-            .attr('y1', 0)
-            .attr('y2', 0)
-            .attr('stroke', 'steelblue')
-            .attr('stroke-width', '1.5px')
-            .attr('transform', `translate(30, -5)`);
-        inLegend.append('circle')
-            .attr('cx', 40)
-            .attr('cy', -5)
-            .attr('fill', 'steelblue')
-            .attr('r', 1.5);
+        {
+            let inLegend = trafficGraph.append('g')
+                .attr('id', 'inLegend')
+                .attr('transform', `translate(${width - 50}, 10)`);
+            inLegend.append('text')
+                .attr('style', 'font: 12px sans-serif;')
+                .attr('opacity', 0.75)
+                .text('in:');
+            inLegend.append('line')
+                .attr('x1', 0)
+                .attr('x2', 20)
+                .attr('y1', 0)
+                .attr('y2', 0)
+                .attr('stroke', 'steelblue')
+                .attr('stroke-width', '1.5px')
+                .attr('transform', `translate(30, -5)`);
+            inLegend.append('circle')
+                .attr('cx', 40)
+                .attr('cy', -5)
+                .attr('fill', 'steelblue')
+                .attr('r', 1.5);
 
-        let outLegend = trafficGraph.append('g')
-            .attr('id', 'outLegend')
-            .attr('transform', `translate(${width - 50}, 20)`);
-        outLegend.append('text')
-            .attr('style', 'font: 12px sans-serif;')
-            .attr('opacity', 0.75)
-            .text('out:');
-        outLegend.append('line')
-            .attr('x1', 0)
-            .attr('x2', 20)
-            .attr('y1', 0)
-            .attr('y2', 0)
-            .attr('stroke', 'red')
-            .attr('stroke-width', '1.5px')
-            .attr('transform', `translate(30, -5)`);
-        outLegend.append('circle')
-            .attr('cx', 40)
-            .attr('cy', -5)
-            .attr('fill', 'red')
-            .attr('r', 1.5);
+            let outLegend = trafficGraph.append('g')
+                .attr('id', 'outLegend')
+                .attr('transform', `translate(${width - 50}, 20)`);
+            outLegend.append('text')
+                .attr('style', 'font: 12px sans-serif;')
+                .attr('opacity', 0.75)
+                .text('out:');
+            outLegend.append('line')
+                .attr('x1', 0)
+                .attr('x2', 20)
+                .attr('y1', 0)
+                .attr('y2', 0)
+                .attr('stroke', 'red')
+                .attr('stroke-width', '1.5px')
+                .attr('transform', `translate(30, -5)`);
+            outLegend.append('circle')
+                .attr('cx', 40)
+                .attr('cy', -5)
+                .attr('fill', 'red')
+                .attr('r', 1.5);
+        }
 
         // Append path for in values
         trafficGraph.append('path')
@@ -533,20 +545,16 @@ class Vizualization {
             .attr('cy', d => yScale(d.out));
     }
 
-    getOverallMaxBW()
-    {
+    // Finds overall max bandwith to display on vis.
+    getOverallMaxBW() {
         let bw = Number.MAX_SAFE_INTEGER;
         let ip = null;
         let nodes = Array.from(this.all_nodes.values()).filter(d => d.id.startsWith('ip'));
 
-        for (let node of nodes)
-        {
-            console.log(node.max_bandwidth);
-            if (node.max_bandwidth && node.max_bandwidth < bw)
-            {
+        for (let node of nodes) {
+            if (node.max_bandwidth && node.max_bandwidth < bw) {
                 bw = node.max_bandwidth;
                 ip = node.ip;
-                //console.log('BW updated to ' + bw);
             }
         }
 
@@ -557,21 +565,16 @@ class Vizualization {
             .attr('x', 25)
             .attr('y', (_, i) => (i + 1) * 25)
             .text((d, i) => {
-                if (d === null || d === Number.MAX_SAFE_INTEGER)
-                {
+                if (d === null || d === Number.MAX_SAFE_INTEGER) {
                     return '';
                 }
 
-                if (i === 0)
-                {
-                    return `Max Known Bandwidth: ${d3.format('~s')(d)}bps`;
-                } else
-                {
+                if (i === 0) {
+                    return `Known Bandwidth Limit: ${d3.format('~s')(d)}bps`;
+                } else {
                     return `Limited by node at IP: ${d}`;
                 }
             });
-
-        console.log(nodes);
     }
 
     update() {
@@ -580,13 +583,10 @@ class Vizualization {
         this.getOverallMaxBW();
 
         this.vNodes = Array.from(this.node_data.values());
-        // for (let node of this.vNodes)
-        // {
-        //     this.expandNode(node);
-        // }
 
-        //this.vNodes = Array.from(this.all_nodes.values());
         this.vLinks = new Array();
+
+        let that = this;
 
         let i = 0;
         while (i < this.vNodes.length) {
@@ -648,44 +648,19 @@ class Vizualization {
             .attr("y", d => -1 * this.getNodeRadiusPackets(d) / 2);
 
         this.node.append("circle")
+            .classed('node', true)
             .attr("r", d => this.getNodeRadiusPackets(d) / 2)
             .attr("fill", d => this.getNodeColorOrg(d))
             .attr("opacity", d => d.domain != "unknown" ? 0.0 : 1.0)
-            .on("dblclick", d => {
-                d3.event.preventDefault();
-                this.expandNode(d);
-                this.update();
-            })
-            .on("mouseover", (d) => {
-                this.tooltip.transition().duration(200).style('opacity', 0.9);
-                let packets = d.packets;
 
-                let trafficInfo = new Map();
-
-                for (let packet of packets) {
-                    if (packet.resource) {
-                        for (let traffic of packet.traffic) {
-                            trafficInfo.set(traffic[0], {'ts': traffic[0], 'in': traffic[1], 'out': traffic[2]});
-                        }
-                    }
-                }
-
-                this.tooltip_stats.text(`${d.ip ? d.ip : ""} (${d.org}) | ${packets.length} packets | Max bandwidth: ${d.max_bandwidth ? d3.format('s')(d.max_bandwidth) + "bps |" : "Unknown |"} RTT (mean): ${d3.mean(packets, p => p.rtt)}`);
-                if (d.id.startsWith("ip") && this.atr_iframes.has(d.id)) {
-                    this.atr_iframes.get(d.id).style("display", "block");
-                } else if (d.id.startsWith("ip") && trafficInfo.size > 0) {
-                    this.netbeamGraph(trafficInfo);
-                }
-
-            })
-            .on("mouseout", (d) => {
-                this.tooltip.transition().duration(200).style('opacity', 0);
-                if (d.id.startsWith("ip") && this.atr_iframes.has(d.id)) {
-                    this.atr_iframes.get(d.id).style("display", "none");
-                }
-                this.tooltip.selectAll('svg').remove();
-            })
+            // Click to expand nodes
+            .on("click", clickHandler)
+            // Mouseover previews Grafana/d3 traffic charts
+            .on('mouseover', mouseoverHandler)
+            .on("mouseout", mouseoutHandler)
+            .on('dblclick', dblclickHandler)
             .on('mousemove', () => {
+                // Updates position of global tooltip.
                 this.tooltip.style('left', (d3.event.pageX + 10) + 'px').style('top', (d3.event.pageY + 10) + 'px')
             })
             .call(this._drag());
@@ -697,5 +672,147 @@ class Vizualization {
         this.simulation.nodes(this.vNodes);
         this.simulation.force("link", d3.forceLink(this.vLinks).id(d => d.id));
         this.simulation.alpha(1).restart();
+
+        /* ###### Helpers and Handlers ####### */
+
+        // Helper method to get traffic info from Netbeam-polled nodes into acceptable format for secondary d3 vis.
+        function generateTrafficInfo(packets) {
+            let trafficInfo = new Map();
+            for (let packet of packets) {
+                if (packet.resource && packet.traffic) {
+                    for (let traffic of packet.traffic) {
+                        trafficInfo.set(traffic[0], {'ts': traffic[0], 'in': traffic[1], 'out': traffic[2]});
+                    }
+                }
+            }
+            return trafficInfo;
+        }
+
+        // Generate ToolTipStats. Not complicated, just abstracted b/c it's used more than once.
+        function generateTTS(d, packets) {
+            return `${d.ip ? d.ip : ""} (${d.org}) | ` +
+                `${packets.length} packets | ` +
+                `${d.max_bandwidth ? "Max bandwidth: " + d3.format('s')(d.max_bandwidth) + "bps |" : ""} ` +
+                `RTT (mean): ${d3.mean(packets, p => p.rtt)}`;
+        }
+
+        // Shows the global tooltip on mouseover (if applicable)
+        function mouseoverHandler(d) {
+            that.tooltip.transition().duration(200).style('opacity', 0.9);
+
+            let packets = d.packets;
+
+            let trafficInfo = generateTrafficInfo(packets);
+
+            that.tooltip_stats.text(generateTTS(d, packets));
+
+            if (d.id.startsWith("ip") && that.atr_iframes.has(d.id)) {
+                // Show grafana iframe
+                that.atr_iframes.get(d.id).style("display", "block");
+            } else if (d.id.startsWith("ip") && trafficInfo.size > 0) {
+                // Show d3 vis of netbeam data
+                that.netbeamGraph(trafficInfo, that.tooltip);
+            }
+        }
+
+        // Hide global tooltip on mouseout (if applicable)
+        function mouseoutHandler(d) {
+            that.tooltip.transition().duration(200).style('opacity', 0);
+            if (d.id.startsWith("ip") && that.atr_iframes.has(d.id)) {
+                that.atr_iframes.get(d.id).style("display", "none");
+            }
+            that.tooltip.selectAll('svg').remove();
+        }
+
+        // Expand nodes on single click (no drag)
+        function clickHandler(d) {
+            d3.event.preventDefault();
+            that.expandNode(d);
+            that.update();
+        }
+
+        // Pin draggable tooltip on double click (if applicable)
+        function dblclickHandler(d) {
+            // Make sure that isn't already pinned
+            if (d3.select(`#tooltip${CSS.escape(d.id)}`).node() !== null) return;
+
+            // Create the tooltip div
+            let tooltip = d3.select(that.root_element)
+                .append('div')
+                .attr('id', `tooltip${d.id}`)
+                .classed('tooltip removable', true)
+                .attr("style", "position: absolute; opacity: 0.9;");
+
+            // Append tooltip stats
+            tooltip.append('div')
+                .append('text')
+                .text(generateTTS(d, d.packets));
+
+            // Initial attributes
+            let draggable = false;
+            let initialX = 0;
+            let initialY = 0;
+            let updatedX = 0;
+            let updatedY = 0;
+
+            // Make draggable on mousedown
+            tooltip.on('mousedown', function () {
+                d3.event.preventDefault();
+                draggable = true;
+                initialX = d3.event.clientX;
+                initialY = d3.event.clientY;
+            });
+
+            // Remove draggable on mouseup
+            tooltip.on('mouseup', function () {
+                draggable = false;
+                initialX = 0;
+                initialY = 0;
+            });
+
+            // "Drag" the tooltip if draggable
+            tooltip.on('mousemove', function () {
+                d3.event.preventDefault();
+
+                if (draggable) {
+                    // Calculate updated position
+                    updatedX = initialX - d3.event.clientX;
+                    updatedY = initialY - d3.event.clientY;
+                    initialX = d3.event.clientX;
+                    initialY = d3.event.clientY;
+
+                    // Update position
+                    let thisElement = d3.select(this).node();
+                    thisElement.style.top = (thisElement.offsetTop - updatedY) + 'px';
+                    thisElement.style.left = (thisElement.offsetLeft - updatedX) + 'px';
+                }
+            });
+
+            // Remove on double click
+            tooltip.on('dblclick', function () {
+                d3.select(this).remove();
+            });
+
+            // Start out in default position
+            tooltip.style('left', (d3.event.pageX + 10) + 'px')
+                .style('top', (d3.event.pageY + 10) + 'px');
+
+            let trafficInfo = generateTrafficInfo(d.packets);
+
+            if (d.id.startsWith("ip") && that.atr_iframes.has(d.id)) {
+                // Add the requisite iframe for grafana
+                tooltip.append('iframe')
+                    .attr('width', 450)
+                    .attr('height', 200)
+                    .attr('src', getATRChartURL(d.ip))
+                    .style('display', 'block');
+            } else if (d.id.startsWith("ip") && trafficInfo.size > 0) {
+                // Add the d3 vis for netbeam info
+                that.netbeamGraph(trafficInfo, tooltip);
+            } else {
+                // If neither data source is applicable, remove the tooltip
+                tooltip.remove();
+            }
+        }
     }
 }

@@ -7,13 +7,14 @@ import requests
 import urllib3
 import socket
 import threading
+import sys
 from icmplib import traceroute
-import netbeam
+from server import netbeam
 from os import path, stat
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-ip_validation_regex = re.compile(r'((25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9][0-9]|[0-9])\.)'
-                                 r'{3}(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9][0-9]|[0-9])')
+ip_validation_regex = re.compile(r'^((25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9][0-9]|[0-9])\.)'
+                                 r'{3}(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9][0-9]|[0-9])$')
 my_ip = subprocess.run(['curl', 'ifconfig.me'],
                        stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
                        universal_newlines=True).stdout.splitlines()[0]
@@ -97,7 +98,6 @@ def add_netbeam_info_threaded(d3_json, source_path=None):
 
     for tr in d3_json['traceroutes']:
         for packet in tr['packets']:
-            print(json.dumps(packet))
             if netbeam_cache.get(packet.get('ip')):
                 thread = threading.Thread(target=add_netbeam_info_tw, args=(packet, netbeam_cache[packet['ip']]))
                 threads.append(thread)
@@ -109,36 +109,9 @@ def add_netbeam_info_threaded(d3_json, source_path=None):
     return d3_json
 
 
-def add_geo_info_tw(packet):
-    if 'ip' in packet:
-        ip = packet['ip']
-    else:
-        return
-
-    response = requests.get(f'https://freegeoip.app/json/{ip}')
-
-    if response.status_code == 200 and len(response.content) != 0:
-        rjson = response.json()
-        packet['location'] = {'lat': rjson['latitude'],
-                              'lon': rjson['longitude']}
-    return
-
-
-def add_geo_info_threaded(d3_json):
-    threads = []
-    for tr in d3_json['traceroutes']:
-        for packet in tr['packets']:
-            thread = threading.Thread(target=add_geo_info_tw, args=(packet,))
-            threads.append(thread)
-            thread.start()
-
-    for thread in threads:
-        thread.join()
-
-    return d3_json
-
-
 def rdap_org_lookup(ip):
+    retError = {"org": "unknown", "domain": "unknown"}
+
     if ip not in rdap_cache:
         if ip_validation_regex.match(ip):
             print(f"Requesting Org of {ip}")
@@ -178,9 +151,9 @@ def rdap_org_lookup(ip):
                         pass
             else:
                 print(f'Received response from unknown NCC; {response.url}')
-                return {"org": "unknown", "domain": "unknown"}
+                return retError
         else:
-            return {"org": "unknown", "domain": "unknown"}
+            return retError
     return rdap_cache[ip]
 
 
@@ -192,8 +165,12 @@ def check_pscheduler(endpoint):
     """
     if not endpoint.__contains__('https'):
         endpoint = 'https://' + endpoint
-    response = requests.get(f'{endpoint}/pscheduler', verify=False).content.decode('utf8')
-    return response.__contains__('pScheduler API server')
+    try:
+        response = requests.get(f'{endpoint}/pscheduler', verify=False, timeout=6).content.decode('utf8')
+        return response.__contains__('pScheduler API server')
+    except:
+        pass
+    return False
 
 
 def target_to_ip(target):
@@ -308,8 +285,6 @@ def pscheduler_to_d3(source, dest, numRuns=1):
     limiter -= numRuns
     lock.release()
 
-    output = add_geo_info_threaded(output)
-
     return add_netbeam_info_threaded(output)
 
 
@@ -360,9 +335,6 @@ def system_to_d3_threaded(dest, numRuns=1):
         system_to_d3_tw(dest, returnArray, random.randrange(1000000))
 
     output = {'traceroutes': returnArray}
-
-    output = add_geo_info_threaded(output)
-
     return add_netbeam_info_threaded(output)
     # return output
 
@@ -445,8 +417,6 @@ def esmond_to_d3(source=None, dest=None, ts_min=None, ts_max=None,
 
     # Return output if captured. Return none otherwise.
     if len(output) != 0:
-        output = add_geo_info_threaded(output)
-
         return add_netbeam_info_threaded({'traceroutes': output})
     else:
         return None
@@ -530,7 +500,6 @@ def system_copy_to_d3(dataIn):
                     output[i]["packets"].append(toAdd)
             output[i]["target_address"] = ip
     if len(output) != 0:
-        output = add_geo_info_threaded(output)
         return add_netbeam_info_threaded({'traceroutes': output})
     else:
         return None
@@ -564,7 +533,6 @@ def add_netbeam_info_old(d3_json, source_path=None):
     return d3_json
 
 
-"""
 def system_to_d3_old_tw(dest, returnArray):
     dest_ip = target_to_ip(dest)
 
@@ -627,7 +595,6 @@ def system_to_d3_old_threaded(dest, numRuns=1):
 
     output = {'traceroutes': returnArray}
     return add_netbeam_info_threaded(output)
-"""
 
 
 def system_to_d3_old(dest, numRuns=1):
@@ -655,16 +622,12 @@ def system_to_d3_old(dest, numRuns=1):
 
     # Schedule traceroute using pscheduler (allows for remote sources)
     for _ in range(numRuns):
-        # processList.append(
-        #     subprocess.Popen(['traceroute', dest], stdout=subprocess.PIPE, universal_newlines=True))
-        processList.append(
-            subprocess.Popen(['traceroute', '-n', '-q', '1', dest], stdout=subprocess.PIPE, universal_newlines=True))
+        processList.append(subprocess.Popen(['traceroute', dest], stdout=subprocess.PIPE, universal_newlines=True))
 
     for process in processList:
         process.wait()
 
     output = []
-    parent_ip = ''
 
     for process in processList:
         output.append(dict())
@@ -674,26 +637,20 @@ def system_to_d3_old(dest, numRuns=1):
         output[i]['packets'] = []
         output[i]['packets'].append({
             'ttl': 0,
-            'parent': None,
             'ip': my_ip,
             'rtt': 0
         })
-        parent_ip = my_ip
         for line in process.communicate()[0].splitlines():
             if re.match(r'^\s*[0-9]+\s+', line):
                 split = line.split()
 
                 # Common to all items in the traceroute path.
                 toAdd = {
-                    'parent': parent_ip,
                     "ttl": int(split[0])
                 }
                 # Hop didn't reply
                 if re.match(r"No|\*", split[1]):
-                    ip = f'{my_ip}_to_{dest_ip}_unknown_hop_{int(split[0])}'
-                    toAdd['ip'] = ip
                     output[i]["packets"].append(toAdd)
-                    parent_ip = ip
                 # Hop replied; additional information available
                 else:
                     ip = ""
@@ -711,7 +668,6 @@ def system_to_d3_old(dest, numRuns=1):
                     toAdd["ip"] = ip
                     toAdd["rtt"] = rtt.__round__(3)
                     output[i]["packets"].append(toAdd)
-                    parent_ip = ip
         i += 1
         process.stdout.close()
         process.kill()
@@ -721,23 +677,4 @@ def system_to_d3_old(dest, numRuns=1):
     lock.acquire()
     limiter -= numRuns
     lock.release()
-
-    # output = add_geo_info_threaded(output)
     return add_netbeam_info_threaded(output)
-
-
-# st = time.time()
-# json.dumps(system_to_d3_old('8.8.8.8'))
-# print(time.time() - st)
-# dest = '134.55.42.38'
-#
-# for i in range(1,5):
-#     print(f'Running {i} system traceroute(s) to {dest}:')
-#     start_time = time.time()
-#     print('\tNo threading of netbeam, subprocess traceroute')
-#     system_to_d3_old(dest, i)
-#     print(f'\tTook {time.time() - start_time} seconds')
-#     start_time = time.time()
-#     print('\tThreaded netbeam, icmplib traceroute')
-#     system_to_d3_threaded(dest, i)
-#     print(f'\tTook {time.time() - start_time} seconds')

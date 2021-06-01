@@ -2,11 +2,18 @@ const width = 600;
 const height = 600;
 
 let entities = ({"traceroutes": []});
-let hiddenNTTs = ({"traceroutes" : []});
+let hiddenNTTs = ({"traceroutes": []});
+// Timeout values - pscheduler is 40 sec, system is 20 sec
+const pscheduler_timeout = 40000;
+const system_timeout = 20000;
+
+// Adds a timeout to the API calls - this can be adjusted above
+const timeout = (prom, time) => Promise.race([prom, new Promise((res) => setTimeout(
+    () => res({'error': 'Timed out'}),
+    time))]);
 
 let netbeamTableHelper = (ip, label, hops, speed) => {
-    if (!document.getElementById(`table_${ip}_${label}`))
-    {
+    if (!document.getElementById(`table_${ip}_${label}`)) {
         let collapse_body = document.getElementById(`collapse_body_${ip}`);
         collapse_body.innerHTML += `<table class="table table-bordered" id="table_${ip}_${label}">
                                         <thead>
@@ -35,10 +42,8 @@ let netbeamTableHelper = (ip, label, hops, speed) => {
         // Checks to see if value is in table already (using time)
         let rows = tbody.getElementsByTagName('tr');
         let hopExists = false;
-        for (let row of rows)
-        {
-            if (row.cells[0].innerHTML === normalizeUTCTime(hop[0]))
-            {
+        for (let row of rows) {
+            if (row.cells[0].innerHTML === normalizeUTCTime(hop[0])) {
                 hopExists = true;
                 break;
             }
@@ -68,8 +73,7 @@ const netbeamTable = async (traceroutes) => {
             if ("traffic" in packet) {
                 // Set up card for each individual IP address. Done in traffic because
                 // it's the first table generated.
-                if (accordion_div.getElementsByClassName('card').length === 0)
-                {
+                if (accordion_div.getElementsByClassName('card').length === 0) {
                     accordion_div.innerHTML += `<div class="card"><div class="card-header">Netbeam Info</div></div>`;
                 }
                 if (!document.getElementById(`collapse_${ip}`)) {
@@ -100,8 +104,7 @@ const netbeamTable = async (traceroutes) => {
     });
 }
 
-const updateViz = async() =>
-{
+const updateViz = async () => {
     let graph = await createInternetGraph(entities.traceroutes);
     let org_graph = clusterBy(graph,
         (entity) => entity.org,
@@ -110,98 +113,90 @@ const updateViz = async() =>
     return org_graph;
 }
 
+/**
+ * Handles checking/unchecking a box in the current run table.
+ * @param id
+ * @param shown
+ * @returns {Promise<void>}
+ */
 const checkHandler = async (id, shown) => {
-    console.log(id, shown);
-
+    // List of entities to search and add to respectively
     let searchNTTs = null;
     let addNTTs = null;
 
-    if (shown)
-    {
+    // If we are re-showing something, we want searchNTTs to be the list of currently hidden entities,
+    // and we want to add our "found" entity to the list to show
+    if (shown) {
         searchNTTs = hiddenNTTs;
         addNTTs = entities;
-    } else
-    {
+    // Similarly, if we are hiding something we want searchNTTs to be the list of currently shown entities,
+    // and we want to add our "found" entity to the list to hide
+    } else {
         searchNTTs = entities;
         addNTTs = hiddenNTTs;
     }
 
-    let foundObj = null;
-    let foundIter = 0;
-
-    for (let i = 0; i < searchNTTs.traceroutes.length; i++)
-    {
-        if (searchNTTs.traceroutes[i].id === id)
-        {
-            foundObj = searchNTTs.traceroutes[i];
-            foundIter = i;
-            break;
+    // Find all traceroutes with matching IDs and move them between the two lists accordingly.
+    for (let i = 0; i < searchNTTs.traceroutes.length; ++i) {
+        if (searchNTTs.traceroutes[i].id === id) {
+            addNTTs.traceroutes.push(searchNTTs.traceroutes[i]);
+            searchNTTs.traceroutes.splice(i, 1);
+            --i;
         }
     }
 
-    searchNTTs.traceroutes.splice(foundIter, 1);
-    addNTTs.traceroutes.push(foundObj);
-
+    // Update the visualization - the checkhandler sets the data after this update.
     return await updateViz();
 }
 
+/**
+ * Runs an end to end traceroute.
+ */
+const e2eBtnHandler = async (source, dest, num_runs, uuid) => {
+    // Run the traceroute (with timeout)
+    let result = await timeout(runTraceroute(source, dest, num_runs), source ? pscheduler_timeout : system_timeout)
+        .then(
+            // OnFulfillment
+            (value) => {
+                if (value.error) {
+                    // This will be timeout or pScheduler
+                    document.getElementById(`${uuid}_status`).innerHTML = value.error;
+                    return null;
+                } else {
+                    document.getElementById(`${uuid}_status`).innerHTML = 'Finished';
+                    return value;
+                }
+            },
+            // If rejected we ran into an unknown error
+            _ => {
+                document.getElementById(`${uuid}_status`).innerHTML = 'Unknown Error';
+                return null;
+            }
+        );
 
-const btndemo = async (source, dest, num_runs, uuid) => {
-    console.log(source, dest, num_runs);
-    const result = await runTraceroute(source, dest, num_runs);
+    // Error occured - either timed out or pscheduler error
+    if (result == null) {
+        // Disable checkbox to prevent further modification
+        let checkbox = document.getElementById(`${uuid}_selected`).children[0];
+        checkbox.checked = false;
+        checkbox.disabled = true;
+        return;
+    }
 
-
-    document.getElementById(`${uuid}_status`).innerHTML = "Finished";
-    for (let traceroute of result.traceroutes)
-    {
+    // Every traceroute from this run is given the same ID to enable/disable them later
+    for (let traceroute of result.traceroutes) {
         traceroute.id = uuid;
     }
 
-    console.log(result);
+    // Add to the netbeam table
+    netbeamTable(result.traceroutes);
 
-    await netbeamTable(result.traceroutes);
-
+    // Update the visualization
     entities.traceroutes = entities.traceroutes.concat(result.traceroutes);
-    //console.log(entities.traceroutes);
-    // let graph = await createInternetGraph(entities.traceroutes);
-    // let org_graph = clusterBy(graph,
-    //     (entity) => entity.org,
-    //     (entity) => new Set([...entity.source_ids, ...entity.target_ids]),
-    //     "Org");
-    // return org_graph;
-    return await updateViz();
+
+    let data = await updateViz();
+
+    viz.setData(data);
 }
 
-const demo = async (dest1, dest2) => {
-    // const result1 = await d3.json(`http://habanero.chpc.utah.edu:5000/api/v1/resources/traceroutes?dest=${dest1}`);
-    // const result2 = await d3.json(`http://habanero.chpc.utah.edu:5000/api/v1/resources/traceroutes?dest=${dest2}`);
-    const result1 = await d3.json(`http://localhost:5000/api/v1/resources/traceroutes?dest=${dest1}`);
-    const result2 = await d3.json(`http://localhost:5000/api/v1/resources/traceroutes?dest=${dest2}`);
-    let graph1 = await createInternetGraph(result1.traceroutes);
-    let graph2 = await createInternetGraph(result2.traceroutes);
-    let graph = mergeInternetGraphs(graph1, graph2);
-    let org_graph = clusterBy(graph,
-        (entity) => entity.org,
-        (entity) => new Set([...entity.source_ids, ...entity.target_ids]),
-        "Org");
-    return org_graph;
-}
-
-async function loadData() {
-    const metadata = await d3.json("data/esmond_examples/metadata.json");
-    const packets = await d3.json("data/esmond_examples/packets.json");
-    return ({metadata: metadata, traces: packets});
-}
-
-
-//d3.svg("resources/Utah_Utes_-_U_logo.svg").then((xml) => {
-//    console.log(xml);
-//    let xmlDoc = d3.select(xml.documentElement);
-//    let v = d3.select("#d3_vis").node().appendChild(xml.documentElement);
-//    console.log(xmlDoc);
-//}); 
-
-
-//const viz = new Vizualization("#d3_vis");
-let altViz = new NetworkGraph(null, '#d3_vis');
-//demo("8.8.8.8", "9.9.9.9").then(data => {viz.setData(data)});
+const viz = new Vizualization("#d3_vis");

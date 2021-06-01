@@ -37,7 +37,6 @@ def createIP2ResourceDict(filePath=None):
         return
 
 
-
 def timeInterval(interval="15m", startPoint=time.time()):
     """
     Takes a time interval and returns the unix time values (in ms) corresponding to the edges of the time interval.
@@ -191,9 +190,10 @@ def getTrafficByTimeRange(resource: str = "devices/wash-cr5/interfaces/to_wash-b
 
     res = {}
 
+    # rInfo = something like [traffic, True, Traffic]
     for rInfo in zip(requestTypes, units, properNames):
         try:
-            r = requests.get(requestStr(rInfo[0]), timeout=4)
+            r = requests.get(requestStr(rInfo[0]), timeout=5)
 
             if r.status_code == 200 and len(r.content) != 0:
                 res[rInfo[0]] = r.json()

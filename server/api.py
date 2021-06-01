@@ -30,13 +30,17 @@ def traceroutes():
 
     # Use the jsonify function from Flask to convert our list of
     # Python dictionaries to the JSON format.
+    # TODO : MOVE TIMEOUT TO HERE AND RETURN AS ERROR
     if source:
         if d3_conversion.check_pscheduler(source):
+            print(f'{source} accepted as pScheduler source')
             response = d3_conversion.pscheduler_to_d3(source, dest, num_runs)
         else:
-            return f"Error: pScheduler not found at {source}"
+            response = {'error': 'pScheduler Error'}
     else:
         response = d3_conversion.system_to_d3_old(dest, num_runs)
+
+    print(response)
 
     response = jsonify(response)
 
