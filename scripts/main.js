@@ -1,7 +1,7 @@
-const width = 600;
-const height = 600;
+// const width = 600;
+// const height = 600;
 
-let entities = ({"traceroutes": []});
+let visibleNTTs = ({"traceroutes": []});
 let hiddenNTTs = ({"traceroutes": []});
 // Timeout values - pscheduler is 40 sec, system is 20 sec
 const pscheduler_timeout = 40000;
@@ -105,10 +105,13 @@ const netbeamTable = async (traceroutes) => {
 }
 
 const updateViz = async () => {
-    let graph = await createInternetGraph(entities.traceroutes);
+    // Create new graph from
+    let graph = await createInternetGraph(visibleNTTs.traceroutes);
     let org_graph = clusterBy(graph,
         (entity) => entity.org,
-        (entity) => new Set([...entity.source_ids, ...entity.target_ids]),
+        // TODO: verify that changing this from source + target ids to just target ids is okay
+        (entity) => new Set([...entity.target_ids]),
+        // (entity) => new Set([...entity.source_ids, ...entity.target_ids]),
         "Org");
     return org_graph;
 }
@@ -128,11 +131,11 @@ const checkHandler = async (id, shown) => {
     // and we want to add our "found" entity to the list to show
     if (shown) {
         searchNTTs = hiddenNTTs;
-        addNTTs = entities;
+        addNTTs = visibleNTTs;
     // Similarly, if we are hiding something we want searchNTTs to be the list of currently shown entities,
     // and we want to add our "found" entity to the list to hide
     } else {
-        searchNTTs = entities;
+        searchNTTs = visibleNTTs;
         addNTTs = hiddenNTTs;
     }
 
@@ -192,11 +195,9 @@ const e2eBtnHandler = async (source, dest, num_runs, uuid) => {
     netbeamTable(result.traceroutes);
 
     // Update the visualization
-    entities.traceroutes = entities.traceroutes.concat(result.traceroutes);
+    visibleNTTs.traceroutes = visibleNTTs.traceroutes.concat(result.traceroutes);
 
-    let data = await updateViz();
-
-    viz.setData(data);
+    return await updateViz();
 }
 
 const viz = new Vizualization("#d3_vis");

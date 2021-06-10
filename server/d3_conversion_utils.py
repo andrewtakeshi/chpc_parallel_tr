@@ -21,50 +21,55 @@ def ip_to_asn(ip):
 
 
 def rdap_org_lookup(ip):
-    retError = {"org": "unknown", "domain": "unknown"}
+    ret_error = {"org": "unknown", "domain": "unknown"}
 
     if ip not in rdap_cache:
         if ip_validation_regex.match(ip):
             print(f"Requesting Org of {ip}")
-            response = requests.get(f'https://rdap.arin.net/registry/ip/{ip}', timeout=6)
-            # ARIN managed networks
-            if response.url.__contains__('arin'):
-                print('Received response from ARIN')
-                for ntt in response.json()['entities']:
-                    try:
-                        rdap_cache[ip] = {"org": ntt['vcardArray'][1][1][3]}
-                        break
-                    except:
-                        pass
-                for ntt in response.json()['entities']:
-                    try:
-                        rdap_cache[ip]["domain"] = ntt['vcardArray'][1][5][3].split('@')[-1]
-                        print(rdap_cache[ip])
-                        break
-                    except:
-                        pass
-                if "domain" not in rdap_cache[ip]:
-                    for ntt in response.json()['entities'][0]['entities']:
+            try:
+                response = requests.get(f'https://rdap.arin.net/registry/ip/{ip}')
+                if response.status_code != 200:
+                    return ret_error
+                # ARIN managed networks
+                if response.url.__contains__('arin'):
+                    print('Received response from ARIN')
+                    for ntt in response.json()['entities']:
                         try:
-                            rdap_cache[ip]["domain"] = ntt['vcardArray'][1][5][3].split('@')[-1]
+                            rdap_cache[ip] = {"org": ntt['vcardArray'][1][1][3]}
                             break
                         except:
                             pass
-            # RIPE managed networks
-            elif response.url.__contains__('ripe'):
-                print('Received response from RIPE')
-                for ntt in response.json()['entities']:
-                    try:
-                        if 'registrant' in ntt['roles']:
-                            rdap_cache[ip] = {"org": ntt['handle'], "domain": "unknown"}
+                    for ntt in response.json()['entities']:
+                        try:
+                            rdap_cache[ip]["domain"] = ntt['vcardArray'][1][5][3].split('@')[-1]
+                            print(rdap_cache[ip])
                             break
-                    except:
-                        pass
-            else:
-                print(f'Received response from unknown NCC; {response.url}')
-                return retError
+                        except:
+                            pass
+                    if "domain" not in rdap_cache[ip]:
+                        for ntt in response.json()['entities'][0]['entities']:
+                            try:
+                                rdap_cache[ip]["domain"] = ntt['vcardArray'][1][5][3].split('@')[-1]
+                                break
+                            except:
+                                pass
+                # RIPE managed networks
+                elif response.url.__contains__('ripe'):
+                    print('Received response from RIPE')
+                    for ntt in response.json()['entities']:
+                        try:
+                            if 'registrant' in ntt['roles']:
+                                rdap_cache[ip] = {"org": ntt['handle'], "domain": "unknown"}
+                                break
+                        except:
+                            pass
+                else:
+                    print(f'Received response from unknown NCC; {response.url}')
+                    return ret_error
+            except requests.exceptions.ConnectionError:
+                return ret_error
         else:
-            return retError
+            return ret_error
     return rdap_cache[ip]
 
 

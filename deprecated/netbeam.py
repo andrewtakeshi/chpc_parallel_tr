@@ -9,7 +9,7 @@ url = "http://netbeam.es.net"
 
 def createIP2ResourceDict(filePath=None):
     if filePath is None:
-        f = open("interfaces.json", "wt")
+        f = open("../server/interfaces.json", "wt")
     else:
         f = open(filePath, "wt")
 

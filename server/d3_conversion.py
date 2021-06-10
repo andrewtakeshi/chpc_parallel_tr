@@ -110,7 +110,7 @@ def pscheduler_to_d3(source, dest, num_runs=1):
     limiter -= num_runs
     lock.release()
 
-    return d3_netbeam.add_netbeam_info_threaded(output)
+    return add_additional_information(output)
 
 
 # Thread specific work
@@ -159,7 +159,7 @@ def system_to_d3_threaded(dest, num_runs=1):
         system_to_d3_tw(dest, return_array, random.randrange(1000000))
 
     output = {'traceroutes': return_array}
-    return d3_netbeam.add_netbeam_info_threaded(output)
+    return add_additional_information(output)
 
 
 def esmond_to_d3(source=None, dest=None, ts_min=None, ts_max=None,
@@ -391,7 +391,7 @@ def system_to_d3_old_threaded(dest, numRuns=1):
         threads[i].join()
 
     output = {'traceroutes': returnArray}
-    return d3_netbeam.add_netbeam_info_threaded(output)
+    return add_additional_information(output)
 
 
 def system_to_d3_old(dest, numRuns=1):
@@ -476,6 +476,11 @@ def system_to_d3_old(dest, numRuns=1):
     lock.acquire()
     limiter -= numRuns
     lock.release()
-    output = d3_netbeam.add_netbeam_info_threaded(output)
-    print(output)
-    return d3_geo_ip.add_geo_info_naive(output)
+    return add_additional_information(output)
+
+
+def add_additional_information(d3_json):
+    d3_json = d3_netbeam.add_netbeam_info_threaded(d3_json)
+    # d3_json = d3_geo_ip.add_geo_info_naive(d3_json)
+    d3_json = d3_geo_ip.add_geo_info_threaded(d3_json)
+    return d3_json

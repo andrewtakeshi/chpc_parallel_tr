@@ -1,10 +1,11 @@
 import flask
 from flask import request, jsonify
-from server import d3_conversion
+from server import d3_conversion, d3_conversion_utils
+from flask_cors import CORS
 
 app = flask.Flask(__name__)
 app.config["DEBUG"] = True
-
+CORS(app)
 
 @app.route('/', methods=['GET'])
 def home():
@@ -56,7 +57,7 @@ def iporgs():
     else:
         return "Error: No 'ip' field provided. Please specify an IP address."
 
-    response = d3_conversion.rdap_org_lookup(ip)
+    response = d3_conversion_utils.rdap_org_lookup(ip)
     response = jsonify(response)
     response.headers.add('Access-Control-Allow-Origin', '*')
     return response

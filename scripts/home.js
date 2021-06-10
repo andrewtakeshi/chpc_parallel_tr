@@ -58,7 +58,7 @@ async function resetForms()
     document.getElementById("cr_table").getElementsByTagName('tbody')[0].innerHTML = "";
     document.getElementById("netbeam_accordion").innerHTML = "";
 
-    entities.traceroutes = [];
+    visibleNTTs.traceroutes = [];
     hiddenNTTs.traceroutes = [];
 
     return await updateViz();
