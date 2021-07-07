@@ -4,8 +4,11 @@ import time
 import threading
 import requests
 import re
+import sqlite3
+import calendar
 
-url = "http://netbeam.es.net"
+NETBEAM_URL = "http://netbeam.es.net"
+
 
 # TODO: Remove this and use isodate library with ISO 8601 formatted durations instead.
 def time_interval(interval="15m", start_time=time.time()):
@@ -46,6 +49,58 @@ def time_interval(interval="15m", start_time=time.time()):
         return begin, end_time
 
 
+def refresh_netbeam_db(db_path):
+    con = sqlite3.connect(db_path)
+    cur = con.cursor()
+
+    try:
+        r = requests.get(f"{NETBEAM_URL}/api/network/esnet/prod/interfaces", timeout=5)
+        for resource in r.json():
+            if resource['ipv4']:
+                try:
+                    cur.execute('insert into resources values (?, ?, ?, current_timestamp)',
+                                (resource['ipv4'], resource['resource'],
+                                 resource['speed'] * 1000000 if resource['speed'] else None))
+                except sqlite3.IntegrityError:
+                    continue
+        con.commit()
+        con.close()
+    except requests.exceptions.Timeout:
+        return
+
+
+def ip_to_netbeam_db(db_path='netbeam_ip_map.db'):
+    con = sqlite3.connect(db_path)
+    cur = con.cursor()
+
+    try:
+        cur.execute('select * from resources limit 1')
+    except sqlite3.OperationalError as e:
+        cur.execute(
+            'create table resources (ip text primary key not null, resource text, '
+            'speed numeric, timestamp datetime default current_timestamp)')
+        con.commit()
+        con.close()
+        refresh_netbeam_db(db_path)
+        return
+
+    time_format = '%Y-%m-%d %H:%M:%S'
+
+    last_time = cur.execute('select timestamp from resources order by timestamp limit 1').fetchone()[0]
+    con.commit()
+    con.close()
+
+    if not last_time:
+        refresh_netbeam_db(db_path)
+        return
+
+    last_time = time.strptime(last_time, time_format)
+
+    if time.time() - calendar.timegm(last_time) > 1:  # 60 * 60 * 24:
+        refresh_netbeam_db(db_path)
+        return
+
+
 def ip_to_resource_dict(filePath=None):
     if filePath is None:
         f = open("interfaces.json", "wt")
@@ -55,7 +110,7 @@ def ip_to_resource_dict(filePath=None):
     res = {}
 
     try:
-        r = requests.get(f"{url}/api/network/esnet/prod/interfaces", timeout=5)
+        r = requests.get(f"{NETBEAM_URL}/api/network/esnet/prod/interfaces", timeout=5)
 
         if r.status_code == 200:
             for item in r.json():
@@ -98,7 +153,8 @@ def netbeam_traffic_by_time_range(resource: str = "devices/wash-cr5/interfaces/t
     proper_names = ["Traffic", "Unicast Packets", "Discards", "Errors"]
 
     # API endpoint is nearly identical for all the different things; only differs @ requestType.
-    request_str = lambda request_type: f"{url}/api/network/esnet/prod/{resource}/{request_type}?begin={begin}&end={end}"
+    request_str = lambda \
+            request_type: f"{NETBEAM_URL}/api/network/esnet/prod/{resource}/{request_type}?begin={begin}&end={end}"
 
     begin, end = time_interval(interval=interval)
 
@@ -118,6 +174,58 @@ def netbeam_traffic_by_time_range(resource: str = "devices/wash-cr5/interfaces/t
             return None
 
     return res
+
+
+def add_netbeam_info_db_naive(d3_json, db_path='netbeam_ip.db'):
+    ip_to_netbeam_db(db_path)
+
+    con = sqlite3.connect(db_path)
+    cur = con.cursor()
+
+    for tr in d3_json['traceroutes']:
+        for packet in tr['packets']:
+            if packet.get('ip'):
+                db_result = cur.execute('select * from resources where ip=(?)', (packet['ip'],)).fetchone()
+                if db_result:
+                    packet['resource'] = db_result[1]
+                    packet['speed'] = db_result[2]
+                    res = netbeam_traffic_by_time_range(db_result[1])
+                    if res is not None:
+                        packet['traffic'] = res['traffic']['points']
+                        packet['unicast_packets'] = res['unicast_packets']['points']
+                        packet['discards'] = res['discards']['points']
+                        packet['errors'] = res['errors']['points']
+
+                    return d3_json
+    con.close()
+
+
+def add_netbeam_info_db_threaded(d3_json, db_path='netbeam_ip.db'):
+    ip_to_netbeam_db(db_path)
+
+    con = sqlite3.connect(db_path)
+    cur = con.cursor()
+
+    threads = []
+
+    for tr in d3_json['traceroutes']:
+        for packet in tr['packets']:
+            if packet.get('ip'):
+                db_result = cur.execute('select * from resources where ip=(?)', (packet['ip'],)).fetchone()
+                if db_result:
+                    netbeam_item = {
+                        'resource': db_result[1],
+                        'speed': db_result[2]
+                    }
+                    thread = threading.Thread(target=add_netbeam_info_tw, args=(packet, netbeam_item))
+                    threads.append(thread)
+                    thread.start()
+
+    for thread in threads:
+        thread.join()
+
+    con.close()
+    return d3_json
 
 
 def add_netbeam_info_naive(d3_json, source_path=None):

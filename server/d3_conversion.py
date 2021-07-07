@@ -479,8 +479,21 @@ def system_to_d3_old(dest, numRuns=1):
     return add_additional_information(output)
 
 
+def remove_unknowns(d3_json):
+    for tr in d3_json['traceroutes']:
+        i = 0
+        while i < len(tr['packets']):
+            packet = tr['packets'][i]
+            if 'ip' not in packet:
+                tr['packets'].remove(packet)
+            else:
+                i += 1
+    return d3_json
+
 def add_additional_information(d3_json):
+    d3_json = remove_unknowns(d3_json)
     d3_json = d3_netbeam.add_netbeam_info_threaded(d3_json)
-    # d3_json = d3_geo_ip.add_geo_info_naive(d3_json)
     d3_json = d3_geo_ip.add_geo_info_threaded(d3_json)
+    # d3_json = d3_geo_ip.add_geo_info_naive(d3_json)
+    # d3_json = d3_netbeam.add_netbeam_info_db_naive(d3_json)
     return d3_json

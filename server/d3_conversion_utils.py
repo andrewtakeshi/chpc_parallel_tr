@@ -20,8 +20,9 @@ def ip_to_asn(ip):
         return None
 
 
+# TODO: REMOVE THIS AND REPLACE WITH WHOIS LOOKUP
 def rdap_org_lookup(ip):
-    ret_error = {"org": "unknown", "domain": "unknown"}
+    ret_error = {"org": None, "domain": None}
 
     if ip not in rdap_cache:
         if ip_validation_regex.match(ip):

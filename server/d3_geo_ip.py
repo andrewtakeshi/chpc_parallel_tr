@@ -2,6 +2,30 @@ import requests
 import threading
 from server import d3_conversion_utils
 
+geo_cache = dict()
+
+
+def whois_ip(dest):
+    if dest not in geo_cache:
+        dest = d3_conversion_utils.target_to_ip(dest)
+        if d3_conversion_utils.ip_validation_regex.match(dest):
+            r = requests.get(f'http://ipwhois.app/json/{dest}')
+            if r.status_code == 200:
+                json = dict(r.json())
+                if json.keys().__contains__('latitude'):
+                    geo_cache[dest] = {
+                        'lat': float(json['latitude']),
+                        'lon': float(json['longitude']),
+                        'org': json['org']
+                    }
+                else:
+                    geo_cache[dest] = {
+                        'lat': None,
+                        'lon': None,
+                        'org': None
+                    }
+    return geo_cache[dest]
+
 
 def ip_to_geo(dest):
     if d3_conversion_utils.ip_validation_regex.match(dest):
@@ -51,17 +75,15 @@ def add_geo_info_threaded(d3_json):
     for thread in threads:
         thread.join()
 
-    i = front = back = 0
-
     for tr in d3_json['traceroutes']:
         # Use the UU Bookstore as an arbitrary "default" until a better one is found
         last_known = {
             'x': 40.7637,
             'y': -111.8475
         }
+
         # TODO: Assign undefined packets as average of the previous and next defined ones.
         for packet in tr['packets']:
-            # print(i, front, back)
             if packet['lon'] is not None:
                 last_known['lon'] = packet['lon']
                 last_known['lat'] = packet['lat']

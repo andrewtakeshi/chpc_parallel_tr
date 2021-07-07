@@ -1,11 +1,108 @@
-// const width = 600;
-// const height = 600;
-
 let visibleNTTs = ({"traceroutes": []});
 let hiddenNTTs = ({"traceroutes": []});
 // Timeout values - pscheduler is 40 sec, system is 20 sec
 const pscheduler_timeout = 40000;
 const system_timeout = 20000;
+
+// function formLogger(form) {
+//     if (validate(form)) {
+//         let text = "";
+//         for (let i = 0; i < form.length; i++) {
+//             if (form.elements[i].tagName != "BUTTON") {
+//                 text += form.elements[i].name + ": " + form.elements[i].value + "\n";
+//             }
+//         }
+//         console.log(text);
+//     }
+// }
+//
+// function validate(form) {
+//     let accepted = true;
+//     for (let i = 0; i < form.length; i++) {
+//         if (form.elements[i].tagName == "INPUT") {
+//
+//             let name = form.elements[i].id;
+//             let spanName = name + "_warn";
+//             if (form.elements[i].value == "") {
+//                 accepted = false;
+//                 document.getElementById(spanName).hidden = false;
+//             } else {
+//                 document.getElementById(spanName).hidden = true;
+//             }
+//         }
+//     }
+//
+//     return accepted;
+// }
+
+async function resetForms() {
+    let forms = $("form");
+    for (let form of forms) {
+        form.reset();
+    }
+    // for (let i = 0; i < forms.length; i++) {
+    //     forms[i].reset();
+    // }
+
+    let warnings = $("[name='warn']");
+    for (let warning of warnings) {
+        warning.hidden = true;
+    }
+    // for (let i = 0; i < warnings.length; i++) {
+    //     warnings[i].hidden = true;
+    // }
+
+    // Hide tables on reset.
+    document.getElementById("current_run_table_area").style.visibility = "hidden";
+    document.getElementById("netbeam_table_area").style.visibility = "hidden";
+    // Clear tables on reset.
+    document.getElementById("cr_table").getElementsByTagName('tbody')[0].innerHTML = "";
+    document.getElementById("netbeam_accordion").innerHTML = "";
+
+    visibleNTTs.traceroutes = [];
+    hiddenNTTs.traceroutes = [];
+
+    return await updateViz();
+}
+
+function addToCRTable(uuid) {
+    if (document.getElementById("esmond_ip_dest").value === "")
+        return;
+
+    document.getElementById("current_run_table_area").style.visibility = "visible";
+
+    let numRows = document.getElementById('cr_table').rows.length - 1;
+    let tbody = document.getElementById('cr_table').getElementsByTagName('tbody')[0];
+    let cell_ids = ['type', 'source', 'dest', 'numRuns', 'status', 'selected']
+
+    let row = tbody.insertRow();
+    row.id = `${uuid}`;
+    for (let i = 0; i < 6; i++) {
+        row.insertCell(i);
+        row.cells[i].id = `${uuid}_${cell_ids[i]}`
+    }
+
+    let source = document.getElementById("esmond_ip_source").value;
+    let dest = document.getElementById("esmond_ip_dest").value;
+    let type = source ? "pScheduler" : "System";
+    let numRuns = document.getElementById("esmond_num_runs").value;
+
+
+    row.cells[0].innerHTML = type;
+    row.cells[1].innerHTML = source ? source : self.location.hostname;
+    row.cells[2].innerHTML = dest;
+    row.cells[3].innerHTML = numRuns;
+    row.cells[4].innerHTML = "Pending"
+    row.cells[5].style.textAlign = "center";
+
+    let checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.checked = true;
+    checkbox.onchange = function () {
+        checkHandler(uuid, checkbox.checked).then(data => viz.setData(data));
+    }
+    row.cells[5].appendChild(checkbox);
+}
 
 // Adds a timeout to the API calls - this can be adjusted above
 const timeout = (prom, time) => Promise.race([prom, new Promise((res) => setTimeout(
@@ -132,8 +229,8 @@ const checkHandler = async (id, shown) => {
     if (shown) {
         searchNTTs = hiddenNTTs;
         addNTTs = visibleNTTs;
-    // Similarly, if we are hiding something we want searchNTTs to be the list of currently shown entities,
-    // and we want to add our "found" entity to the list to hide
+        // Similarly, if we are hiding something we want searchNTTs to be the list of currently shown entities,
+        // and we want to add our "found" entity to the list to hide
     } else {
         searchNTTs = visibleNTTs;
         addNTTs = hiddenNTTs;
@@ -197,7 +294,32 @@ const e2eBtnHandler = async (source, dest, num_runs, uuid) => {
     // Update the visualization
     visibleNTTs.traceroutes = visibleNTTs.traceroutes.concat(result.traceroutes);
 
+    // return result.traceroutes[0];
+
+    // TODO: MAKE THIS LESS DEPENDENT ON VIZ
     return await updateViz();
 }
 
+
 const viz = new Vizualization("#d3_vis");
+
+// const map = new MapVisualization('#map_vis');
+
+const force_map = new ForceMap('#map_vis');
+
+d3.json('resources/states-10m.json').then(data => {
+    data = topojson.feature(data, data.objects.states);
+    // d3.json('resources/countries-50m.json').then(data => {
+//     data = topojson.feature(data, data.objects.countries);
+
+    force_map.setTopography(data);
+    force_map.drawMap();
+});
+
+// d3.json('resources/states-10m.json').then(data => {
+//     // let outline = topojson.feature(data, data.objects.nation);
+//     console.log(data);
+//     map_vis.setTopography(data);
+//     map_vis.drawMap();
+// });
+
