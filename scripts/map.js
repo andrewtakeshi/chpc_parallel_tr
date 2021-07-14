@@ -1,121 +1,28 @@
-class MapVisualization {
-    constructor(root_element) {
-        this.width = 800;
-        this.height = 600;
-
-        this.root_element = root_element;
-        this.topojson = null;
-        this.path = d3.geoPath().projection(this.projection);
-
-        this.packets = new Map();
-    }
-
-    setTopography(topojson) {
-        this.topojson = topojson;
-    }
-
-    zoomed() {
-        d3.select(this)
-            .selectAll('path')
-            .style('stroke-width', 1 / d3.event.transform.k + 'px')
-            .attr('transform', d3.event.transform);
-        d3.select(this)
-            .selectAll('circle')
-            .attr('r', d => d.radius / d3.event.transform.k)
-            .attr('transform', d3.event.transform);
-    }
-
-    update(latExt, lonExt) {
-        this.latExt = latExt;
-        this.lonExt = lonExt;
-    }
-
-    drawMap() {
-        this.svg = d3.select(this.root_element)
-            .append('svg')
-            .attr('id', 'map_svg')
-            .style('display', 'block')
-            .style('margin', 'auto')
-            .attr('width', this.width)
-            .attr('height', this.height);
-
-        this.zoom = d3.zoom()
-            .scaleExtent([1, 20])
-            .on('zoom', this.zoomed);
-        this.svg.call(this.zoom);
-
-        let country_collection = topojson.feature(this.topojson, this.topojson.objects.countries);
-
-        // let state_collection = topojson.feature(this.topojson, this.topojson.objects.states);
-        //
-        // // Remove non-contiguous states from the feature list.
-        // let remove_list = ['72', '78', '60', '66', '69', '15', '02'];
-        // for (let i = 0; i < state_collection.features.length; i++) {
-        //     let state = state_collection.features[i];
-        //     if (remove_list.includes(state.id)) {
-        //         state_collection.features.splice(i, 1);
-        //         i--;
-        //     }
-        // }
-
-        this.projection = d3.geoEquirectangular()
-            .fitSize([this.width, this.height], country_collection);
-
-        let path = d3.geoPath().projection(this.projection);
-
-        this.state_outline = this.svg.selectAll('path')
-            .data(country_collection.features)
-            .join('path')
-            .attr('id', d => `${d.id}_map`)
-            .classed('outline', true)
-            .attr('d', path);
-    }
-
-    drawNodes(data) {
-        for (let packet of data.packets) {
-            if (packet.ip) {
-                if (this.packets.has(packet.ip)) {
-                    this.packets.get(packet.ip).count += 1;
-                } else {
-                    this.packets.set(packet.ip, {
-                        count: 1,
-                        lat: packet.lat,
-                        lon: packet.lon
-                    });
-                }
-            }
-        }
-
-        this.nodeScalar = d3.scaleLinear()
-            .domain(d3.extent([...this.packets.values()], d => d.count))
-            .range([1, 10]);
-
-        for (let packet of this.packets.values()) {
-            packet.radius = this.nodeScalar(packet.count);
-        }
-
-        this.svg.selectAll('circle')
-            .data([...this.packets.values()])
-            .join('circle')
-            .classed('map_node', true)
-            .attr('cx', d => this.projection([d.lon, d.lat])[0])
-            .attr('cy', d => this.projection([d.lon, d.lat])[1])
-            .attr('r', d => d.radius);
-    }
-}
-
 class ForceMap {
-    constructor(root_element, width = 1200, height = 800) {
+    constructor(root_element, width = 1200, height = 800, showMap = true) {
         // Common elements
         this.width = width;
         this.height = height;
-        this.root_element = root_element;
-        this.svg = d3.select(this.root_element)
+        this.showMap = showMap;
+        this.rootElement = root_element;
+        this.svg = d3.select(this.rootElement)
             .append('svg')
             .attr('width', this.width)
             .attr('height', this.height)
             .style('display', 'block')
             .style('margin', 'auto');
+
+        function filterFunc() {
+            let event = d3.event;
+            return !(event.type === 'dblclick');
+        }
+
+        this.zoom = d3.zoom()
+            .scaleExtent([1, 20])
+            // TODO: Mess with the translateExtent
+            .translateExtent([[-this.width + 150, -this.height + 150], [2 * this.width - 150, 2 * this.width - 150]])
+            .filter(filterFunc)
+            .on('zoom', this.zoomHandler);
 
         this.forceG = this.svg.append('g')
             .attr('id', 'forceGroup');
@@ -126,9 +33,6 @@ class ForceMap {
 
         this.projection = d3.geoEquirectangular();
         this.path = d3.geoPath().projection(this.projection);
-        this.zoom = d3.zoom()
-            .scaleExtent([1, 20])
-            .on('zoom', this.zoomed);
         this.packets = new Map();
 
         // Force specific
@@ -163,35 +67,17 @@ class ForceMap {
             .attr('stroke', '#999')
             .attr('stroke-opacity', 0.6)
             .attr('marker-end', 'url(#end)')
+            .attr('stroke-width', 1)
             .selectAll('line');
 
-        this.all_nodes = this.forceG.append('g')
+        this.allNodes = this.forceG.append('g')
             .classed('all_nodes', true)
             .attr('stroke', '#fff')
             .attr('stroke-width', 1.5)
             .selectAll('circle');
 
-        // Initialize interactivity
-        // TODO: Add position force which pulls to correct x/y after scale.
-        this.simulation = d3.forceSimulation()
-            .force('collision', d3.forceCollide()
-                .radius(d => this.getNodeRadiusPackets(d))
-                .strength(0.1))
-            // .force('forceX', d3.forceX(d => this.getXPos(d)))
-            // .force('forceY', d3.forceY(d => this.getYPos(d)));
-            .force('forceX', d3.forceX(d => this.projection([d.lon, d.lat])[0])
-                .strength(1))
-            .force('forceY', d3.forceY(d => this.projection([d.lon, d.lat])[1])
-                .strength(1));
-
-        this.simulation.on('tick', () => {
-            this.all_links
-                .attr('x1', d => d.source.x)
-                .attr('y1', d => d.source.y)
-                .attr('x2', d => d.target.x)
-                .attr('y2', d => d.target.y);
-            this.all_nodes.attr('transform', d => `translate(${d.x}, ${d.y})`);
-        });
+        this.toggleMap();
+        this.setSimulation();
 
         this.maxBW = this.svg.append('g');
     }
@@ -204,39 +90,65 @@ class ForceMap {
         this.topojson = topojson;
     }
 
-    zoomed() {
-        d3.select(this)
+    zoomHandler() {
+        // Map transforms
+        d3.select('#mapGroup')
             .selectAll('path')
             .style('stroke-width', 1 / d3.event.transform.k + 'px')
             .attr('transform', d3.event.transform);
-        d3.select(this)
-            .selectAll('circle')
-            .attr('r', d => d.radius / d3.event.transform.k)
-            .attr('transform', d3.event.transform);
+
+        let all_nodes = d3.select('#forceGroup')
+            .selectAll('g.single_node');
+
+        // If force nodes exist, perform force transforms
+        if (all_nodes.nodes().length > 0) {
+            // Select image and circle and perform appropriate transforms
+            all_nodes.selectAll('circle')
+                .attr('r', d => (d.radius / 2) / d3.event.transform.k);
+            all_nodes.selectAll('image')
+                .attr('width', d => d.radius / d3.event.transform.k)
+                .attr('height', d => d.radius / d3.event.transform.k)
+                .attr('x', d => (-1 * d.radius / 2) / d3.event.transform.k)
+                .attr('y', d => (-1 * d.radius / 2) / d3.event.transform.k);
+
+            // Transform links
+            d3.select('#forceGroup')
+                .selectAll('line.link')
+                .attr('stroke-width', 1 / d3.event.transform.k + 'px');
+
+            // Move the entire force group
+            d3.select('#forceGroup')
+                .attr('transform', d3.event.transform);
+        }
     }
 
+    toggleMap() {
+        if (this.showMap) {
+            this.zoom.on('zoom', this.zoomHandler);
+            this.drawMap();
+        } else {
+            this.svg.call(this.zoom.transform, d3.zoomIdentity);
+            this.zoom.on('zoom', null);
+            this.mapG.selectAll('path').remove();
+        }
+    }
+
+
     drawMap() {
-        // TODO : Possilby change to mapG
-        // this.svg.call(this.zoom);
-
-        // let country_collection = topojson.feature(this.topojson, this.topojson.objects.countries);
-
-        let remove_list = ['72', '78', '60', '66', '69', '15', '02'];
-        for (let i = 0; i < this.topojson.features.length; i++) {
-            let state = this.topojson.features[i];
-            if (remove_list.includes(state.id)) {
-                this.topojson.features.splice(i, 1);
-                i--;
-            }
+        if (!this.topojson) {
+            return;
         }
 
+        this.svg.call(this.zoom);
 
         this.projection = d3.geoEquirectangular()
             .fitSize([this.width, this.height], this.topojson);
 
         let path = d3.geoPath().projection(this.projection);
 
-        this.svg.selectAll('path')
+        this.mapG.selectAll('path').remove();
+
+        this.mapG.selectAll('path')
             .data(this.topojson.features)
             .join('path')
             .attr('id', d => `${d.id}_map`)
@@ -244,41 +156,41 @@ class ForceMap {
             .attr('d', path);
     }
 
-    // updateMapNodes(data) {
-    //     for (let packet of data.packets) {
-    //         if (packet.ip) {
-    //             if (this.packets.has(packet.ip)) {
-    //                 this.packets.get(packet.ip).count += 1;
-    //             } else {
-    //                 this.packets.set(packet.ip, {
-    //                     count: 1,
-    //                     lat: packet.lat,
-    //                     lon: packet.lon
-    //                 });
-    //             }
-    //         }
-    //     }
-    //
-    //     this.nodeScalar = d3.scaleLinear()
-    //         .domain(d3.extent([...this.packets.values()], d => d.count))
-    //         .range([1, 10]);
-    //
-    //     for (let packet of this.packets.values()) {
-    //         packet.radius = this.nodeScalar(packet.count);
-    //     }
-    //
-    //     this.mapG.selectAll('circle')
-    //         .data([...this.packets.values()])
-    //         .join('circle')
-    //         .classed('map_node', true)
-    //         .attr('cx', d => this.projection([d.lon, d.lat])[0])
-    //         .attr('cy', d => this.projection([d.lon, d.lat])[1])
-    //         .attr('r', d => d.radius);
-    // }
-
     /************************************
      ********** Force Section ***********
      ************************************/
+
+    setSimulation() {
+        if (this.showMap) {
+            // Initialize interactivity
+            this.simulation = d3.forceSimulation()
+                .force('collision', d3.forceCollide()
+                    .radius(d => d.radius))
+                // .strength(0.1))
+                .force('forceX', d3.forceX(d => this.projection([d.lon, d.lat])[0])
+                    .strength(1))
+                .force('forceY', d3.forceY(d => this.projection([d.lon, d.lat])[1])
+                    .strength(1));
+        } else {
+            this.simulation = d3.forceSimulation()
+                .force('link', d3.forceLink().id())
+                .force('charge', d3.forceManyBody())
+                .force('center', d3.forceCenter(this.width / 2, this.height / 2))
+                .force('forceY', d3.forceY(this.height / 2))
+                .force('collision', d3.forceCollide()
+                    .radius(d => d.radius));
+        }
+
+        this.simulation.on('tick', () => {
+            this.all_links
+                .attr('x1', d => d.source.x)
+                .attr('y1', d => d.source.y)
+                .attr('x2', d => d.target.x)
+                .attr('y2', d => d.target.y);
+            this.allNodes.attr('transform', d => `translate(${d.x}, ${d.y})`);
+        });
+    }
+
     collapseNode(node) {
         const _collapse = (child) => {
             child.expanded = false;
@@ -293,12 +205,17 @@ class ForceMap {
     }
 
     expandNode(node) {
+        if (node.expanded) {
+            return false;
+        }
         node.expanded = true;
         if (node.children) {
             for (var [id, child] of node.children) {
                 this.collapseNode(child);
             }
+            return true;
         }
+        return false;
     }
 
     getNodeColorOrg(node) {
@@ -306,25 +223,6 @@ class ForceMap {
         const scale = d3.scaleOrdinal(d3.schemeCategory10).domain(domain);
         return scale(node.org);
     }
-
-    getNodeRadiusPackets(node) {
-        const scale = d3.scaleLinear().domain([1, d3.max([...this.node_data.values()], v => v.packets.length)]).range([16, 24]);
-        return scale(node.packets.length)
-    }
-
-    // getXPos(node) {
-    //     let scale = d3.scaleLinear()
-    //         .domain(d3.extent(this.simulation.nodes().map(d => d.lon)))
-    //         .range([25, this.viz_width - 25]);
-    //     return scale(node.lon);
-    // }
-    //
-    // getYPos(node) {
-    //     let scale = d3.scaleLinear()
-    //         .domain(d3.extent(this.simulation.nodes().map(d => d.lat)))
-    //         .range([this.viz_height - 25, 25]);
-    //     return scale(node.lat);
-    // }
 
     /**
      * Converts node_data to a map, id => node.
@@ -346,11 +244,11 @@ class ForceMap {
         return flat_data;
     }
 
-    _drag() {
+    dragHandler() {
         let simulation = this.simulation;
-        let width = this.viz_width;
-        let height = this.viz_height;
-        let nodes = this.all_nodes;
+        let width = this.width;
+        let height = this.height;
+        let nodes = this.allNodes;
 
         let clamp = (v, lo, hi) => v < lo ? lo : v > hi ? hi : v;
 
@@ -589,33 +487,30 @@ class ForceMap {
 
         this.getOverallMaxBW();
 
-        this.node_values = Array.from(this.node_data.values());
-
-        console.log('node values');
-        console.log(this.node_values);
+        this.nodeValues = Array.from(this.node_data.values());
 
         this.vLinks = new Array();
 
         let that = this;
 
         let i = 0;
-        while (i < this.node_values.length) {
+        while (i < this.nodeValues.length) {
             // Handle 'expanded' org vNodes.
             // Update position of the children (as far as simulation is concerned)
-            if (this.node_values[i].expanded && this.node_values[i].children) {
-                for (let child of this.node_values[i].children.values()) {
+            if (this.nodeValues[i].expanded && this.nodeValues[i].children) {
+                for (let child of this.nodeValues[i].children.values()) {
                     // Inherit cluster's position in graph to avoid visual chaos
                     // TODO: Update with lat/lon - use scales defined above
                     if (child.x == undefined) {
-                        child.x = this.node_values[i].x;
-                        child.y = this.node_values[i].y;
-                        child.vx = this.node_values[i].vx;
-                        child.vy = this.node_values[i].vy;
+                        child.x = this.nodeValues[i].x;
+                        child.y = this.nodeValues[i].y;
+                        child.vx = this.nodeValues[i].vx;
+                        child.vy = this.nodeValues[i].vy;
                     }
-                    this.node_values.push(child);
+                    this.nodeValues.push(child);
                 }
                 // Remove the parent 'org' vNode.
-                this.node_values.splice(i, 1);
+                this.nodeValues.splice(i, 1);
             } else {
                 i += 1;
             }
@@ -624,8 +519,12 @@ class ForceMap {
         // Remove preloaded ATR Grafana iFrames
         this.floating_tooltip.selectAll('iframe').remove();
 
+        let nodeRadiusScale = d3.scaleLinear()
+            .domain([1, d3.max([...this.node_data.values()], v => v.packets.length)])
+            .range([16, 24]);
+
         // Preload ATR Grafana iFrames for rendered IP nodes
-        for (let d of this.node_values) {
+        for (let d of this.nodeValues) {
             if (d.id.startsWith('ip') && !this.atr_iframes.has(d.id)) {
                 const URL = getATRChartURL(d.ip);
                 if (URL.length > 0) {
@@ -637,10 +536,10 @@ class ForceMap {
                     this.atr_iframes.set(d.id, iframe);
                 }
             }
-        }
+            // }
+            // for (let d of this.node_values) {
+            // Add links to vLinks from the source node 'd' to all targets 't'
 
-        // Add links to vLinks from the source node 'd' to all targets 't'
-        for (let d of this.node_values) {
             let target_aliases = new Set();
             if (d.target_ids) {
                 for (let t of d.target_ids) {
@@ -651,57 +550,68 @@ class ForceMap {
                         this.vLinks.push(({source: d, target: this.all_nodes_flat.get(t)}));
                 }
             }
+            d.radius = nodeRadiusScale(d.packets.length);
         }
 
         // Doesn't check for domains that are unknown or undefined
         let unknown = (domain) => domain !== 'unknown' && typeof domain !== 'undefined';
 
         // Create separate group for each node
-        this.all_nodes = this.all_nodes
-            .data(this.node_values, d => d.id)
+        this.allNodes = this.allNodes
+            .data(this.nodeValues, d => d.id)
             .join('g')
             .classed('single_node', true);
 
-        this.all_nodes.selectAll('image').remove();
-        this.all_nodes.selectAll('circle').remove();
+        let zoomNode = this.allNodes.selectAll('circle').node();
+
+        let zoomDenominator = 1;
+
+        if (zoomNode) {
+            zoomDenominator = d3.zoomTransform(zoomNode).k;
+        }
+
+        this.allNodes.selectAll('image').remove();
+        this.allNodes.selectAll('circle').remove();
 
         // Add image (favicon) if we can find it using duckduckgo ico search.
-        this.all_nodes.append('image')
+        this.allNodes.append('image')
             .attr('xlink:href', d => unknown(d.domain) ? `http://icons.duckduckgo.com/ip2/${d.domain}.ico` : '')
             .attr('draggable', false)
-            .attr('width', d => this.getNodeRadiusPackets(d))
-            .attr('height', d => this.getNodeRadiusPackets(d))
-            .attr('x', d => -1 * this.getNodeRadiusPackets(d) / 2)
-            .attr('y', d => -1 * this.getNodeRadiusPackets(d) / 2);
+            .attr('width', d => (d.radius) / zoomDenominator)
+            .attr('height', d => (d.radius) / zoomDenominator)
+            .attr('x', d => (-1 * d.radius / 2) / zoomDenominator)
+            .attr('y', d => (-1 * d.radius / 2) / zoomDenominator);
 
         // Always append circle - this will show if no favicon is retrieved, otherwise opacity = 0 and it's hidden.
-        this.all_nodes.append('circle')
+        this.allNodes.append('circle')
             .classed('node', true)
-            .attr('r', d => this.getNodeRadiusPackets(d) / 2)
+            .attr('r', d => (d.radius / 2) / zoomDenominator)
             .attr('fill', d => this.getNodeColorOrg(d))
             .attr('opacity', d => unknown(d.domain) ? 0.0 : 1.0)
-
+            // Doubleclick 'pins' the charts
+            .on('dblclick', dblclickHandler)
             // Click to expand nodes
             .on('click', clickHandler)
             // Mouseover previews Grafana/d3 traffic charts
             .on('mouseover', mouseoverHandler)
             .on('mouseout', mouseoutHandler)
-            // Doubleclick 'pins' the charts
-            .on('dblclick', dblclickHandler)
             .on('mousemove', () => {
                 // Updates position of global tooltip.
                 this.floating_tooltip.style('left', (d3.event.pageX + 10) + 'px').style('top', (d3.event.pageY + 10) + 'px')
             })
-            .call(this._drag());
+            .call(this.dragHandler());
 
         this.all_links = this.all_links
             .data(this.vLinks)
             .join('line')
-            .classed('link', true);
+            .classed('link', true)
+            .attr('stroke-width', 1 / zoomDenominator);
 
-        this.simulation.nodes(this.node_values);
+        this.simulation.nodes(this.nodeValues);
         // TODO: Check effect of disabling the link forces.
-        // this.simulation.force('link', d3.forceLink(this.vLinks).id(d => d.id));
+        if (!this.showMap) {
+            this.simulation.force('link', d3.forceLink(this.vLinks).id(d => d.id));
+        }
         this.simulation.alpha(1).restart();
 
         /* ###### Helpers and Handlers ####### */
@@ -758,17 +668,20 @@ class ForceMap {
         // Expand nodes on single click (no drag)
         function clickHandler(d) {
             d3.event.preventDefault();
-            that.expandNode(d);
-            that.update();
+            if (that.expandNode(d)) {
+                that.update();
+            }
         }
 
         // Pin draggable tooltip on double click (if applicable)
         function dblclickHandler(d) {
+            d3.event.preventDefault();
+
             // Make sure that isn't already pinned
             if (d3.select(`#tooltip${CSS.escape(d.id)}`).node() !== null) return;
 
             // Create the tooltip div
-            let tooltip = d3.select(that.root_element)
+            let tooltip = d3.select(that.rootElement)
                 .append('div')
                 .attr('id', `tooltip${d.id}`)
                 .classed('tooltip removable', true)

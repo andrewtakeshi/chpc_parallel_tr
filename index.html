@@ -33,7 +33,6 @@
     <script src="scripts/index.js" defer></script>
 
 
-
     <title>Parallel Traceroute</title>
 
     <style>
@@ -117,9 +116,10 @@
                         </span>
             </div>
 
-            <div class="form-row btn-group">
-                <button id="e2e_btn" name="e2e_btn"
-                        onclick="let unique = uuid.v4();
+            <div class="form-row">
+                <div class="btn-group col-8 float-left">
+                    <button id="e2e_btn" name="e2e_btn"
+                            onclick="let unique = uuid.v4();
                                 let source = document.getElementById('esmond_ip_source').value;
                                 let dest = document.getElementById('esmond_ip_dest').value;
                                 let num_runs = document.getElementById('esmond_num_runs').value;
@@ -128,15 +128,29 @@
                                     force_map.setData(data);
                                     //viz.setData(data)
                                     });"
-                        type="submit"
-                        class="btn btn-outline-primary">End-to-end Traceroute
-                </button>
-                <!--<button id="esmond_btn" name="esmond_btn" onclick="formLogger(this.form)" type="submit"
-                        class="btn btn-outline-primary" disabled>Esmond Traceroute
-                </button> -->
-                <button id="refresh_vis_btn" class="btn btn-outline-dark"
-                        onclick="updateViz().then(data => viz.setData(data));">Refresh Visualisation
-                </button>
+                            type="submit"
+                            class="btn btn-outline-primary">
+                        End-to-end Traceroute
+                    </button>
+                    <!--<button id="esmond_btn" name="esmond_btn" onclick="formLogger(this.form)" type="submit"
+                            class="btn btn-outline-primary" disabled>Esmond Traceroute
+                    </button> -->
+                    <button id="refresh_vis_btn" class="btn btn-outline-dark"
+                            onclick="updateViz().then(data => force_map.setData(data));">
+                        Refresh Visualisation
+                    </button>
+                    <button id="map_toggle_btn" class="btn btn-outline-info"
+                            onclick="toggleMapBtnHandler().then(data => force_map.setData(data));">
+                        Hide Map
+                    </button>
+                </div>
+                <div class="btn-group col-4 float-right">
+
+                    <select id="map_select" class="form-select w-100" onchange="mapSelectHandler().then(data => force_map.setData(data));">
+                        <option selected value="world">World</option>
+                        <option value="us">Contiguous United States</option>
+                    </select>
+                </div>
             </div>
         </form>
     </div>
@@ -160,14 +174,8 @@
     </table>
 </div>
 
-<div id="map_area" style="margin-top: 25px;">
-    <div id="map_vis">
-    </div>
-</div>
-
 <div id="vis_area" style="margin-top: 25px;">
     <div id="d3_vis">
-        <!-- Placeholder for actual visualization -->
     </div>
 </div>
 
@@ -182,7 +190,7 @@
         <form id="configuration_form" name="configuration_form" onsubmit="return false">
             <div class="form-row btn-group" style="margin-top: 10px;">
                 <button id="reset_config_btn" class="btn btn-danger"
-                        onclick="resetForms().then(data => viz.setData(data));">Reset Page
+                        onclick="resetBtnHandler().then(data => force_map.setData(data));">Reset Page
                 </button>
             </div>
         </form>

@@ -35,7 +35,7 @@ const system_timeout = 20000;
 //     return accepted;
 // }
 
-async function resetForms() {
+async function resetBtnHandler() {
     let forms = $("form");
     for (let form of forms) {
         form.reset();
@@ -99,7 +99,7 @@ function addToCRTable(uuid) {
     checkbox.type = 'checkbox';
     checkbox.checked = true;
     checkbox.onchange = function () {
-        checkHandler(uuid, checkbox.checked).then(data => viz.setData(data));
+        checkHandler(uuid, checkbox.checked).then(data => force_map.setData(data));
     }
     row.cells[5].appendChild(checkbox);
 }
@@ -206,9 +206,7 @@ const updateViz = async () => {
     let graph = await createInternetGraph(visibleNTTs.traceroutes);
     let org_graph = clusterBy(graph,
         (entity) => entity.org,
-        // TODO: verify that changing this from source + target ids to just target ids is okay
-        (entity) => new Set([...entity.target_ids]),
-        // (entity) => new Set([...entity.source_ids, ...entity.target_ids]),
+        (entity) => new Set([...entity.source_ids, ...entity.target_ids]),
         "Org");
     return org_graph;
 }
@@ -300,26 +298,61 @@ const e2eBtnHandler = async (source, dest, num_runs, uuid) => {
     return await updateViz();
 }
 
+function setTopojson(selectedOption) {
+    let resourceString = '';
+    switch (selectedOption) {
+        case 'world':
+            resourceString = 'resources/countries-50m.json';
+            break;
+        case 'us':
+            resourceString = 'resources/states-10m.json';
+            break;
+    }
 
-const viz = new Vizualization("#d3_vis");
 
-// const map = new MapVisualization('#map_vis');
+    d3.json(resourceString).then(data => {
+        data = topojson.feature(data, data.objects[Object.keys(data.objects)[0]]);
 
-const force_map = new ForceMap('#map_vis');
+        // Remove US territories, Hawaii, and Alaska from the map
+        if (selectedOption === 'us') {
+            let remove_list = ['72', '78', '60', '66', '69', '15', '02'];
+            for (let i = 0; i < data.features.length; i++) {
+                let state = data.features[i];
+                if (remove_list.includes(state.id)) {
+                    data.features.splice(i, 1);
+                    i--;
+                }
+            }
+        }
 
-d3.json('resources/states-10m.json').then(data => {
-    data = topojson.feature(data, data.objects.states);
-    // d3.json('resources/countries-50m.json').then(data => {
-//     data = topojson.feature(data, data.objects.countries);
+        force_map.setTopography(data);
+        force_map.drawMap();
+    });
+}
 
-    force_map.setTopography(data);
-    force_map.drawMap();
-});
+const toggleMapBtnHandler = async () => {
+    force_map.showMap = !force_map.showMap;
+    force_map.toggleMap();
+    force_map.setSimulation();
 
-// d3.json('resources/states-10m.json').then(data => {
-//     // let outline = topojson.feature(data, data.objects.nation);
-//     console.log(data);
-//     map_vis.setTopography(data);
-//     map_vis.drawMap();
-// });
+    document.getElementById('map_toggle_btn').innerHTML = force_map.showMap ? 'Hide Map' : 'Show Map';
+
+    return await updateViz();
+}
+
+const mapSelectHandler = async () => {
+    if (!force_map.showMap) return;
+    let selectedOption = document.getElementById('map_select').value;
+
+    setTopojson(selectedOption);
+    return await updateViz();
+}
+
+const force_map = new ForceMap('#d3_vis');
+setTopojson('world');
+
+
+
+
+
 
