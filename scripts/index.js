@@ -292,9 +292,6 @@ const e2eBtnHandler = async (source, dest, num_runs, uuid) => {
     // Update the visualization
     visibleNTTs.traceroutes = visibleNTTs.traceroutes.concat(result.traceroutes);
 
-    // return result.traceroutes[0];
-
-    // TODO: MAKE THIS LESS DEPENDENT ON VIZ
     return await updateViz();
 }
 
@@ -349,7 +346,7 @@ const mapSelectHandler = async () => {
 }
 
 const force_map = new ForceMap('#d3_vis');
-setTopojson('world');
+setTopojson('us');
 
 
 

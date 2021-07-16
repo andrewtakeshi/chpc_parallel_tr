@@ -49,7 +49,14 @@
         div.tooltip {
             position: absolute;
             opacity: 0;
+            background-color: rgba(242,242,242,0.8);
+            border-radius: 10px;
         }
+
+        div.tooltip.removable{
+            opacity: 0.9;
+        }
+
 
         circle.node {
             z-index: 999;
@@ -146,9 +153,10 @@
                 </div>
                 <div class="btn-group col-4 float-right">
 
-                    <select id="map_select" class="form-select w-100" onchange="mapSelectHandler().then(data => force_map.setData(data));">
-                        <option selected value="world">World</option>
-                        <option value="us">Contiguous United States</option>
+                    <select id="map_select" class="form-select w-100"
+                            onchange="mapSelectHandler().then(data => force_map.setData(data));">
+                        <option selected value="us">Contiguous United States</option>
+                        <option value="world">World</option>
                     </select>
                 </div>
             </div>

@@ -17,18 +17,14 @@ const runTraceroute = async (source, dest, num_runs) => {
 
 const getOrgFromIP = async (ip) => {
     let api_call = `http://${api_server}${rdap_api}?ip=${ip}`;
-    console.log(`Requesting ${api_call}`);
-    const result = await d3.json(api_call);
-    return result;
+    return await d3.json(api_call);
 }
 
 const getMaxBWFromGRNOCIP = async (ip) => {
     // TODO: Better way of telling if it's part of GRNOC
     if (ip.startsWith('198') || ip.startsWith('162') || ip.startsWith('192')) {
         let api_call = `https://snapp-portal.grnoc.iu.edu/tsds-cross-domain/query.cgi?method=query;query=get%20max_bandwidth%20between(now-10m,%20now)%20from%20interface%20where%20interface_address.value%20=%20%22${ip}%22`;
-        console.log(`Requesting ${api_call}`);
-        const result = await d3.json(api_call);
-        return result;
+        return await d3.json(api_call);
     } else {
         return {'results': []};
     }
@@ -51,9 +47,7 @@ const createInternetGraph = async (traceroutes, existing = undefined) => {
     for (let trace of traceroutes) {
         let packets = trace.packets;
         for (let i = 0; i < packets.length; i++) {
-            // if (!packets[i].hasOwnProperty('ip'))
             if (packets[i].ip == undefined)
-                // TODO: Find better way of differentiating between 'unknown'
                 packets[i].ip = `hop_${i}_${trace.id.substring(0, 5)}`;
         }
         for (let i = 0; i < packets.length; i++) {
@@ -66,11 +60,10 @@ const createInternetGraph = async (traceroutes, existing = undefined) => {
                 // Calls the API
                 const orgResult = await getOrgFromIP(packet.ip);
                 let maxBW = undefined;
-                // TODO: UNCOMMENT
-                // const tsdsResult = await getMaxBWFromGRNOCIP(packet.ip);
-                // if (tsdsResult.results.length > 0) {
-                //     maxBW = tsdsResult.results[0].max_bandwidth;
-                // }
+                const tsdsResult = await getMaxBWFromGRNOCIP(packet.ip);
+                if (tsdsResult.results.length > 0) {
+                    maxBW = tsdsResult.results[0].max_bandwidth;
+                }
                 entity = ({
                     id: entity_id,
                     ip: packet.ip,
@@ -102,7 +95,6 @@ const createInternetGraph = async (traceroutes, existing = undefined) => {
 // clusterBy takes a map of entities with an 'id' property and returns a map of new entities that reference
 // the input entities as children. Clustering is breadth-first driven by the given label equality, degree,
 // and relationship parameters.
-// TODO: Remove org clustering for case where it is a single IP - see also updateViz in index.js.
 const clusterBy = (entities, getLabel, getRelationships, id_prefix = undefined, max_degree = 1) => {
     const result = new Map();
 

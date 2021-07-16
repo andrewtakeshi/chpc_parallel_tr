@@ -9,6 +9,7 @@ class ForceMap {
             .append('svg')
             .attr('width', this.width)
             .attr('height', this.height)
+            .attr('id', 'mainVisSVG')
             .style('display', 'block')
             .style('margin', 'auto');
 
@@ -19,7 +20,6 @@ class ForceMap {
 
         this.zoom = d3.zoom()
             .scaleExtent([1, 20])
-            // TODO: Mess with the translateExtent
             .translateExtent([[-this.width + 150, -this.height + 150], [2 * this.width - 150, 2 * this.width - 150]])
             .filter(filterFunc)
             .on('zoom', this.zoomHandler);
@@ -43,9 +43,7 @@ class ForceMap {
 
         this.floating_tooltip = d3.select(root_element).append('div')
             .attr('id', 'forcemap_tooltip')
-            .classed('tooltip', true)
-            .style('position', 'absolute')
-            .style('opacity', 0);
+            .classed('tooltip', true);
 
         this.tooltip_stats = this.floating_tooltip.append('div');
 
@@ -58,6 +56,7 @@ class ForceMap {
             .attr('refY', 0)
             .attr('markerWidth', 6)
             .attr('markerHeight', 6)
+            .attr('markerUnits', 'userSpaceOnUse')
             .attr('orient', 'auto')
             .append('svg:path')
             .attr('d', 'M0,-5L10,0L0,5');
@@ -114,7 +113,7 @@ class ForceMap {
             // Transform links
             d3.select('#forceGroup')
                 .selectAll('line.link')
-                .attr('stroke-width', 1 / d3.event.transform.k + 'px');
+                .attr('stroke-width', d => d.packet_count / d3.event.transform.k + 'px');
 
             // Move the entire force group
             d3.select('#forceGroup')
@@ -244,20 +243,17 @@ class ForceMap {
         return flat_data;
     }
 
-    dragHandler() {
+    nodeDrag() {
         let simulation = this.simulation;
         let width = this.width;
         let height = this.height;
-        let nodes = this.allNodes;
 
         let clamp = (v, lo, hi) => v < lo ? lo : v > hi ? hi : v;
 
         function dragstarted(d) {
-            // Originally 0.3
             if (!d3.event.active) {
                 simulation.alphaTarget(0.3).restart();
             }
-
             d.fx = d.x;
             d.fy = d.y;
         }
@@ -269,13 +265,16 @@ class ForceMap {
 
         function dragended(d) {
             if (!d3.event.active) {
-                simulation.alphaTarget(0).restart();
+                simulation.alphaTarget(0);
             }
             d.fx = null;
             d.fy = null;
         }
 
         return d3.drag()
+            // Needed for smooth dragging, along with calling drag from the
+            // group (i.e. g.single_node) rather than calling on the circle
+            .container(d3.select('#mainVisSVG').node())
             .on('start', dragstarted)
             .on('drag', dragged)
             .on('end', dragended);
@@ -500,7 +499,6 @@ class ForceMap {
             if (this.nodeValues[i].expanded && this.nodeValues[i].children) {
                 for (let child of this.nodeValues[i].children.values()) {
                     // Inherit cluster's position in graph to avoid visual chaos
-                    // TODO: Update with lat/lon - use scales defined above
                     if (child.x == undefined) {
                         child.x = this.nodeValues[i].x;
                         child.y = this.nodeValues[i].y;
@@ -520,7 +518,7 @@ class ForceMap {
         this.floating_tooltip.selectAll('iframe').remove();
 
         let nodeRadiusScale = d3.scaleLinear()
-            .domain([1, d3.max([...this.node_data.values()], v => v.packets.length)])
+            .domain(d3.extent([...this.node_data.values()], v => v.packets.length))
             .range([16, 24]);
 
         // Preload ATR Grafana iFrames for rendered IP nodes
@@ -536,8 +534,7 @@ class ForceMap {
                     this.atr_iframes.set(d.id, iframe);
                 }
             }
-            // }
-            // for (let d of this.node_values) {
+
             // Add links to vLinks from the source node 'd' to all targets 't'
 
             let target_aliases = new Set();
@@ -547,7 +544,11 @@ class ForceMap {
                 }
                 for (let t of target_aliases) {
                     if (d.id != t)
-                        this.vLinks.push(({source: d, target: this.all_nodes_flat.get(t)}));
+                        this.vLinks.push(({
+                            source: d,
+                            target: this.all_nodes_flat.get(t),
+                            packet_count: Math.sqrt(this.all_nodes_flat.get(t).packets.length)
+                        }));
                 }
             }
             d.radius = nodeRadiusScale(d.packets.length);
@@ -575,6 +576,7 @@ class ForceMap {
 
         // Add image (favicon) if we can find it using duckduckgo ico search.
         this.allNodes.append('image')
+            .classed('single_node_img', true)
             .attr('xlink:href', d => unknown(d.domain) ? `http://icons.duckduckgo.com/ip2/${d.domain}.ico` : '')
             .attr('draggable', false)
             .attr('width', d => (d.radius) / zoomDenominator)
@@ -584,7 +586,7 @@ class ForceMap {
 
         // Always append circle - this will show if no favicon is retrieved, otherwise opacity = 0 and it's hidden.
         this.allNodes.append('circle')
-            .classed('node', true)
+            .classed('single_node_circle', true)
             .attr('r', d => (d.radius / 2) / zoomDenominator)
             .attr('fill', d => this.getNodeColorOrg(d))
             .attr('opacity', d => unknown(d.domain) ? 0.0 : 1.0)
@@ -598,17 +600,19 @@ class ForceMap {
             .on('mousemove', () => {
                 // Updates position of global tooltip.
                 this.floating_tooltip.style('left', (d3.event.pageX + 10) + 'px').style('top', (d3.event.pageY + 10) + 'px')
-            })
-            .call(this.dragHandler());
+            });
+
+        d3.selectAll('.single_node')
+            .call(this.nodeDrag());
 
         this.all_links = this.all_links
             .data(this.vLinks)
             .join('line')
             .classed('link', true)
-            .attr('stroke-width', 1 / zoomDenominator);
+            // .attr('stroke-width', 1 / zoomDenominator);
+            .attr('stroke-width', d => d.packet_count / zoomDenominator);
 
         this.simulation.nodes(this.nodeValues);
-        // TODO: Check effect of disabling the link forces.
         if (!this.showMap) {
             this.simulation.force('link', d3.forceLink(this.vLinks).id(d => d.id));
         }
@@ -684,8 +688,7 @@ class ForceMap {
             let tooltip = d3.select(that.rootElement)
                 .append('div')
                 .attr('id', `tooltip${d.id}`)
-                .classed('tooltip removable', true)
-                .attr('style', 'position: absolute; opacity: 0.9;');
+                .classed('tooltip removable', true);
 
             // Append tooltip stats
             tooltip.append('div')

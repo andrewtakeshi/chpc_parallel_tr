@@ -1,6 +1,6 @@
 # Temporal analysis of network routes for scientific data transfers
 
-Paul Fischer, Joe Breen (U of Utah CHPC)
+Paul Fischer, Andrew Golightly, Joe Breen (U of Utah CHPC)
 
 ## Service overview (U of U CHPC perspective)
 
