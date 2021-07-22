@@ -51,12 +51,12 @@
             opacity: 0;
             background-color: rgba(242,242,242,0.8);
             border-radius: 10px;
+            word-wrap: break-word;
         }
 
         div.tooltip.removable{
             opacity: 0.9;
         }
-
 
         circle.node {
             z-index: 999;
@@ -157,6 +157,7 @@
                             onchange="mapSelectHandler().then(data => force_map.setData(data));">
                         <option selected value="us">Contiguous United States</option>
                         <option value="world">World</option>
+                        <option value="eu">Europe</option>
                     </select>
                 </div>
             </div>

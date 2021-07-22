@@ -10,9 +10,17 @@ const runTraceroute = async (source, dest, num_runs) => {
     }
     api_call += `&num_runs=${num_runs}`;
     console.log(`Requesting ${api_call}`);
-    let result = await d3.json(api_call);
-    console.log(result);
-    return result;
+    try
+    {
+        return await d3.json(api_call);
+    }
+    catch (e)
+    {
+        if (e instanceof TypeError)
+        {
+            return {'error' : 'Network Error'};
+        }
+    }
 };
 
 const getOrgFromIP = async (ip) => {
@@ -74,7 +82,9 @@ const createInternetGraph = async (traceroutes, existing = undefined) => {
                     source_ids: new Set(),
                     target_ids: new Set(),
                     lat: packet.lat,
-                    lon: packet.lon
+                    lon: packet.lon,
+                    city: packet.city,
+                    region: packet.region
                 });
                 entities.set(entity_id, entity);
             }
@@ -191,8 +201,12 @@ const propReducer = (property) => {
         case 'lon':
             f = (a, b) => a + b;
             break;
+        case 'city':
+        case 'region':
+            f = (a, b) => a === b ? a : 'Avg. Location';
+            break;
         default:
-            f = (a, b) => a == b ? a : undefined;
+            f = (a, b) => a === b ? a : undefined;
     }
     return f;
 }

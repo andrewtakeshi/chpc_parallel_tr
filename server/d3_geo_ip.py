@@ -35,11 +35,15 @@ def ip_to_geo(dest):
             if json.keys().__contains__('lat'):
                 return {
                     'lat': json['lat'],
-                    'lon': json['lon']
+                    'lon': json['lon'],
+                    'city': json['city'],
+                    'region': json['region']
                 }
     return {
         'lat': None,
-        'lon': None
+        'lon': None,
+        'city': None,
+        'region': None
     }
 
 
@@ -51,6 +55,8 @@ def add_geo_info_naive(d3_json):
                 if geo_info['lat'] is not None:
                     packet['lon'] = geo_info['lon']
                     packet['lat'] = geo_info['lat']
+                    packet['city'] = geo_info['city']
+                    packet['region'] = geo_info['region']
     return d3_json
 
 
@@ -60,9 +66,13 @@ def add_geo_info_tw(packet):
         if res is not None:
             packet['lon'] = res['lon']
             packet['lat'] = res['lat']
+            packet['city'] = res['city']
+            packet['region'] = res['region']
     else:
         packet['lon'] = None
         packet['lat'] = None
+        packet['city'] = None
+        packet['region'] = None
 
 
 def add_geo_info_threaded(d3_json):
@@ -78,8 +88,10 @@ def add_geo_info_threaded(d3_json):
     for tr in d3_json['traceroutes']:
         # Use the UU Bookstore as an arbitrary "default" until a better one is found
         last_known = {
-            'x': 40.7637,
-            'y': -111.8475
+            'lon': 40.7637,
+            'lat': -111.8475,
+            'city': 'Salt Lake City',
+            'region': 'UT'
         }
 
         # TODO: Assign undefined packets as average of the previous and next defined ones.
@@ -87,8 +99,12 @@ def add_geo_info_threaded(d3_json):
             if packet['lon'] is not None:
                 last_known['lon'] = packet['lon']
                 last_known['lat'] = packet['lat']
+                last_known['city'] = packet['city']
+                last_known['region'] = packet['region']
             else:
                 packet['lon'] = last_known['lon']
                 packet['lat'] = last_known['lat']
+                packet['city'] = last_known['city']
+                packet['region'] = last_known['region']
 
     return d3_json

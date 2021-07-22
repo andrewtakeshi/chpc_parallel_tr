@@ -219,8 +219,8 @@ const updateViz = async () => {
  */
 const checkHandler = async (id, shown) => {
     // List of entities to search and add to respectively
-    let searchNTTs = null;
-    let addNTTs = null;
+    let searchNTTs;
+    let addNTTs;
 
     // If we are re-showing something, we want searchNTTs to be the list of currently hidden entities,
     // and we want to add our "found" entity to the list to show
@@ -303,6 +303,9 @@ function setTopojson(selectedOption) {
             break;
         case 'us':
             resourceString = 'resources/states-10m.json';
+            break;
+        case 'eu':
+            resourceString = 'resources/eu.json';
             break;
     }
 

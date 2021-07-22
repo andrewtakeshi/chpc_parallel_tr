@@ -13,15 +13,10 @@ class ForceMap {
             .style('display', 'block')
             .style('margin', 'auto');
 
-        function filterFunc() {
-            let event = d3.event;
-            return !(event.type === 'dblclick');
-        }
-
         this.zoom = d3.zoom()
-            .scaleExtent([1, 20])
+            .scaleExtent([1, 10])
             .translateExtent([[-this.width + 150, -this.height + 150], [2 * this.width - 150, 2 * this.width - 150]])
-            .filter(filterFunc)
+            .filter(() => !(d3.event.type === 'dblclick'))
             .on('zoom', this.zoomHandler);
 
         this.forceG = this.svg.append('g')
@@ -41,31 +36,44 @@ class ForceMap {
         this.node_visual_alias = new Map();
         this.atr_iframes = new Map();
 
-        this.floating_tooltip = d3.select(root_element).append('div')
+        this.floating_tooltip = d3.select(root_element)
+            .append('div')
             .attr('id', 'forcemap_tooltip')
             .classed('tooltip', true);
 
-        this.tooltip_stats = this.floating_tooltip.append('div');
+        this.tooltip_stats = this.floating_tooltip
+            .append('div');
 
-        this.forceG.append('svg:defs').selectAll('marker')
-            .data(['end'])      // Different link/path types can be defined here
-            .enter().append('svg:marker')    // This section adds in the arrows
-            .attr('id', String)
-            .attr('viewBox', '0 -5 10 10')
-            .attr('refX', 23)
-            .attr('refY', 0)
-            .attr('markerWidth', 6)
-            .attr('markerHeight', 6)
-            .attr('markerUnits', 'userSpaceOnUse')
+        // this.forceG.append('svg:defs').selectAll('marker')
+        //     .data(['end'])      // Different link/path types can be defined here
+        //     .enter().append('svg:marker')    // This section adds in the arrows
+        //     .attr('id', String)
+        //     .attr('viewBox', '0 -5 10 10')
+        //     .attr('refX', 15)
+        //     .attr('refY', 0)
+        //     .attr('markerWidth', 6)
+        //     .attr('markerHeight', 6)
+        //     .attr('markerUnits', 'userSpaceOnUse')
+        //     .attr('orient', 'auto')
+        //     .append('svg:path')
+        //     .attr('d', 'M0,-5L10,0L0,5');
+        this.forceG.append('svg:defs')
+            .append('marker')
+            .attr('id', 'arrowhead')
+            .attr('viewBox', '0 0 10 7')
+            .attr('markerWidth', 10)
+            .attr('markerHeight', 7)
+            .attr('refX', 8)
+            .attr('refY', 3.5)
             .attr('orient', 'auto')
-            .append('svg:path')
-            .attr('d', 'M0,-5L10,0L0,5');
+            .append('polygon')
+            .attr('points', '0 0, 10 3.5, 0 7');
 
         this.all_links = this.forceG.append('g')
             .classed('all_links', true)
             .attr('stroke', '#999')
-            .attr('stroke-opacity', 0.6)
-            .attr('marker-end', 'url(#end)')
+            .attr('stroke-opacity', 1)
+            // .attr('marker-end', 'url(#arrowhead)')
             .attr('stroke-width', 1)
             .selectAll('line');
 
@@ -281,6 +289,10 @@ class ForceMap {
     }
 
     setData(data) {
+        if (data === undefined || data === null) {
+            return;
+        }
+
         this.node_data = data;
 
         this.all_nodes_flat = this.flattenNodeData();
@@ -527,8 +539,8 @@ class ForceMap {
                 const URL = getATRChartURL(d.ip);
                 if (URL.length > 0) {
                     const iframe = this.floating_tooltip.append('iframe')
-                        .attr('width', 450)
-                        .attr('height', 200)
+                        .attr('width', 600)
+                        .attr('height', 300)
                         .style('display', 'none')
                         .attr('src', getATRChartURL(d.ip));
                     this.atr_iframes.set(d.id, iframe);
@@ -605,13 +617,28 @@ class ForceMap {
         d3.selectAll('.single_node')
             .call(this.nodeDrag());
 
+        // this.forceG.selectAll('defs').remove();
+
+        this.forceG.append('defs')
+            .selectAll('marker')
+            .data(this.vLinks)
+            .join('marker')
+            .attr('id', d => `${CSS.escape(d.source.id.replace(/\s/g, ''))}_${CSS.escape(d.target.id.replace(/\s/g, ''))}_arrowhead`)
+            .attr('markerWidth', 10)
+            .attr('markerHeight', 7)
+            .attr('refX', d => `${8 + (d.target.radius / zoomDenominator)}`)
+            .attr('refY', 3.5)
+            .attr('orient', 'auto')
+            .append('polygon')
+            .attr('points', '0 0, 10 3.5, 0 7');
+
         this.all_links = this.all_links
             .data(this.vLinks)
             .join('line')
             .classed('link', true)
-            // .attr('stroke-width', 1 / zoomDenominator);
-            .attr('stroke-width', d => d.packet_count / zoomDenominator);
-
+            .attr('stroke-width', d => d.packet_count / zoomDenominator)
+            .attr('marker-end', d => `url(#${CSS.escape(d.source.id.replace(/\s/g, ''))}_${CSS.escape(d.target.id.replace(/\s/g, ''))}_arrowhead)`);
+            // .attr('marker-end', 'url(#arrowhead)');
         this.simulation.nodes(this.nodeValues);
         if (!this.showMap) {
             this.simulation.force('link', d3.forceLink(this.vLinks).id(d => d.id));
@@ -634,11 +661,18 @@ class ForceMap {
         }
 
         // Generate ToolTipStats. Not complicated, just abstracted b/c it's used more than once.
-        function generateTTS(d, packets) {
-            return `${d.ip ? d.ip : ''} (${d.org}) | ` +
-                `${packets.length} packets | ` +
-                `${d.max_bandwidth ? 'Max bandwidth: ' + d3.format('s')(d.max_bandwidth) + 'bps |' : ''} ` +
-                `RTT (mean): ${d3.mean(packets, p => p.rtt)}`;
+        function generateTTS(d, packets, selection) {
+            selection.selectAll('text').remove();
+            selection.append('text')
+                .text(`${d.ip ? d.ip : ''} (${d.org}) | ` +
+                    `${packets.length} packets | ` +
+                    `${d.max_bandwidth ? 'Max bandwidth: ' + d3.format('s')(d.max_bandwidth) + 'bps |' : ''} ` +
+                    `RTT (mean): ${d3.mean(packets, p => p.rtt)}`);
+
+            // selection.append('tspan')
+            //     .attr('dx', 0)
+            //     .attr('dy', '1.2em')
+            //     .text(`${d.city}, ${d.region} | ${d.lat}, ${d.lon}`);
         }
 
         // Shows the global tooltip on mouseover (if applicable)
@@ -649,7 +683,7 @@ class ForceMap {
 
             let trafficInfo = generateTrafficInfo(packets);
 
-            that.tooltip_stats.text(generateTTS(d, packets));
+            generateTTS(d, packets, that.tooltip_stats);
 
             if (d.id.startsWith('ip') && that.atr_iframes.has(d.id)) {
                 // Show grafana iframe
@@ -691,9 +725,7 @@ class ForceMap {
                 .classed('tooltip removable', true);
 
             // Append tooltip stats
-            tooltip.append('div')
-                .append('text')
-                .text(generateTTS(d, d.packets));
+            generateTTS(d, d.packets, tooltip.append('div'));
 
             // Initial attributes
             let draggable = false;
@@ -749,8 +781,8 @@ class ForceMap {
             if (d.id.startsWith('ip') && that.atr_iframes.has(d.id)) {
                 // Add iframe for grafana
                 tooltip.append('iframe')
-                    .attr('width', 450)
-                    .attr('height', 200)
+                    .attr('width', 600)
+                    .attr('height', 300)
                     .attr('src', getATRChartURL(d.ip))
                     .style('display', 'block');
             } else if (d.id.startsWith('ip') && trafficInfo.size > 0) {
