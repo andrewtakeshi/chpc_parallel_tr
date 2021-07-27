@@ -44,36 +44,10 @@ class ForceMap {
         this.tooltip_stats = this.floating_tooltip
             .append('div');
 
-        // this.forceG.append('svg:defs').selectAll('marker')
-        //     .data(['end'])      // Different link/path types can be defined here
-        //     .enter().append('svg:marker')    // This section adds in the arrows
-        //     .attr('id', String)
-        //     .attr('viewBox', '0 -5 10 10')
-        //     .attr('refX', 15)
-        //     .attr('refY', 0)
-        //     .attr('markerWidth', 6)
-        //     .attr('markerHeight', 6)
-        //     .attr('markerUnits', 'userSpaceOnUse')
-        //     .attr('orient', 'auto')
-        //     .append('svg:path')
-        //     .attr('d', 'M0,-5L10,0L0,5');
-        this.forceG.append('svg:defs')
-            .append('marker')
-            .attr('id', 'arrowhead')
-            .attr('viewBox', '0 0 10 7')
-            .attr('markerWidth', 10)
-            .attr('markerHeight', 7)
-            .attr('refX', 8)
-            .attr('refY', 3.5)
-            .attr('orient', 'auto')
-            .append('polygon')
-            .attr('points', '0 0, 10 3.5, 0 7');
-
         this.all_links = this.forceG.append('g')
             .classed('all_links', true)
             .attr('stroke', '#999')
             .attr('stroke-opacity', 1)
-            // .attr('marker-end', 'url(#arrowhead)')
             .attr('stroke-width', 1)
             .selectAll('line');
 
@@ -111,18 +85,14 @@ class ForceMap {
         if (all_nodes.nodes().length > 0) {
             // Select image and circle and perform appropriate transforms
             all_nodes.selectAll('circle')
-                .attr('r', d => (d.radius / 2) / d3.event.transform.k);
+                .attr('r', d => (d.radius) / d3.event.transform.k);
             all_nodes.selectAll('image')
-                .attr('width', d => d.radius / d3.event.transform.k)
-                .attr('height', d => d.radius / d3.event.transform.k)
-                .attr('x', d => (-1 * d.radius / 2) / d3.event.transform.k)
-                .attr('y', d => (-1 * d.radius / 2) / d3.event.transform.k);
+                .attr('width', d => d.diameter / d3.event.transform.k)
+                .attr('height', d => d.diameter / d3.event.transform.k)
+                .attr('x', d => (-d.radius) / d3.event.transform.k)
+                .attr('y', d => (-d.radius) / d3.event.transform.k);
 
-            // Transform links
-            d3.select('#forceGroup')
-                .selectAll('line.link')
-                .attr('stroke-width', d => d.packet_count / d3.event.transform.k + 'px');
-
+            // No link transformation needed because of vector-effect : non-scaling-stroke in CSS.
             // Move the entire force group
             d3.select('#forceGroup')
                 .attr('transform', d3.event.transform);
@@ -172,8 +142,8 @@ class ForceMap {
             // Initialize interactivity
             this.simulation = d3.forceSimulation()
                 .force('collision', d3.forceCollide()
-                    .radius(d => d.radius))
-                // .strength(0.1))
+                    // .radius(d => d.diameter / 2))
+                    .radius(d => d.diameter))
                 .force('forceX', d3.forceX(d => this.projection([d.lon, d.lat])[0])
                     .strength(1))
                 .force('forceY', d3.forceY(d => this.projection([d.lon, d.lat])[1])
@@ -185,7 +155,7 @@ class ForceMap {
                 .force('center', d3.forceCenter(this.width / 2, this.height / 2))
                 .force('forceY', d3.forceY(this.height / 2))
                 .force('collision', d3.forceCollide()
-                    .radius(d => d.radius));
+                    .radius(d => d.diameter));
         }
 
         this.simulation.on('tick', () => {
@@ -262,6 +232,7 @@ class ForceMap {
             if (!d3.event.active) {
                 simulation.alphaTarget(0.3).restart();
             }
+            d3.select(this).raise();
             d.fx = d.x;
             d.fy = d.y;
         }
@@ -529,7 +500,7 @@ class ForceMap {
         // Remove preloaded ATR Grafana iFrames
         this.floating_tooltip.selectAll('iframe').remove();
 
-        let nodeRadiusScale = d3.scaleLinear()
+        let nodeDiameterScale = d3.scaleLinear()
             .domain(d3.extent([...this.node_data.values()], v => v.packets.length))
             .range([16, 24]);
 
@@ -559,11 +530,12 @@ class ForceMap {
                         this.vLinks.push(({
                             source: d,
                             target: this.all_nodes_flat.get(t),
-                            packet_count: Math.sqrt(this.all_nodes_flat.get(t).packets.length)
+                            packet_scale: Math.sqrt(this.all_nodes_flat.get(t).packets.length)
                         }));
                 }
             }
-            d.radius = nodeRadiusScale(d.packets.length);
+            d.diameter = nodeDiameterScale(d.packets.length);
+            d.radius = d.diameter / 2;
         }
 
         // Doesn't check for domains that are unknown or undefined
@@ -591,15 +563,15 @@ class ForceMap {
             .classed('single_node_img', true)
             .attr('xlink:href', d => unknown(d.domain) ? `http://icons.duckduckgo.com/ip2/${d.domain}.ico` : '')
             .attr('draggable', false)
-            .attr('width', d => (d.radius) / zoomDenominator)
-            .attr('height', d => (d.radius) / zoomDenominator)
-            .attr('x', d => (-1 * d.radius / 2) / zoomDenominator)
-            .attr('y', d => (-1 * d.radius / 2) / zoomDenominator);
+            .attr('width', d => (d.diameter) / zoomDenominator)
+            .attr('height', d => (d.diameter) / zoomDenominator)
+            .attr('x', d => (-d.radius) / zoomDenominator)
+            .attr('y', d => (-d.radius) / zoomDenominator);
 
         // Always append circle - this will show if no favicon is retrieved, otherwise opacity = 0 and it's hidden.
         this.allNodes.append('circle')
             .classed('single_node_circle', true)
-            .attr('r', d => (d.radius / 2) / zoomDenominator)
+            .attr('r', d => (d.radius) / zoomDenominator)
             .attr('fill', d => this.getNodeColorOrg(d))
             .attr('opacity', d => unknown(d.domain) ? 0.0 : 1.0)
             // Doubleclick 'pins' the charts
@@ -619,27 +591,35 @@ class ForceMap {
 
         // this.forceG.selectAll('defs').remove();
 
-        this.forceG.append('defs')
+        if (this.forceG.select('defs').empty()) {
+            this.forceG.append('defs');
+        }
+
+        let markerWidth = 6, markerHeight = 4;
+
+        this.forceG.selectAll('defs')
             .selectAll('marker')
             .data(this.vLinks)
             .join('marker')
-            .attr('id', d => `${CSS.escape(d.source.id.replace(/\s/g, ''))}_${CSS.escape(d.target.id.replace(/\s/g, ''))}_arrowhead`)
-            .attr('markerWidth', 10)
-            .attr('markerHeight', 7)
-            .attr('refX', d => `${8 + (d.target.radius / zoomDenominator)}`)
-            .attr('refY', 3.5)
+            .attr('id', (d, i) => `marker_${i}`)
+            .attr('markerWidth', markerWidth)
+            .attr('markerHeight', markerHeight)
+            .attr('refX', d => (d.target.radius / d.packet_scale) + markerWidth)
+            .attr('refY', markerHeight / 2)
             .attr('orient', 'auto')
             .append('polygon')
-            .attr('points', '0 0, 10 3.5, 0 7');
+            .attr('points', `0 0, ${markerWidth + ' ' + markerHeight / 2}, 0 ${markerHeight}`);
 
         this.all_links = this.all_links
             .data(this.vLinks)
             .join('line')
             .classed('link', true)
-            .attr('stroke-width', d => d.packet_count / zoomDenominator)
-            .attr('marker-end', d => `url(#${CSS.escape(d.source.id.replace(/\s/g, ''))}_${CSS.escape(d.target.id.replace(/\s/g, ''))}_arrowhead)`);
-            // .attr('marker-end', 'url(#arrowhead)');
+            .attr('stroke-width', d => d.packet_scale)
+            // .attr('stroke-width', d => d.packet_scale / zoomDenominator)
+            .attr('marker-end', (d, i) => `url(#marker_${i})`);
+
         this.simulation.nodes(this.nodeValues);
+
         if (!this.showMap) {
             this.simulation.force('link', d3.forceLink(this.vLinks).id(d => d.id));
         }
