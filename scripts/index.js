@@ -3,6 +3,7 @@ let hiddenNTTs = ({"traceroutes": []});
 // Timeout values - pscheduler is 40 sec, system is 20 sec
 const pscheduler_timeout = 40000;
 const system_timeout = 20000;
+let inQueue = 0;
 
 // function formLogger(form) {
 //     if (validate(form)) {
@@ -247,15 +248,27 @@ const checkHandler = async (id, shown) => {
     return await updateViz();
 }
 
+
 /**
  * Runs an end to end traceroute.
  */
 const e2eBtnHandler = async (source, dest, num_runs, uuid) => {
+    let updateInQueue = () => {
+        let innerHTML = '';
+        if (inQueue > 0) {
+            innerHTML = `<h3>${inQueue} ${inQueue > 1 ? 'Traceroutes' : 'Traceroute'} Running</h3>`;
+        }
+        document.getElementById('inQueue_area').innerHTML = innerHTML;
+    }
+    inQueue += parseInt(num_runs);
+    updateInQueue();
     // Run the traceroute (with timeout)
     let result = await timeout(runTraceroute(source, dest, num_runs), source ? pscheduler_timeout : system_timeout)
         .then(
             // OnFulfillment
             (value) => {
+                inQueue -= parseInt(num_runs);
+                updateInQueue();
                 if (value.error) {
                     // This will be timeout or pScheduler
                     document.getElementById(`${uuid}_status`).innerHTML = value.error;
@@ -267,6 +280,8 @@ const e2eBtnHandler = async (source, dest, num_runs, uuid) => {
             },
             // If rejected we ran into an unknown error
             _ => {
+                inQueue -= parseInt(num_runs);
+                updateInQueue();
                 document.getElementById(`${uuid}_status`).innerHTML = 'Unknown Error';
                 return null;
             }

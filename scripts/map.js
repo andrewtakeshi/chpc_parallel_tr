@@ -433,22 +433,22 @@ class ForceMap {
 
     // Finds overall max bandwidth to display on vis.
     getOverallMaxBW() {
-        let bw = Number.MAX_SAFE_INTEGER;
+        let min_bw = Number.MAX_SAFE_INTEGER;
         let ip = null;
         // Select all nodes that are actual nodes (not abstracted org nodes)
         let nodes = Array.from(this.all_nodes_flat.values()).filter(d => d.id.startsWith('ip'));
 
         for (let node of nodes) {
-            if (node.max_bandwidth && node.max_bandwidth < bw) {
-                bw = node.max_bandwidth;
+            if (node.max_bandwidth && node.max_bandwidth < min_bw) {
+                min_bw = node.max_bandwidth;
                 ip = node.ip;
             }
         }
 
         this.maxBW.selectAll('text')
-            .data([bw, ip])
+            .data([min_bw, ip])
             .join('text')
-            .attr('fill', 'lightgrey')
+            .attr('fill', 'black')
             .attr('x', 25)
             .attr('y', (_, i) => (i + 1) * 25)
             .text((d, i) => {
@@ -457,7 +457,7 @@ class ForceMap {
                 }
 
                 if (i === 0) {
-                    return `Known Bandwidth Limit: ${d3.format('~s')(d)}bps`;
+                    return `Bandwidth Limit for Known Portion of Path: ${d3.format('~s')(d)}bps`;
                 } else {
                     return `Limited by node at IP: ${d}`;
                 }

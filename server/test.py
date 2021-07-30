@@ -1,3 +1,5 @@
+import sys
+
 from server import d3_conversion as d3c
 from server import d3_conversion_utils
 from server import d3_netbeam
@@ -11,6 +13,7 @@ import json
 from server.d3_netbeam import ip_to_resource_dict
 from server.d3_netbeam import ip_to_netbeam_db
 from server.d3_netbeam import add_netbeam_info_db_naive
+import subprocess
 
 # diff = difflib.Differ()
 #
@@ -117,12 +120,16 @@ limit = 100
 dict_time = 0
 db_time = 0
 
-for _ in range(limit):
-    st = time.time()
-    d3_netbeam.add_netbeam_info_threaded(d3_json)
-    dict_time += time.time() - st
-    st = time.time()
-    d3_netbeam.add_netbeam_info_db_threaded(d3_json)
-    db_time += time.time() - st
-print(f'dict time = {dict_time / limit}')
-print(f'db time = {db_time / limit}')
+# for _ in range(limit):
+#     st = time.time()
+#     d3_netbeam.add_netbeam_info_threaded(d3_json)
+#     dict_time += time.time() - st
+#     st = time.time()
+#     d3_netbeam.add_netbeam_info_db_threaded(d3_json)
+#     db_time += time.time() - st
+# print(f'dict time = {dict_time / limit}')
+# print(f'db time = {db_time / limit}')
+
+sub = subprocess.Popen(['pscheduler', 'task', '--debug', 'trace', '-s', '204.99.128.12', '-d', '8.8.8.8'],
+                                             stdout=subprocess.PIPE, universal_newlines=True)
+sub.wait()

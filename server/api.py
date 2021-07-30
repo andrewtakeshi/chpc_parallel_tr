@@ -37,7 +37,7 @@ def traceroutes():
             print(f'{source} accepted as pScheduler source')
             response = d3_conversion.pscheduler_to_d3(source, dest, num_runs)
         else:
-            response = {'error': 'pScheduler Error'}
+            response = {'error': 'pScheduler not found'}
     else:
         response = d3_conversion.system_to_d3_old(dest, num_runs)
 
