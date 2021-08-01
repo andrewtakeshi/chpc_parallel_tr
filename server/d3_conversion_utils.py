@@ -1,10 +1,12 @@
 import requests
-import urllib3
+# import urllib3
+from requests.packages.urllib3.exceptions import InsecureRequestWarning
 import subprocess
 import re
 import socket
 
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
+
 ip_validation_regex = re.compile(r'^((25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9][0-9]|[0-9])\.)'
                                  r'{3}(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9][0-9]|[0-9])$')
 my_ip = subprocess.run(['curl', 'ifconfig.me'],

@@ -1,11 +1,9 @@
 import flask
 from flask import request, jsonify
 from server import d3_conversion, d3_conversion_utils
-from flask_cors import CORS
 
 app = flask.Flask(__name__)
 app.config["DEBUG"] = True
-CORS(app)
 
 @app.route('/', methods=['GET'])
 def home():
@@ -31,8 +29,12 @@ def traceroutes():
 
     # Use the jsonify function from Flask to convert our list of
     # Python dictionaries to the JSON format.
-    # TODO : MOVE TIMEOUT TO HERE AND RETURN AS ERROR
+    # TODO : REPLACE PSCHEDULER
     if source:
+        # if d3_conversion_utils.check_api_server(source):
+        #   response = requests... to server, with just the destination specified (to force a "system" tr from them)
+        #   then just return the json() data retrieved.
+        # I think this should work?
         if d3_conversion_utils.check_pscheduler(source):
             print(f'{source} accepted as pScheduler source')
             response = d3_conversion.pscheduler_to_d3(source, dest, num_runs)
