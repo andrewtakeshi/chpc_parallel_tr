@@ -1,4 +1,20 @@
+/**
+ * Traceroute visualization; uses a map to display hops spatially and a force map to add an element of interactivity +
+ * handle collisions between nodes in roughly the same area.
+ *
+ * @author Paul Fischer, Andrew Golightly
+ */
 class ForceMap {
+    /**
+     * Constructs a new force map.
+     * @param root_element  Path or ID. Must be selectable by d3. Typically this is just the div where the force map
+     * visualization should go.
+     * @param width         Width of the SVG.
+     * @param height        Height of the SVG.
+     * @param showMap       Boolean which determines if the map should be initially shown or hidden. The force map
+     * is configured to use lat/lon to map the nodes to their respective locations if the map is shown, or to place the
+     * nodes in a roughly straight line if it is hidden.
+     */
     constructor(root_element, width = 1200, height = 800, showMap = true) {
         // Common elements
         this.width = width;
@@ -16,34 +32,41 @@ class ForceMap {
         this.zoom = d3.zoom()
             .scaleExtent([1, 10])
             .translateExtent([[-this.width + 150, -this.height + 150], [2 * this.width - 150, 2 * this.width - 150]])
+            // We use double click for something else, so we override the zoom behaviour for this event.
             .filter(() => !(d3.event.type === 'dblclick'))
             .on('zoom', this.zoomHandler);
 
+        // All d3-force related things go to forceG.
         this.forceG = this.svg.append('g')
             .attr('id', 'forceGroup');
+
+        // All d3-geo (the map) related things go to mapG
         this.mapG = this.svg.append('g')
             .attr('id', 'mapGroup');
 
-        // Map specific
-
-        this.projection = d3.geoEquirectangular();
-        this.path = d3.geoPath().projection(this.projection);
+        // Map specific - see d3-geo for more information.
+        // this.projection = d3.geoEquirectangular();
+        // this.path = d3.geoPath().projection(this.projection);
         this.packets = new Map();
 
-        // Force specific
-
+        // Force specific - see d3-force for more information.
         this.node_data = new Map();
         this.node_visual_alias = new Map();
         this.atr_iframes = new Map();
 
+        // Global tooltip - this is different from the "pinned" tooltips.
         this.floating_tooltip = d3.select(root_element)
             .append('div')
             .attr('id', 'forcemap_tooltip')
             .classed('tooltip', true);
-
         this.tooltip_stats = this.floating_tooltip
             .append('div');
 
+        // Max bandwidth group overlay on top of the map/force vis.
+        this.maxBW = this.svg.append('g');
+
+        // TODO: Remove attributes from here - should be applied directly to links or done in CSS.
+        // Create group for all the links
         this.all_links = this.forceG.append('g')
             .classed('all_links', true)
             .attr('stroke', '#999')
@@ -51,26 +74,34 @@ class ForceMap {
             .attr('stroke-width', 1)
             .selectAll('line');
 
+        // Create group for all the nodes
         this.allNodes = this.forceG.append('g')
             .classed('all_nodes', true)
             .attr('stroke', '#fff')
             .attr('stroke-width', 1.5)
             .selectAll('circle');
 
+        // Disables or enables the map, depending on the value of this.showMap.
         this.toggleMap();
+        // Sets the desired force behavior depending on the value of this.showMap.
         this.setSimulation();
-
-        this.maxBW = this.svg.append('g');
     }
 
 
     /************************************
      *********** Map Section ************
      ************************************/
-    setTopography(topojson) {
-        this.topojson = topojson;
+    /**
+     * Sets the topography - used for changing what map is shown.
+     * @param geojson - Filtered and processed geojson.
+     */
+    setTopography(geojson) {
+        this.geojson = geojson;
     }
 
+    /**
+     * Defines zoom behavior.
+     */
     zoomHandler() {
         // Map transforms
         d3.select('#mapGroup')
@@ -92,18 +123,23 @@ class ForceMap {
                 .attr('x', d => (-d.radius) / d3.event.transform.k)
                 .attr('y', d => (-d.radius) / d3.event.transform.k);
 
-            // No link transformation needed because of vector-effect : non-scaling-stroke in CSS.
+            // No link transformation needed because of 'vector-effect : non-scaling-stroke' in CSS.
             // Move the entire force group
             d3.select('#forceGroup')
                 .attr('transform', d3.event.transform);
         }
     }
 
+    /**
+     * Hide or show the map, depending on the value of this.showMap.
+     */
     toggleMap() {
         if (this.showMap) {
+            // Draw the map and enable zoom.
             this.zoom.on('zoom', this.zoomHandler);
             this.drawMap();
         } else {
+            // Reset zoom, disable it, and then remove the map.
             this.svg.call(this.zoom.transform, d3.zoomIdentity);
             this.zoom.on('zoom', null);
             this.mapG.selectAll('path').remove();
@@ -111,22 +147,29 @@ class ForceMap {
     }
 
 
+    /**
+     * Draws the map.
+     */
     drawMap() {
-        if (!this.topojson) {
+        // Don't do anything if the geojson isn't present.
+        if (!this.geojson) {
             return;
         }
 
         this.svg.call(this.zoom);
 
+        // Set up the projection and path.
         this.projection = d3.geoEquirectangular()
-            .fitSize([this.width, this.height], this.topojson);
-
+            .fitSize([this.width, this.height], this.geojson);
         let path = d3.geoPath().projection(this.projection);
 
+        // Remove any existing map - we want to redraw entirely instead of joining
+        // because the different geojson files can have conflicting IDs.
         this.mapG.selectAll('path').remove();
 
+        // Actually draw the map
         this.mapG.selectAll('path')
-            .data(this.topojson.features)
+            .data(this.geojson.features)
             .join('path')
             .attr('id', d => `${d.id}_map`)
             .classed('outline', true)
@@ -137,6 +180,14 @@ class ForceMap {
      ********** Force Section ***********
      ************************************/
 
+    /**
+     * Set the simulation depending on the value of this.drawMap.
+     * if drawMap:
+     *      Simulation maps nodes to lat/lon
+     * else:
+     *      Simulation uses default ordering, with forces centering the vis on the center of the SVG + a forceY to get
+     *      the nodes to appear in a relatively straight line.
+     */
     setSimulation() {
         if (this.showMap) {
             // Initialize interactivity
@@ -149,6 +200,7 @@ class ForceMap {
                 .force('forceY', d3.forceY(d => this.projection([d.lon, d.lat])[1])
                     .strength(1));
         } else {
+            // TODO: Use the hop id to get nodes to actually go in a roughly straight line.
             this.simulation = d3.forceSimulation()
                 .force('link', d3.forceLink().id())
                 .force('charge', d3.forceManyBody())
@@ -158,6 +210,7 @@ class ForceMap {
                     .radius(d => d.diameter));
         }
 
+        // Common to both simulations; updates the link and node positions on every tick of the simulation.
         this.simulation.on('tick', () => {
             this.all_links
                 .attr('x1', d => d.source.x)
@@ -168,6 +221,11 @@ class ForceMap {
         });
     }
 
+    /**
+     * Recursively collapses the children of node. Allows for expanding the children of expanded nodes?
+     * I'm not entirely sure, as this is part of Paul's work.
+     * @param node The node to "collapse".
+     */
     collapseNode(node) {
         const _collapse = (child) => {
             child.expanded = false;
@@ -181,6 +239,12 @@ class ForceMap {
         _collapse(node);
     }
 
+    /**
+     * Expand a node (i.e. go from org node to multiple IP nodes).
+     * @param node The node to expand.
+     * @returns {boolean} Returns true if the node was expanded and had children. Returns false if the node was already
+     * expanded or the node didn't have any children that could be expanded.
+     */
     expandNode(node) {
         if (node.expanded) {
             return false;
@@ -195,6 +259,11 @@ class ForceMap {
         return false;
     }
 
+    /**
+     * Used to color nodes that a favicon doesn't exist for.
+     * @param node Node to assign a color to.
+     * @returns Color according to d3.scaleOrdinal.
+     */
     getNodeColorOrg(node) {
         const domain = d3.map([...this.node_data.values()], v => v.org).keys();
         const scale = d3.scaleOrdinal(d3.schemeCategory10).domain(domain);
@@ -221,22 +290,30 @@ class ForceMap {
         return flat_data;
     }
 
+    /**
+     * Force simulation drag handler.
+     * @returns An instance of d3.drag with all the proper handlers set up.
+     */
     nodeDrag() {
         let simulation = this.simulation;
         let width = this.width;
         let height = this.height;
 
+        // Prevent dragging beyond the width and height of the SVG.
         let clamp = (v, lo, hi) => v < lo ? lo : v > hi ? hi : v;
 
         function dragstarted(d) {
             if (!d3.event.active) {
                 simulation.alphaTarget(0.3).restart();
             }
+            // Bring the dragged node to the top. Small ease of use thing. Less important because the force between
+            // nodes should prevent any overlaps, but it's still nice to have.
             d3.select(this).raise();
             d.fx = d.x;
             d.fy = d.y;
         }
 
+        // TODO: Scale by the zoom factor.
         function dragged(d) {
             d.fx = clamp(d3.event.x, 0, width);
             d.fy = clamp(d3.event.y, 0, height);
@@ -251,8 +328,8 @@ class ForceMap {
         }
 
         return d3.drag()
-            // Needed for smooth dragging, along with calling drag from the
-            // group (i.e. g.single_node) rather than calling on the circle
+            // Needed for smooth dragging, along with calling drag from the group (i.e. g.single_node) rather than
+            // calling on the circle
             .container(d3.select('#mainVisSVG').node())
             .on('start', dragstarted)
             .on('drag', dragged)
@@ -285,13 +362,16 @@ class ForceMap {
     /**
      * Creates traffic graph using info scraped through Netbeam API.
      * @param trafficInfo - Traffic info gathered from Netbeam
-     * @param div - Root element that the traffic graph is added to.
+     * @param div - d3 selection corresponding to the root element to draw the Netbeam graph on.
+     * @param checks - Boolean which determines if the checkboxes controlling the additional information (i.e. discards,
+     * errors, and unicast packets) should be added. By default this is false, and should only be set to true for the
+     * pinned tooltips.
      */
-    netbeamGraph(trafficInfo, div) {
-        let margin = {top: 10, right: 30, bottom: 30, left: 60};
+    netbeamGraph(trafficInfo, div, checks = false) {
+        let margin = {top: 30, right: 200, bottom: 30, left: 60};
 
-        let oWidth = 600;
-        let oHeight = 300;
+        let oWidth = 850;
+        let oHeight = 350;
 
         let width = oWidth - margin.left - margin.right;
         let height = oHeight - margin.top - margin.bottom;
@@ -327,23 +407,127 @@ class ForceMap {
 
         let valsArr = [...trafficInfo.values()];
 
-        let min = d3.min(valsArr.map(d => Math.min(d.in, d.out)));
-        let max = d3.max(valsArr.map(d => Math.max(d.in, d.out)));
+        let ts_filter = (obj) =>
+        {
+            let vals = [];
+            for (let key of Object.keys(obj))
+            {
+                if (key !== 'ts')
+                {
+                    vals.push(obj[key]);
+                }
+            }
+            return vals;
+        }
+
+
+        // Combined min/max of all properties - time stamp.
+        let min = d3.min(valsArr.map(d => d3.min(ts_filter(d))));
+        let max = d3.max(valsArr.map(d => d3.max(ts_filter(d))));
+
+
+        // let min = d3.min(valsArr.map(d => Math.min(d.traffic_in, d.traffic_out)));
+        // let max = d3.max(valsArr.map(d => Math.max(d.traffic_in, d.traffic_out)));
+
 
         let yScale = d3.scaleLinear()
             .domain([min, max])
             .range([height, 0]);
-        let yAxis = trafficGraph.append('g')
+        trafficGraph.append('g')
             .attr('id', 'yaxis')
             .call(d3.axisLeft(yScale)
                 .ticks(6)
                 .tickFormat(d => d3.format('~s')(d) + 'bps'));
 
-        // Set up legend
-        {
+        let add_path_and_circs = (measurement, color) => {
+
+            if (d3.select(`#${measurement}_line_${div.attr('id')}`).node() !== null)
+            {
+                d3.select(`#${measurement}_line_${div.attr('id')}`).remove();
+                d3.select(`#${measurement}_circs_${div.attr('id')}`).remove();
+                return;
+            }
+
+            trafficGraph.append('path')
+                .attr('id', `${measurement}_line_${div.attr('id')}`)
+                .datum(valsArr.filter(d => `${measurement}` in d))
+                .attr('fill', 'none')
+                .attr('stroke', color)
+                .attr('stroke-width', 1.5)
+                .attr('d', d3.line()
+                    .x(d => xScale(d.ts))
+                    .y(d => yScale(d[measurement]))
+                    .curve(d3.curveMonotoneX));
+
+            trafficGraph.append('g')
+                .attr('id', `${measurement}_circs_${div.attr('id')}`)
+                .selectAll('circle')
+                .data(valsArr.filter(d => `${measurement}` in d))
+                .join('circle')
+                .attr('r', 1.5)
+                .attr('fill', color)
+                .attr('cx', d => xScale(d.ts))
+                .attr('cy', d => yScale(d[measurement]));
+
+        }
+
+        let types = ['Traffic In', 'Traffic Out', 'Unicast Packets In', 'Unicast Packets Out',
+            'Errors In', 'Errors Out', 'Discards In', 'Discards Out'];
+
+        let colorScale = d3.scaleOrdinal()
+            .domain(types)
+            .range(['steelblue', 'red', 'blue', 'crimson', 'cadetblue', 'darksalmon', 'skyblue', 'violet']);
+
+        if (checks) {
+            let boxes = div.append('div')
+                .style('position', 'absolute')
+                .style('top', `${margin.top}px`)
+                .style('right', '20px')
+                .classed('checkbox-area', true)
+                .attr('width', `${margin.right - 20}px`)
+                .attr('height', `${height}px`);
+
+            if (boxes.selectAll('ul').nodes().length === 0) {
+                boxes.append('ul');
+            }
+
+            boxes.selectAll('ul')
+                .selectAll('li')
+                .data(types)
+                .join('li')
+                .style('list-style-type', 'none');
+
+            let list_items = div.selectAll('div')
+                .selectAll('ul')
+                .selectAll('li');
+
+            list_items.append('input')
+                .attr('id', d => `checkbox_${d.replace(/\s/g, '')}_${div.attr('id')}`)
+                .attr('value', d => d)
+                .attr('type', 'checkbox')
+                .classed('form-check-input', true)
+                // TODO: write change function to toggle display of additional information. Also color code the text.
+                .on('click', function (d) {
+                    d3.event.stopPropagation();
+                    let val = d.replace(/\s/g, '_').toLowerCase();
+                    add_path_and_circs(val, colorScale(d));
+                })
+                // Prevent dblclick on checkbox from hiding the tooltip.
+                .on('dblclick', _ => d3.event.stopPropagation());
+
+            list_items.selectAll('input')
+                .filter(d => d === types[0] || d === types[1])
+                .property('checked', true);
+
+            list_items.append('label')
+                .attr('for', d => `checkbox_${d.replace(/\s/g, '')}_${div.attr('id')}`)
+                .style('color', d => colorScale(d))
+                .text(d => d);
+        } else {
+
             let inLegend = trafficGraph.append('g')
                 .attr('id', 'inLegend')
-                .attr('transform', `translate(${width - 50}, 10)`);
+                .attr('transform', `translate(${width}, 10)`);
             inLegend.append('text')
                 .attr('style', 'font: 12px sans-serif;')
                 .attr('opacity', 0.75)
@@ -364,7 +548,7 @@ class ForceMap {
 
             let outLegend = trafficGraph.append('g')
                 .attr('id', 'outLegend')
-                .attr('transform', `translate(${width - 50}, 20)`);
+                .attr('transform', `translate(${width}, 20)`);
             outLegend.append('text')
                 .attr('style', 'font: 12px sans-serif;')
                 .attr('opacity', 0.75)
@@ -384,51 +568,56 @@ class ForceMap {
                 .attr('r', 1.5);
         }
 
-        // Append path for in values
-        trafficGraph.append('path')
-            .attr('id', 'inLine')
-            .datum(valsArr)
-            .attr('fill', 'none')
-            .attr('stroke', 'steelblue')
-            .attr('stroke-width', 1.5)
-            .attr('d', d3.line()
-                .x(d => xScale(d.ts))
-                .y(d => yScale(d.in))
-                .curve(d3.curveMonotoneX));
 
-        // Append path for out values
-        trafficGraph.append('path')
-            .attr('id', 'outLine')
-            .datum(valsArr)
-            .attr('fill', 'none')
-            .attr('stroke', 'red')
-            .attr('stroke-width', 1.5)
-            .attr('d', d3.line()
-                .x(d => xScale(d.ts))
-                .y(d => yScale(d.out))
-                .curve(d3.curveMonotoneX));
 
-        // Append dots for in values
-        trafficGraph.append('g')
-            .attr('id', 'inCircs')
-            .selectAll('circle')
-            .data(valsArr)
-            .join('circle')
-            .attr('r', 1.5)
-            .attr('fill', 'steelblue')
-            .attr('cx', d => xScale(d.ts))
-            .attr('cy', d => yScale(d.in));
+        add_path_and_circs('traffic_in', colorScale('traffic_in'));
+        add_path_and_circs('traffic_out', colorScale('traffic_out'));
 
-        // Append dots for out values
-        trafficGraph.append('g')
-            .attr('id', 'outCircs')
-            .selectAll('circle')
-            .data(valsArr)
-            .join('circle')
-            .attr('r', 1.5)
-            .attr('fill', 'red')
-            .attr('cx', d => xScale(d.ts))
-            .attr('cy', d => yScale(d.out));
+        // // Append path for in values
+        // trafficGraph.append('path')
+        //     .attr('id', 'inLine')
+        //     .datum(valsArr)
+        //     .attr('fill', 'none')
+        //     .attr('stroke', 'steelblue')
+        //     .attr('stroke-width', 1.5)
+        //     .attr('d', d3.line()
+        //         .x(d => xScale(d.ts))
+        //         .y(d => yScale(d.traffic_in))
+        //         .curve(d3.curveMonotoneX));
+        //
+        // // Append path for out values
+        // trafficGraph.append('path')
+        //     .attr('id', 'outLine')
+        //     .datum(valsArr)
+        //     .attr('fill', 'none')
+        //     .attr('stroke', 'red')
+        //     .attr('stroke-width', 1.5)
+        //     .attr('d', d3.line()
+        //         .x(d => xScale(d.ts))
+        //         .y(d => yScale(d.traffic_out))
+        //         .curve(d3.curveMonotoneX));
+        //
+        // // Append dots for in values
+        // trafficGraph.append('g')
+        //     .attr('id', 'inCircs')
+        //     .selectAll('circle')
+        //     .data(valsArr)
+        //     .join('circle')
+        //     .attr('r', 1.5)
+        //     .attr('fill', 'steelblue')
+        //     .attr('cx', d => xScale(d.ts))
+        //     .attr('cy', d => yScale(d.traffic_in));
+        //
+        // // Append dots for out values
+        // trafficGraph.append('g')
+        //     .attr('id', 'outCircs')
+        //     .selectAll('circle')
+        //     .data(valsArr)
+        //     .join('circle')
+        //     .attr('r', 1.5)
+        //     .attr('fill', 'red')
+        //     .attr('cx', d => xScale(d.ts))
+        //     .attr('cy', d => yScale(d.traffic_out));
     }
 
     // Finds overall max bandwidth to display on vis.
@@ -632,8 +821,21 @@ class ForceMap {
             let trafficInfo = new Map();
             for (let packet of packets) {
                 if (packet.resource && packet.traffic) {
-                    for (let traffic of packet.traffic) {
-                        trafficInfo.set(traffic[0], {'ts': traffic[0], 'in': traffic[1], 'out': traffic[2]});
+
+                    let prop_adder = (prop) => {
+                        for (let _prop of packet[prop]) {
+                            if (!trafficInfo.has(_prop[0])) {
+                                trafficInfo.set(_prop[0], {'ts' : _prop[0]});
+                            }
+                            trafficInfo.get(_prop[0])[`${prop}_in`] = _prop[1];
+                            trafficInfo.get(_prop[0])[`${prop}_out`] = _prop[2];
+                        }
+                    }
+
+                    let props = ['traffic', 'unicast_packets', 'errors', 'discards']
+
+                    for (let prop of props) {
+                        prop_adder(prop);
                     }
                 }
             }
@@ -648,6 +850,8 @@ class ForceMap {
                     `${packets.length} packets | ` +
                     `${d.max_bandwidth ? 'Max bandwidth: ' + d3.format('s')(d.max_bandwidth) + 'bps |' : ''} ` +
                     `RTT (mean): ${d3.mean(packets, p => p.rtt)}`);
+
+            // TODO: Add notice if no graph is available.
 
             // selection.append('tspan')
             //     .attr('dx', 0)
@@ -696,12 +900,14 @@ class ForceMap {
             d3.event.preventDefault();
 
             // Make sure that isn't already pinned
-            if (d3.select(`#tooltip${CSS.escape(d.id)}`).node() !== null) return;
+            if (d3.select(`#tooltip${CSS.escape(d.id.replace(/(\s|\.|\(|\))+/g, '_'))}`).node() !== null) return;
+
+            //d.replace(/\s/g, '')
 
             // Create the tooltip div
             let tooltip = d3.select(that.rootElement)
                 .append('div')
-                .attr('id', `tooltip${d.id}`)
+                .attr('id', `tooltip${CSS.escape(d.id.replace(/(\s|\.|\(|\))+/g, '_'))}`)
                 .classed('tooltip removable', true);
 
             // Append tooltip stats
@@ -767,7 +973,8 @@ class ForceMap {
                     .style('display', 'block');
             } else if (d.id.startsWith('ip') && trafficInfo.size > 0) {
                 // Add the d3 vis for netbeam info
-                that.netbeamGraph(trafficInfo, tooltip);
+                that.netbeamGraph(trafficInfo, tooltip, true);
+
             } else {
                 // If neither data source is applicable, remove the tooltip
                 tooltip.remove();

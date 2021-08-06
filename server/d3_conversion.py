@@ -8,6 +8,9 @@ import threading
 from icmplib import traceroute
 from server import d3_netbeam, d3_conversion_utils, d3_geo_ip
 
+
+# TODO: Add locks to everything
+# lock + limiter are used to limit the number of concurrent traceroutes running
 lock = threading.Lock()
 limiter = 0
 
@@ -24,9 +27,8 @@ def pscheduler_to_d3(source, dest, num_runs=1):
     :return: JSON ingestible by the d3 visualisation if the traceroute is successful. None otherwise.
     """
 
-    # # Check the source - no longer necessary as this is done client side.
-    # if not check_pscheduler(source):
-    #     return None
+    # Check the source - no longer necessary as this is done from the API server (api.py) before this is ever called.
+
 
     i = 0
     process_list = []
@@ -114,7 +116,7 @@ def pscheduler_to_d3(source, dest, num_runs=1):
 
 
 # Thread specific work
-def system_to_d3_tw(dest, return_array, tr_id):
+def system_to_d3_icmplib_tw(dest, return_array, tr_id):
     dest_ip = d3_conversion_utils.target_to_ip(dest)
     hops = traceroute(address=dest, count=1, id=tr_id)
     my_ip = d3_conversion_utils.my_ip
@@ -142,21 +144,20 @@ def system_to_d3_tw(dest, return_array, tr_id):
 
 
 # Creates threads for system_to_d3
-def system_to_d3_threaded(dest, num_runs=1):
+def system_to_d3_icmplib_threaded(dest, num_runs=1):
     threads = []
     return_array = []
-    system_traceroute_lock = threading.Lock()
 
     if num_runs > 1:
         for i in range(num_runs):
             threads.append(
-                threading.Thread(target=system_to_d3_tw, args=(dest, return_array, random.randrange(1000000),)))
+                threading.Thread(target=system_to_d3_icmplib_tw, args=(dest, return_array, random.randrange(1000000),)))
             threads[i].start()
 
         for i in range(num_runs):
             threads[i].join()
     else:
-        system_to_d3_tw(dest, return_array, random.randrange(1000000))
+        system_to_d3_icmplib_tw(dest, return_array, random.randrange(1000000))
 
     output = {'traceroutes': return_array}
     return add_additional_information(output)
@@ -328,7 +329,7 @@ def system_copy_to_d3(dataIn):
         return None
 
 
-def system_to_d3_old_tw(dest, returnArray):
+def system_to_d3_tw(dest, returnArray):
     dest_ip = d3_conversion_utils.target_to_ip(dest)
 
     sp_stdout = subprocess.run(['traceroute', dest, '-q', '1'], stdout=subprocess.PIPE, universal_newlines=True).stdout
@@ -379,12 +380,12 @@ def system_to_d3_old_tw(dest, returnArray):
     returnArray.append(res)
 
 
-def system_to_d3_old_threaded(dest, numRuns=1):
+def system_to_d3_threaded(dest, numRuns=1):
     threads = []
     returnArray = []
 
     for i in range(numRuns):
-        threads.append(threading.Thread(target=system_to_d3_old_tw, args=(dest, returnArray,)))
+        threads.append(threading.Thread(target=system_to_d3_tw, args=(dest, returnArray,)))
         threads[i].start()
 
     for i in range(numRuns):

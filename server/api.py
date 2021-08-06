@@ -5,6 +5,7 @@ from server import d3_conversion, d3_conversion_utils
 app = flask.Flask(__name__)
 app.config["DEBUG"] = True
 
+
 @app.route('/', methods=['GET'])
 def home():
     return '''<h1>Internet analysis</h1>
@@ -29,7 +30,7 @@ def traceroutes():
 
     # Use the jsonify function from Flask to convert our list of
     # Python dictionaries to the JSON format.
-    # TODO : REPLACE PSCHEDULER
+    # TODO : REPLACE PSCHEDULER - we can use our own API server to do this with minimal changes.
     if source:
         # if d3_conversion_utils.check_api_server(source):
         #   response = requests... to server, with just the destination specified (to force a "system" tr from them)
@@ -52,6 +53,7 @@ def traceroutes():
     return response
 
 
+# TODO: REMOVE THIS - It's a lot more efficient to just return this as part of the traceroute data imo.
 @app.route('/api/v1/resources/iporgs', methods=['GET'])
 def iporgs():
     if "ip" in request.args:
@@ -65,4 +67,5 @@ def iporgs():
     return response
 
 
-app.run(host='0.0.0.0')
+if __name__ == '__main__':
+    app.run(host='0.0.0.0')
