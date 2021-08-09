@@ -24,7 +24,7 @@ def ip_to_asn(ip):
 
 # TODO: REMOVE THIS AND REPLACE WITH WHOIS LOOKUP
 def rdap_org_lookup(ip):
-    ret_error = {"org": None, "domain": None}
+    not_found = {"org": None, "domain": None}
 
     if ip not in rdap_cache:
         if ip_validation_regex.match(ip):
@@ -32,7 +32,7 @@ def rdap_org_lookup(ip):
             try:
                 response = requests.get(f'https://rdap.arin.net/registry/ip/{ip}')
                 if response.status_code != 200:
-                    return ret_error
+                    return not_found
                 # ARIN managed networks
                 if response.url.__contains__('arin'):
                     print('Received response from ARIN')
@@ -68,13 +68,12 @@ def rdap_org_lookup(ip):
                             pass
                 else:
                     print(f'Received response from unknown NCC; {response.url}')
-                    return ret_error
+                    return not_found
             except requests.exceptions.ConnectionError:
-                return ret_error
+                return not_found
         else:
-            return ret_error
+            return not_found
     return rdap_cache[ip]
-
 
 def check_pscheduler(endpoint):
     """

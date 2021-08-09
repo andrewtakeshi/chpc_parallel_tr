@@ -1,7 +1,7 @@
 //const api_server = 'network-viz.chpc.utah.edu:5000'
 const api_server = '127.0.0.1:8081';
 const tr_api = '/api/v1/resources/traceroutes';
-const rdap_api = '/api/v1/resources/iporgs'
+// const rdap_api = '/api/v1/resources/iporgs'
 
 const runTraceroute = async (source, dest, num_runs) => {
     let api_call = `http://${api_server}${tr_api}?dest=${dest}`;
@@ -23,10 +23,10 @@ const runTraceroute = async (source, dest, num_runs) => {
     }
 };
 
-const getOrgFromIP = async (ip) => {
-    let api_call = `http://${api_server}${rdap_api}?ip=${ip}`;
-    return await d3.json(api_call);
-}
+// const getOrgFromIP = async (ip) => {
+//     let api_call = `http://${api_server}${rdap_api}?ip=${ip}`;
+//     return await d3.json(api_call);
+// }
 
 const getMaxBWFromGRNOCIP = async (ip) => {
     // TODO: Better way of telling if it's part of GRNOC
@@ -66,7 +66,7 @@ const createInternetGraph = async (traceroutes, existing = undefined) => {
 
             if (!entity) {
                 // Calls the API
-                const orgResult = await getOrgFromIP(packet.ip);
+                // const orgResult = await getOrgFromIP(packet.ip);
                 let maxBW = undefined;
                 const tsdsResult = await getMaxBWFromGRNOCIP(packet.ip);
                 if (tsdsResult.results.length > 0) {
@@ -75,8 +75,8 @@ const createInternetGraph = async (traceroutes, existing = undefined) => {
                 entity = ({
                     id: entity_id,
                     ip: packet.ip,
-                    org: orgResult.org,
-                    domain: orgResult.domain,
+                    org: packet.org,
+                    domain: packet.domain,
                     max_bandwidth: packet.speed ? packet.speed : maxBW,
                     packets: new Array(),
                     source_ids: new Set(),

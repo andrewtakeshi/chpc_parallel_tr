@@ -13,6 +13,7 @@ import json
 from server.d3_netbeam import ip_to_resource_dict
 from server.d3_netbeam import ip_to_netbeam_db
 from server.d3_netbeam import add_netbeam_info_db_naive
+from server import d3_rdap
 import subprocess
 
 # diff = difflib.Differ()
@@ -115,10 +116,10 @@ url = 'http://netbeam.es.net/api/network/esnet/prod/interfaces'
 
 # print(d3c.system_to_d3_old('134.55.200.107', 1))
 
-limit = 100
-
-dict_time = 0
-db_time = 0
+# limit = 100
+#
+# dict_time = 0
+# db_time = 0
 
 # for _ in range(limit):
 #     st = time.time()
@@ -130,6 +131,28 @@ db_time = 0
 # print(f'dict time = {dict_time / limit}')
 # print(f'db time = {db_time / limit}')
 
-sub = subprocess.Popen(['pscheduler', 'task', '--debug', 'trace', '-s', '204.99.128.12', '-d', '8.8.8.8'],
-                                             stdout=subprocess.PIPE, universal_newlines=True)
-sub.wait()
+# sub = subprocess.Popen(['pscheduler', 'task', '--debug', 'trace', '-s', '204.99.128.12', '-d', '8.8.8.8'],
+#                                              stdout=subprocess.PIPE, universal_newlines=True)
+# sub.wait()
+
+
+# st = time.time()
+# print(d3_rdap.rdap_cache_threaded(d3_json))
+# print(time.time() - st)
+#
+# st = time.time()
+# for tr in d3_json['traceroutes']:
+#     for packet in tr['packets']:
+#         if 'ip' not in packet:
+#             continue
+#         ip = packet.get('ip')
+#         d3_conversion_utils.rdap_org_lookup(ip)
+# print(time.time() - st)
+
+# print(d3_rdap.rdap_cache_threaded(d3_json))
+# print(d3_rdap.rdap_cache_threaded(d3_json))
+d3_conversion_utils.rdap_org_lookup('206.81.81.102')
+packet = {}
+d3_rdap.rdap_cache_tw(packet, '206.81.81.102')
+print(packet)
+

@@ -6,7 +6,7 @@ import subprocess
 import requests
 import threading
 from icmplib import traceroute
-from server import d3_netbeam, d3_conversion_utils, d3_geo_ip
+from server import d3_netbeam, d3_conversion_utils, d3_geo_ip, d3_rdap
 
 
 # TODO: Add locks to everything
@@ -495,6 +495,7 @@ def add_additional_information(d3_json):
     # d3_json = remove_unknowns(d3_json)
     d3_json = d3_netbeam.add_netbeam_info_threaded(d3_json)
     d3_json = d3_geo_ip.add_geo_info_threaded(d3_json)
+    d3_json = d3_rdap.rdap_cache_threaded(d3_json)
     # d3_json = d3_geo_ip.add_geo_info_naive(d3_json)
     # d3_json = d3_netbeam.add_netbeam_info_db_naive(d3_json)
     return d3_json

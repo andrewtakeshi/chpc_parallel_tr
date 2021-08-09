@@ -203,7 +203,7 @@ def load_netbeam_cache(source_path):
 
 def add_netbeam_info_naive(d3_json, source_path=None):
     """
-    Naive (i.e. single threaded) implementation for adding Netbeam information to a traceroute.
+    Single threaded implementation for adding Netbeam information to a traceroute.
 
     :param d3_json: Dictionary containing the traceroute information. Called d3_json because it is later used by d3.js
     to create the web visualization.

@@ -407,13 +407,10 @@ class ForceMap {
 
         let valsArr = [...trafficInfo.values()];
 
-        let ts_filter = (obj) =>
-        {
+        let ts_filter = (obj) => {
             let vals = [];
-            for (let key of Object.keys(obj))
-            {
-                if (key !== 'ts')
-                {
+            for (let key of Object.keys(obj)) {
+                if (key !== 'ts') {
                     vals.push(obj[key]);
                 }
             }
@@ -441,8 +438,7 @@ class ForceMap {
 
         let add_path_and_circs = (measurement, color) => {
 
-            if (d3.select(`#${measurement}_line_${div.attr('id')}`).node() !== null)
-            {
+            if (d3.select(`#${measurement}_line_${div.attr('id')}`).node() !== null) {
                 d3.select(`#${measurement}_line_${div.attr('id')}`).remove();
                 d3.select(`#${measurement}_circs_${div.attr('id')}`).remove();
                 return;
@@ -506,7 +502,6 @@ class ForceMap {
                 .attr('value', d => d)
                 .attr('type', 'checkbox')
                 .classed('form-check-input', true)
-                // TODO: write change function to toggle display of additional information. Also color code the text.
                 .on('click', function (d) {
                     d3.event.stopPropagation();
                     let val = d.replace(/\s/g, '_').toLowerCase();
@@ -567,7 +562,6 @@ class ForceMap {
                 .attr('fill', 'red')
                 .attr('r', 1.5);
         }
-
 
 
         add_path_and_circs('traffic_in', colorScale('traffic_in'));
@@ -715,12 +709,17 @@ class ForceMap {
                     target_aliases.add(this.node_visual_alias.get(t));
                 }
                 for (let t of target_aliases) {
-                    if (d.id != t)
+                    if (d.id !== t) {
+                        let target = this.all_nodes_flat.get(t);
+                        let d_mbw = d.max_bandwidth ? d.max_bandwidth : 0;
+                        let t_mbw = target.max_bandwidth ? target.max_bandwidth : 0;
                         this.vLinks.push(({
                             source: d,
-                            target: this.all_nodes_flat.get(t),
-                            packet_scale: Math.sqrt(this.all_nodes_flat.get(t).packets.length)
+                            target: target,
+                            packet_scale: Math.sqrt(target.packets.length),
+                            max_bandwidth: Math.min(d_mbw, t_mbw)
                         }));
+                    }
                 }
             }
             d.diameter = nodeDiameterScale(d.packets.length);
@@ -786,6 +785,14 @@ class ForceMap {
 
         let markerWidth = 6, markerHeight = 4;
 
+        let linkColorScale = d3.scaleLinear()
+            .domain(this.vLinks.map(d => d.max_bandwidth).sort((first, second) => {
+                if (first === second) return 0;
+                if (first > second) return 1;
+                return -1;
+            }))
+            .range(['#999', 'red']);
+
         this.forceG.selectAll('defs')
             .selectAll('marker')
             .data(this.vLinks)
@@ -804,7 +811,8 @@ class ForceMap {
             .join('line')
             .classed('link', true)
             .attr('stroke-width', d => d.packet_scale)
-            // .attr('stroke-width', d => d.packet_scale / zoomDenominator)
+            .attr('stroke', '#999')
+            // .attr('stroke', d => linkColorScale(d.max_bandwidth))
             .attr('marker-end', (d, i) => `url(#marker_${i})`);
 
         this.simulation.nodes(this.nodeValues);
@@ -825,7 +833,7 @@ class ForceMap {
                     let prop_adder = (prop) => {
                         for (let _prop of packet[prop]) {
                             if (!trafficInfo.has(_prop[0])) {
-                                trafficInfo.set(_prop[0], {'ts' : _prop[0]});
+                                trafficInfo.set(_prop[0], {'ts': _prop[0]});
                             }
                             trafficInfo.get(_prop[0])[`${prop}_in`] = _prop[1];
                             trafficInfo.get(_prop[0])[`${prop}_out`] = _prop[2];
@@ -923,6 +931,7 @@ class ForceMap {
             // Make draggable on mousedown
             tooltip.on('mousedown', function () {
                 d3.event.preventDefault();
+                d3.select(this).raise();
                 draggable = true;
                 initialX = d3.event.clientX;
                 initialY = d3.event.clientY;
