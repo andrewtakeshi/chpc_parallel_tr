@@ -1,7 +1,7 @@
 //const api_server = 'network-viz.chpc.utah.edu:5000'
 const api_server = '127.0.0.1:8081';
 const tr_api = '/api/v1/resources/traceroutes';
-// const rdap_api = '/api/v1/resources/iporgs'
+const rdap_api = '/api/v1/resources/iporgs'
 
 const runTraceroute = async (source, dest, num_runs) => {
     let api_call = `http://${api_server}${tr_api}?dest=${dest}`;
@@ -10,23 +10,19 @@ const runTraceroute = async (source, dest, num_runs) => {
     }
     api_call += `&num_runs=${num_runs}`;
     console.log(`Requesting ${api_call}`);
-    try
-    {
+    try {
         return await d3.json(api_call);
-    }
-    catch (e)
-    {
-        if (e instanceof TypeError)
-        {
-            return {'error' : 'Network Error'};
+    } catch (e) {
+        if (e instanceof TypeError) {
+            return {'error': 'Network Error'};
         }
     }
 };
 
-// const getOrgFromIP = async (ip) => {
-//     let api_call = `http://${api_server}${rdap_api}?ip=${ip}`;
-//     return await d3.json(api_call);
-// }
+const getOrgFromIP = async (ip) => {
+    let api_call = `http://${api_server}${rdap_api}?ip=${ip}`;
+    return await d3.json(api_call);
+}
 
 const getMaxBWFromGRNOCIP = async (ip) => {
     // TODO: Better way of telling if it's part of GRNOC
@@ -77,6 +73,8 @@ const createInternetGraph = async (traceroutes, existing = undefined) => {
                     ip: packet.ip,
                     org: packet.org,
                     domain: packet.domain,
+                    // org: orgResult.org,
+                    // domain: orgResult.domain,
                     max_bandwidth: packet.speed ? packet.speed : maxBW,
                     packets: new Array(),
                     source_ids: new Set(),
@@ -205,6 +203,10 @@ const propReducer = (property) => {
         case 'region':
             f = (a, b) => a === b ? a : 'Avg. Location';
             break;
+        case 'max_bandwidth':
+            // I think min is best because it gives the most restricted view; not positive though.
+            // Return the minimum bandwidth for the node - defaults to 0 if a bandwidth is undefined
+            f = (a, b) => Math.min(a ? a : 0, b ? b : 0)
         default:
             f = (a, b) => a === b ? a : undefined;
     }

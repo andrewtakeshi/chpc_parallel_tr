@@ -365,9 +365,3 @@ const mapSelectHandler = async () => {
 
 const force_map = new ForceMap('#d3_vis');
 setTopojson('world');
-
-
-
-
-
-

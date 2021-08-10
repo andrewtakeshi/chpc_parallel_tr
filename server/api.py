@@ -54,17 +54,17 @@ def traceroutes():
 
 
 # TODO: REMOVE THIS - It's a lot more efficient to just return this as part of the traceroute data imo.
-# @app.route('/api/v1/resources/iporgs', methods=['GET'])
-# def iporgs():
-#     if "ip" in request.args:
-#         ip = request.args["ip"]
-#     else:
-#         return "Error: No 'ip' field provided. Please specify an IP address."
-#
-#     response = d3_conversion_utils.rdap_org_lookup(ip)
-#     response = jsonify(response)
-#     response.headers.add('Access-Control-Allow-Origin', '*')
-#     return response
+@app.route('/api/v1/resources/iporgs', methods=['GET'])
+def iporgs():
+    if "ip" in request.args:
+        ip = request.args["ip"]
+    else:
+        return "Error: No 'ip' field provided. Please specify an IP address."
+
+    response = d3_conversion_utils.rdap_org_lookup(ip)
+    response = jsonify(response)
+    response.headers.add('Access-Control-Allow-Origin', '*')
+    return response
 
 
 if __name__ == '__main__':

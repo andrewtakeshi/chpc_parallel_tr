@@ -81,6 +81,46 @@ class ForceMap {
             .attr('stroke-width', 1.5)
             .selectAll('circle');
 
+        this.linkColorScale = d3.scaleQuantile()
+            .domain([0, 100000000, 250000000, 500000000, 1000000000, 2000000000, 5000000000, 10000000000, 20000000000, 40000000000, 80000000000, 100000000000, 400000000000])
+            // .domain(d3.extent(this.nodeValues, d => d.max_bandwidth ? d.max_bandwidth : 0))
+            .range(['rgb(119, 190, 252)', 'rgb(55, 161, 251)', 'rgb(162, 254, 175)',
+                'rgb(118, 245, 136)', 'rgb(43, 230, 144)', 'rgb(255, 225, 59)',
+                'rgb(242, 210, 54)', 'rgb(242, 168, 42)', 'rgb(255, 84, 89)',
+                'rgb(242, 5, 68)', 'rgb(232, 70, 165)', 'rgb(191, 112, 249)']);
+
+
+        // Add link legend
+        // Append a group for the legend
+        this.linkLegend = this.svg
+            .append('g')
+            .attr('id', 'linkLegend')
+            .attr('width', '200px')
+            .attr('height', this.height / 2)
+            .attr('transform', `translate(${this.width - 20}, 8)`);
+
+        // Append colored rects to delineate boundaries
+        this.linkLegend.selectAll('rect')
+            .data(this.linkColorScale.range())
+            .join('rect')
+            .attr('width', '20px')
+            .attr('height', (this.height / 2) / 12)
+            .attr('stroke', d => d)
+            .attr('stroke-width', '1px')
+            .attr('fill', d => d)
+            .attr('x', 0)
+            .attr('y', (_, i) => (this.height / 2) / 12 * (11 - i));
+
+        // Append text to describe boundaries
+        this.linkLegend.selectAll('text')
+            .data(this.linkColorScale.domain())
+            .join('text')
+            .classed('link-legend-text', true)
+            .attr('text-anchor', 'end')
+            .attr('x', -5)
+            .attr('y', (_, i) => (this.height / 2) / 12 * (12 - i) + 4)
+            .text(d => d3.format('~s')(d) + 'bps');
+
         // Disables or enables the map, depending on the value of this.showMap.
         this.toggleMap();
         // Sets the desired force behavior depending on the value of this.showMap.
@@ -687,7 +727,7 @@ class ForceMap {
             .domain(d3.extent([...this.node_data.values()], v => v.packets.length))
             .range([16, 24]);
 
-        // Preload ATR Grafana iFrames for rendered IP nodes
+        // Preload ATR Grafana iFrames for rendered IP nodes and generate links
         for (let d of this.nodeValues) {
             if (d.id.startsWith('ip') && !this.atr_iframes.has(d.id)) {
                 const URL = getATRChartURL(d.ip);
@@ -702,7 +742,6 @@ class ForceMap {
             }
 
             // Add links to vLinks from the source node 'd' to all targets 't'
-
             let target_aliases = new Set();
             if (d.target_ids) {
                 for (let t of d.target_ids) {
@@ -763,12 +802,12 @@ class ForceMap {
             .attr('fill', d => this.getNodeColorOrg(d))
             .attr('opacity', d => unknown(d.domain) ? 0.0 : 1.0)
             // Doubleclick 'pins' the charts
-            .on('dblclick', dblclickHandler)
+            .on('dblclick', nodeDblClickHandler)
             // Click to expand nodes
-            .on('click', clickHandler)
+            .on('click', nodeClickHandler)
             // Mouseover previews Grafana/d3 traffic charts
-            .on('mouseover', mouseoverHandler)
-            .on('mouseout', mouseoutHandler)
+            .on('mouseover', nodeMouseoverHandler)
+            .on('mouseout', nodeMouseoutHandler)
             .on('mousemove', () => {
                 // Updates position of global tooltip.
                 this.floating_tooltip.style('left', (d3.event.pageX + 10) + 'px').style('top', (d3.event.pageY + 10) + 'px')
@@ -785,14 +824,6 @@ class ForceMap {
 
         let markerWidth = 6, markerHeight = 4;
 
-        let linkColorScale = d3.scaleLinear()
-            .domain(this.vLinks.map(d => d.max_bandwidth).sort((first, second) => {
-                if (first === second) return 0;
-                if (first > second) return 1;
-                return -1;
-            }))
-            .range(['#999', 'red']);
-
         this.forceG.selectAll('defs')
             .selectAll('marker')
             .data(this.vLinks)
@@ -804,16 +835,28 @@ class ForceMap {
             .attr('refY', markerHeight / 2)
             .attr('orient', 'auto')
             .append('polygon')
-            .attr('points', `0 0, ${markerWidth + ' ' + markerHeight / 2}, 0 ${markerHeight}`);
+            .attr('points', `0 0, ${markerWidth + ' ' + markerHeight / 2}, 0 ${markerHeight}`)
+            .attr('fill', d => this.linkColorScale(d.max_bandwidth))
+            .on('mouseover', linkMouseOverHandler)
+            .on('mouseout', linkMouseOutHandler)
+            .on('mousemove', () => {
+                // Updates position of global tooltip.
+                this.floating_tooltip.style('left', (d3.event.pageX + 10) + 'px').style('top', (d3.event.pageY + 10) + 'px')
+            });
 
         this.all_links = this.all_links
             .data(this.vLinks)
             .join('line')
             .classed('link', true)
             .attr('stroke-width', d => d.packet_scale)
-            .attr('stroke', '#999')
-            // .attr('stroke', d => linkColorScale(d.max_bandwidth))
-            .attr('marker-end', (d, i) => `url(#marker_${i})`);
+            .attr('stroke', d => this.linkColorScale(d.max_bandwidth))
+            .attr('marker-end', (d, i) => `url(#marker_${i})`)
+            .on('mouseover', linkMouseOverHandler)
+            .on('mouseout', linkMouseOutHandler)
+            .on('mousemove', () => {
+                // Updates position of global tooltip.
+                this.floating_tooltip.style('left', (d3.event.pageX + 10) + 'px').style('top', (d3.event.pageY + 10) + 'px')
+            });
 
         this.simulation.nodes(this.nodeValues);
 
@@ -850,25 +893,35 @@ class ForceMap {
             return trafficInfo;
         }
 
+        function generateTTSLink(d, selection) {
+            selection.selectAll('text').remove();
+            selection.append('text')
+                .text(`${d3.format('~s')(d.max_bandwidth)}bps`);
+        }
+
+        function linkMouseOverHandler(d) {
+            that.floating_tooltip.transition().duration(200).style('opacity', 0.9);
+            generateTTSLink(d, that.tooltip_stats);
+        }
+
+        function linkMouseOutHandler(d) {
+            that.floating_tooltip.transition().duration(200).style('opacity', 0);
+        }
+
         // Generate ToolTipStats. Not complicated, just abstracted b/c it's used more than once.
         function generateTTS(d, packets, selection) {
             selection.selectAll('text').remove();
             selection.append('text')
                 .text(`${d.ip ? d.ip : ''} (${d.org}) | ` +
                     `${packets.length} packets | ` +
-                    `${d.max_bandwidth ? 'Max bandwidth: ' + d3.format('s')(d.max_bandwidth) + 'bps |' : ''} ` +
-                    `RTT (mean): ${d3.mean(packets, p => p.rtt)}`);
+                    `${d.max_bandwidth ? 'Max bandwidth: ' + d3.format('~s')(d.max_bandwidth) + 'bps |' : ''} ` +
+                    `RTT (mean): ${d3.format('.3r')(d3.mean(packets, p => p.rtt))}`);
 
             // TODO: Add notice if no graph is available.
-
-            // selection.append('tspan')
-            //     .attr('dx', 0)
-            //     .attr('dy', '1.2em')
-            //     .text(`${d.city}, ${d.region} | ${d.lat}, ${d.lon}`);
         }
 
         // Shows the global tooltip on mouseover (if applicable)
-        function mouseoverHandler(d) {
+        function nodeMouseoverHandler(d) {
             that.floating_tooltip.transition().duration(200).style('opacity', 0.9);
 
             let packets = d.packets;
@@ -887,7 +940,7 @@ class ForceMap {
         }
 
         // Hide global tooltip on mouseout (if applicable)
-        function mouseoutHandler(d) {
+        function nodeMouseoutHandler(d) {
             that.floating_tooltip.transition().duration(200).style('opacity', 0);
             if (d.id.startsWith('ip') && that.atr_iframes.has(d.id)) {
                 that.atr_iframes.get(d.id).style('display', 'none');
@@ -896,21 +949,19 @@ class ForceMap {
         }
 
         // Expand nodes on single click (no drag)
-        function clickHandler(d) {
-            d3.event.preventDefault();
+        function nodeClickHandler(d) {
+            // d3.event.preventDefault();
             if (that.expandNode(d)) {
                 that.update();
             }
         }
 
         // Pin draggable tooltip on double click (if applicable)
-        function dblclickHandler(d) {
+        function nodeDblClickHandler(d) {
             d3.event.preventDefault();
 
             // Make sure that isn't already pinned
             if (d3.select(`#tooltip${CSS.escape(d.id.replace(/(\s|\.|\(|\))+/g, '_'))}`).node() !== null) return;
-
-            //d.replace(/\s/g, '')
 
             // Create the tooltip div
             let tooltip = d3.select(that.rootElement)
