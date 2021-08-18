@@ -1,4 +1,5 @@
 import sys
+import threading
 
 from server import d3_conversion as d3c
 from server import d3_conversion_utils
@@ -151,8 +152,23 @@ url = 'http://netbeam.es.net/api/network/esnet/prod/interfaces'
 
 # print(d3_rdap.rdap_cache_threaded(d3_json))
 # print(d3_rdap.rdap_cache_threaded(d3_json))
-d3_conversion_utils.rdap_org_lookup('206.81.81.102')
-packet = {}
-d3_rdap.rdap_cache_tw(packet, '206.81.81.102')
-print(packet)
+# d3_conversion_utils.rdap_org_lookup('206.81.81.102')
+# packet = {}
+# d3_rdap.rdap_cache_tw(packet, '206.81.81.102')
+# print(packet)
 
+
+# Test of the private regex space - passes.
+# counter = 0
+# for i in range(256):
+#     for j in range(256):
+#         print(f'Testing {i}.{j}.x.x')
+#         for k in range(256):
+#             for l in range(256):
+#                 if d3_geo_ip.private_ip.match(f'{i}.{j}.{k}.{l}'):
+#                     if (i == 10) or (i == 172 and 16 <= j <= 31) or (i == 192 and j == 168):
+#                         counter += 1
+#                     else:
+#                         print(f'{i}.{j}.{k}.{l}')
+# print(counter)
+# assert(counter == pow(2, 24) + pow(2, 20) + pow(2, 16))

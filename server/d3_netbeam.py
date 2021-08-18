@@ -208,7 +208,6 @@ def add_netbeam_info_naive(d3_json, source_path=None):
     :param d3_json: Dictionary containing the traceroute information. Called d3_json because it is later used by d3.js
     to create the web visualization.
     :param source_path: Path to the netbeam interface file; by default this is ./interfaces.json.
-    :return: Modified copy of the dictionary that was originally passed in.
     """
     netbeam_cache = load_netbeam_cache(source_path)
 
@@ -217,8 +216,6 @@ def add_netbeam_info_naive(d3_json, source_path=None):
             if netbeam_cache.get(packet.get('ip')):
                 netbeam_item = netbeam_cache[packet['ip']]
                 add_netbeam_info_tw(packet, netbeam_item)
-
-    return d3_json
 
 
 def add_netbeam_info_threaded(d3_json, source_path=None):
@@ -231,7 +228,6 @@ def add_netbeam_info_threaded(d3_json, source_path=None):
     :param d3_json: Dictionary containing the traceroute information. Called d3_json because it is later used by d3.js
     to create the web visualization.
     :param source_path: Path to the netbeam interface file; by default this is ./interfaces.json.
-    :return: Modified copy of the dictionary that was originally passed in.
     """
     threads = []
 
@@ -249,8 +245,6 @@ def add_netbeam_info_threaded(d3_json, source_path=None):
     # concurrent modification because each thread works on separate data.
     for thread in threads:
         thread.join()
-
-    return d3_json
 
 
 ##################
@@ -337,7 +331,6 @@ def add_netbeam_info_db_naive(d3_json, db_path='netbeam_ip.db'):
 
     :param d3_json: Traceroute dictionary.
     :param db_path: Path to database file with Netbeam interface information.
-    :return: Modified copy of the dictionary that was originally passed in.
     """
     ip_to_netbeam_db(db_path)
 
@@ -359,7 +352,6 @@ def add_netbeam_info_db_naive(d3_json, db_path='netbeam_ip.db'):
                         packet['errors'] = res['errors']['points']
 
     con.close()
-    return d3_json
 
 
 def add_netbeam_info_db_threaded(d3_json, db_path='netbeam_ip.db'):
@@ -394,4 +386,3 @@ def add_netbeam_info_db_threaded(d3_json, db_path='netbeam_ip.db'):
         thread.join()
 
     con.close()
-    return d3_json

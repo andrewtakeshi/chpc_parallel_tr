@@ -73,6 +73,7 @@ const createInternetGraph = async (traceroutes, existing = undefined) => {
                     ip: packet.ip,
                     org: packet.org,
                     domain: packet.domain,
+                    ttl: packet.ttl,
                     // org: orgResult.org,
                     // domain: orgResult.domain,
                     max_bandwidth: packet.speed ? packet.speed : maxBW,
@@ -206,7 +207,11 @@ const propReducer = (property) => {
         case 'max_bandwidth':
             // I think min is best because it gives the most restricted view; not positive though.
             // Return the minimum bandwidth for the node - defaults to 0 if a bandwidth is undefined
-            f = (a, b) => Math.min(a ? a : 0, b ? b : 0)
+            f = (a, b) => Math.min(a ? a : 0, b ? b : 0);
+            break;
+        case 'ttl':
+            f = (a, b) => Math.min(a, b);
+            break;
         default:
             f = (a, b) => a === b ? a : undefined;
     }

@@ -95,7 +95,7 @@ class ForceMap {
         this.linkLegend = this.svg
             .append('g')
             .attr('id', 'linkLegend')
-            .attr('width', '200px')
+            .attr('width', 200)
             .attr('height', this.height / 2)
             .attr('transform', `translate(${this.width - 20}, 8)`);
 
@@ -233,19 +233,25 @@ class ForceMap {
             // Initialize interactivity
             this.simulation = d3.forceSimulation()
                 .force('collision', d3.forceCollide()
-                    // .radius(d => d.diameter / 2))
-                    .radius(d => d.diameter))
+                    .radius(d => 0.6 * d.diameter))
                 .force('forceX', d3.forceX(d => this.projection([d.lon, d.lat])[0])
                     .strength(1))
                 .force('forceY', d3.forceY(d => this.projection([d.lon, d.lat])[1])
                     .strength(1));
         } else {
-            // TODO: Use the hop id to get nodes to actually go in a roughly straight line.
+            let denominator = () => d3.max(d3.selectAll('g.single_node').nodes(), d => d.__data__.ttl);
+            let that = this;
+
             this.simulation = d3.forceSimulation()
-                .force('link', d3.forceLink().id())
-                .force('charge', d3.forceManyBody())
-                .force('center', d3.forceCenter(this.width / 2, this.height / 2))
-                .force('forceY', d3.forceY(this.height / 2))
+                .force('link', d3.forceLink()
+                    .strength(0.5)
+                    .id())
+                .force('charge', d3.forceManyBody()
+                    .distanceMax(100))
+                // .force('center', d3.forceCenter(this.width / 2, this.height / 2))
+                .force('forceX', d3.forceX(d => (d.ttl * ((that.width - 100) / denominator())) + 50))
+                .force('forceY', d3.forceY(this.height / 2)
+                    .strength(0.3))
                 .force('collision', d3.forceCollide()
                     .radius(d => d.diameter));
         }
@@ -457,15 +463,9 @@ class ForceMap {
             return vals;
         }
 
-
         // Combined min/max of all properties - time stamp.
         let min = d3.min(valsArr.map(d => d3.min(ts_filter(d))));
         let max = d3.max(valsArr.map(d => d3.max(ts_filter(d))));
-
-
-        // let min = d3.min(valsArr.map(d => Math.min(d.traffic_in, d.traffic_out)));
-        // let max = d3.max(valsArr.map(d => Math.max(d.traffic_in, d.traffic_out)));
-
 
         let yScale = d3.scaleLinear()
             .domain([min, max])
@@ -603,55 +603,8 @@ class ForceMap {
                 .attr('r', 1.5);
         }
 
-
         add_path_and_circs('traffic_in', colorScale('traffic_in'));
         add_path_and_circs('traffic_out', colorScale('traffic_out'));
-
-        // // Append path for in values
-        // trafficGraph.append('path')
-        //     .attr('id', 'inLine')
-        //     .datum(valsArr)
-        //     .attr('fill', 'none')
-        //     .attr('stroke', 'steelblue')
-        //     .attr('stroke-width', 1.5)
-        //     .attr('d', d3.line()
-        //         .x(d => xScale(d.ts))
-        //         .y(d => yScale(d.traffic_in))
-        //         .curve(d3.curveMonotoneX));
-        //
-        // // Append path for out values
-        // trafficGraph.append('path')
-        //     .attr('id', 'outLine')
-        //     .datum(valsArr)
-        //     .attr('fill', 'none')
-        //     .attr('stroke', 'red')
-        //     .attr('stroke-width', 1.5)
-        //     .attr('d', d3.line()
-        //         .x(d => xScale(d.ts))
-        //         .y(d => yScale(d.traffic_out))
-        //         .curve(d3.curveMonotoneX));
-        //
-        // // Append dots for in values
-        // trafficGraph.append('g')
-        //     .attr('id', 'inCircs')
-        //     .selectAll('circle')
-        //     .data(valsArr)
-        //     .join('circle')
-        //     .attr('r', 1.5)
-        //     .attr('fill', 'steelblue')
-        //     .attr('cx', d => xScale(d.ts))
-        //     .attr('cy', d => yScale(d.traffic_in));
-        //
-        // // Append dots for out values
-        // trafficGraph.append('g')
-        //     .attr('id', 'outCircs')
-        //     .selectAll('circle')
-        //     .data(valsArr)
-        //     .join('circle')
-        //     .attr('r', 1.5)
-        //     .attr('fill', 'red')
-        //     .attr('cx', d => xScale(d.ts))
-        //     .attr('cy', d => yScale(d.traffic_out));
     }
 
     // Finds overall max bandwidth to display on vis.

@@ -8,9 +8,10 @@ import threading
 from icmplib import traceroute
 from server import d3_netbeam, d3_conversion_utils, d3_geo_ip, d3_rdap
 
-
-# TODO: Add locks to everything
+# TODO: Add locks to everything, and variabalize the max and min limit values.
 # lock + limiter are used to limit the number of concurrent traceroutes running
+# The lock is a mutex on limiter; before traceroutes are queued/run the limiter is checked to see if there's enough
+# "space" to do so.
 lock = threading.Lock()
 limiter = 0
 
@@ -26,9 +27,6 @@ def pscheduler_to_d3(source, dest, num_runs=1):
     :param num_runs: Number of times to run the traceroute.
     :return: JSON ingestible by the d3 visualisation if the traceroute is successful. None otherwise.
     """
-
-    # Check the source - no longer necessary as this is done from the API server (api.py) before this is ever called.
-
 
     i = 0
     process_list = []
@@ -115,22 +113,32 @@ def pscheduler_to_d3(source, dest, num_runs=1):
     return add_additional_information(output)
 
 
-# Thread specific work
 def system_to_d3_icmplib_tw(dest, return_array, tr_id):
+    """
+    Thread work for system_to_d3_icmplib_threaded. Each thread runs one traceroute.
+    :param dest: Traceroute destination.
+    :param return_array: Array to write results in.
+    :param tr_id: Traceroute takes an ID to prevent contamination between different threads.
+    """
     dest_ip = d3_conversion_utils.target_to_ip(dest)
+    if dest_ip is None:
+        return {'error': 'Cannot resolve destination'}
     hops = traceroute(address=dest, count=1, id=tr_id)
-    my_ip = d3_conversion_utils.my_ip
+    my_ip = d3_conversion_utils.my_ip()
+    # Add object for single traceroute
     res = {
         'ts': int(time.time()),
         'source_address': my_ip,
         'target_address': dest_ip,
         'packets': []
     }
+    # Add packet for source
     res['packets'].append({
         'ttl': 0,
         'ip': my_ip,
         'rtt': 0
     })
+    # Add traceroute packets
     for hop in hops:
         res['packets'].append(
             {
@@ -138,16 +146,22 @@ def system_to_d3_icmplib_tw(dest, return_array, tr_id):
                 'ip': hop.address,
                 'rtt': hop.avg_rtt
             })
-    # system_traceroute_lock.acquire()
+    # Add results to return_array
     return_array.append(res)
-    # system_traceroute_lock.release()
 
 
-# Creates threads for system_to_d3
 def system_to_d3_icmplib_threaded(dest, num_runs=1):
+    """
+    Multithreaded system traceroute run using icmplib. Works, but it ALWAYS takes the same path which defeats one of the
+    main purposes of the tool, which is to visualize localized network paths (i.e. load balancing).
+    :param dest: Traceroute destination
+    :param num_runs: Number of runs
+    :return: JSON ingestible by d3 visualization.
+    """
     threads = []
     return_array = []
 
+    # Use threads if > 1 run; otherwise, just run the traceroute.
     if num_runs > 1:
         for i in range(num_runs):
             threads.append(
@@ -164,17 +178,27 @@ def system_to_d3_icmplib_threaded(dest, num_runs=1):
 
 
 def esmond_to_d3(source=None, dest=None, ts_min=None, ts_max=None,
-                 base_esmond_url="http://uofu-science-dmz-bandwidth.chpc.utah.edu"):
+                 esmond_server="http://uofu-science-dmz-bandwidth.chpc.utah.edu"):
+    """
+    Looks up historic traceroute data from Esmond and formats it for d3.
+    :param source: Traceroute source
+    :param dest: Traceroute destination
+    :param ts_min: Time period to start search
+    :param ts_max: Time period to end search
+    :param esmond_server: Base address of Esmond server
+    :return: JSON ingestible by d3.
+    """
     # Check for source or destination.
     if source is None and dest is None:
         print("Source or destination must be specified.")
         return None
 
-    # Get information from Esmond
+    # Get information from Esmond - this is all traceroutes run on this server stored in the Esmond DB.
     traceroutes = requests.get(
-        f"{base_esmond_url}/esmond/perfsonar/archive/?format=json&tool-name=pscheduler/traceroute", timeout=10).json()
+        f"{esmond_server}/esmond/perfsonar/archive/?format=json&tool-name=pscheduler/traceroute", timeout=10).json()
 
     # Change ts values if not specified. Changes min to 0 and max to current epoch time + 180 days.
+    # This means it searches all the traceroute data.
     if ts_min is None:
         ts_min = 0
     if ts_max is None:
@@ -185,16 +209,16 @@ def esmond_to_d3(source=None, dest=None, ts_min=None, ts_max=None,
 
     # Get source/destination specific URLs from original Esmond query. Store as tuple of url, source ip, and dest. ip
     # in the urls array.
-    for traceroute in traceroutes:
-        if ((traceroute['destination'] == dest
+    for tr in traceroutes:
+        if ((tr['destination'] == dest
              and (source is None
-                  or traceroute['source'] == source))
-                or (traceroute['source'] == source
+                  or tr['source'] == source))
+                or (tr['source'] == source
                     and (dest is None
-                         or traceroute['destination'] == dest))):
-            for event in traceroute['event-types']:
+                         or tr['destination'] == dest))):
+            for event in tr['event-types']:
                 if event['event-type'] == 'packet-trace':
-                    urls.append((event['base-uri'], traceroute['source'], traceroute['destination']))
+                    urls.append((event['base-uri'], tr['source'], tr['destination']))
 
     # No matching urls found = no source/destination/both matches the values given. Return None.
     if len(urls) == 0:
@@ -203,7 +227,7 @@ def esmond_to_d3(source=None, dest=None, ts_min=None, ts_max=None,
 
     # Access URLs relevant to source/dest
     for url in urls:
-        r = requests.get(f'{base_esmond_url}/{url[0]}/?format=json', timeout=10)
+        r = requests.get(f'{esmond_server}/{url[0]}/?format=json', timeout=10)
         try:
             for trace in r.json():
                 # Filter with ts info
@@ -246,13 +270,13 @@ def esmond_to_d3(source=None, dest=None, ts_min=None, ts_max=None,
         return None
 
 
-# No limiting in place, and quite possibly buggy. Just updated to work with the new schema.
-def system_copy_to_d3(dataIn):
+def system_copy_to_d3(trIn):
     """
     Takes a previously run traceroute and creates the appropriate JSON.
     Does not include source information (as source information is not provided by system traceroute).
     Accepts both Linux and Windows traceroute formats.
-    :param dataIn: Copied traceroute information.
+    No limiting in place, and quite possibly buggy. Just updated to work with the new schema.
+    :param trIn: Copied traceroute information.
     :return: JSON ingestible by the d3 visualisation.
     """
     output = []
@@ -261,7 +285,7 @@ def system_copy_to_d3(dataIn):
 
     linux = True
 
-    for line in dataIn.splitlines():
+    for line in trIn.splitlines():
         # For processing multiple traceroutes (i.e. pasting multiple runs in at once)
         if line.__contains__("Tracing") or line.__contains__("traceroute"):
             i += 1
@@ -330,16 +354,20 @@ def system_copy_to_d3(dataIn):
 
 
 def system_to_d3_tw(dest, returnArray):
-    dest_ip = d3_conversion_utils.target_to_ip(dest)
-
+    """
+    Thread specific work for system_to_d3_threaded. Each thread runs a single traceroute.
+    :param dest: Traceroute destination
+    :param returnArray: Array to write results into
+    """
+    # Run traceroute as subprocess - only do 1 time/hop to reduce time required.
     sp_stdout = subprocess.run(['traceroute', dest, '-q', '1'], stdout=subprocess.PIPE, universal_newlines=True).stdout
 
-    my_ip = d3_conversion_utils.my_ip
+    my_ip = d3_conversion_utils.my_ip()
 
     res = {
         'ts': int(time.time()),
         'source_address': my_ip,
-        'target_address': dest_ip,
+        'target_address': dest,
         'packets': []
     }
 
@@ -350,6 +378,7 @@ def system_to_d3_tw(dest, returnArray):
     })
 
     for line in sp_stdout.splitlines():
+        # Ignore lines that don't contain traceroute info.
         if re.match(r'^\s*[0-9]+\s+', line):
             split = line.split()
 
@@ -381,27 +410,39 @@ def system_to_d3_tw(dest, returnArray):
 
 
 def system_to_d3_threaded(dest, numRuns=1):
+    """
+    Runs a system traceroute to the desired destination - threaded.
+    :param dest: Traceroute destination.
+    :param numRuns: Number of runs.
+    :return: JSON ingestible by d3.
+    """
     threads = []
     returnArray = []
 
-    for i in range(numRuns):
-        threads.append(threading.Thread(target=system_to_d3_tw, args=(dest, returnArray,)))
-        threads[i].start()
+    dest_ip = d3_conversion_utils.target_to_ip(dest)
+    if dest_ip is None:
+        return {'error': 'Cannot resolve destination'}
 
-    for i in range(numRuns):
-        threads[i].join()
+    if numRuns > 1:
+        for i in range(numRuns):
+            threads.append(threading.Thread(target=system_to_d3_tw, args=(dest_ip, returnArray,)))
+            threads[i].start()
+        for i in range(numRuns):
+            threads[i].join()
+    else:
+        system_to_d3_tw(dest_ip, returnArray)
 
     output = {'traceroutes': returnArray}
     return add_additional_information(output)
 
 
-def system_to_d3_old(dest, numRuns=1):
+def system_to_d3(dest, numRuns=1):
     """
-    Runs a system traceroute (on linux systems) to the desired destination. RTT is calculated as the mean average of the
-    three pings for each hop.
-    :param dest: Destination for traceroute.
-    :param numRuns: Number of runs to do.
-    :return: JSON ingestible by the d3 visualisation if the traceroute is successful. None otherwise.
+    Runs a system traceroute to the desired destination. Single threaded, but uses multiple subprocesses so it may
+    actually be multithreaded under the hood, so to speak.
+    :param dest: Traceroute destination.
+    :param numRuns: Number of runs.
+    :return: JSON ingestible by the d3.
     """
 
     i = 0
@@ -410,6 +451,10 @@ def system_to_d3_old(dest, numRuns=1):
 
     dest_ip = d3_conversion_utils.target_to_ip(dest)
 
+    if dest_ip is None:
+        return {'error': 'Cannot resolve destination'}
+
+    # Check to make sure we can run the traceroute according to limiter.
     lock.acquire()
     if limiter >= 10 or (limiter + numRuns) > 15:
         print("Over the run limit. Please try again later.")
@@ -418,17 +463,24 @@ def system_to_d3_old(dest, numRuns=1):
         limiter += numRuns
     lock.release()
 
-    # Schedule traceroute using pscheduler (allows for remote sources)
+    # Run each traceroute as a subprocess - Popen runs it in the background.
     for _ in range(numRuns):
         processList.append(subprocess.Popen(['traceroute', dest], stdout=subprocess.PIPE, universal_newlines=True))
 
+    # Wait for each subprocess to finish.
     for process in processList:
         process.wait()
 
+    # Decrement limiter after we have finished running the traceroutes.
+    lock.acquire()
+    limiter -= numRuns
+    lock.release()
+
     output = []
 
-    my_ip = d3_conversion_utils.my_ip
+    my_ip = d3_conversion_utils.my_ip()
 
+    # Process output of each traceroute.
     for process in processList:
         output.append(dict())
         output[i]['ts'] = int(time.time())
@@ -474,13 +526,14 @@ def system_to_d3_old(dest, numRuns=1):
 
     output = {'traceroutes': output}
 
-    lock.acquire()
-    limiter -= numRuns
-    lock.release()
     return add_additional_information(output)
 
 
 def remove_unknowns(d3_json):
+    """
+    Removes unknown hops from d3 JSON.
+    :param d3_json: JSON formatted for d3. Modified in place, so no return.
+    """
     for tr in d3_json['traceroutes']:
         i = 0
         while i < len(tr['packets']):
@@ -489,13 +542,20 @@ def remove_unknowns(d3_json):
                 tr['packets'].remove(packet)
             else:
                 i += 1
-    return d3_json
+
 
 def add_additional_information(d3_json):
-    # d3_json = remove_unknowns(d3_json)
-    d3_json = d3_netbeam.add_netbeam_info_threaded(d3_json)
-    d3_json = d3_geo_ip.add_geo_info_threaded(d3_json)
-    d3_json = d3_rdap.rdap_cache_threaded(d3_json)
+    """
+    Run all functions which add additional information, i.e. Netbeam and geoIP pieces.
+    :param d3_json: JSON formatted for d3 to add additional information to (i.e. output from system_to_d3_*). All
+    functions called here should modify the JSON in place and should not return anything.
+    :return: Modified version of d3_json.
+    """
+    # remove_unknowns(d3_json)
+    d3_netbeam.add_netbeam_info_threaded(d3_json)
+    d3_geo_ip.add_geo_info_threaded(d3_json)
+    d3_rdap.rdap_threaded(d3_json)
+    # d3_json = d3_rdap.rdap_cache_threaded(d3_json)
     # d3_json = d3_geo_ip.add_geo_info_naive(d3_json)
     # d3_json = d3_netbeam.add_netbeam_info_db_naive(d3_json)
     return d3_json

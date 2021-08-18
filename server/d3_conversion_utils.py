@@ -1,79 +1,58 @@
 import requests
-# import urllib3
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
 import subprocess
 import re
 import socket
 
+# Disables warnings for insecure requests using requests package
 requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
+# Checks for valid IP
 ip_validation_regex = re.compile(r'^((25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9][0-9]|[0-9])\.)'
                                  r'{3}(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9][0-9]|[0-9])$')
-my_ip = subprocess.run(['curl', 'ifconfig.me'],
-                       stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
-                       universal_newlines=True).stdout.splitlines()[0]
-rdap_cache = dict()
+
+# Cached value of my_ip().
+_my_ip_cached = None
+
+
+def my_ip():
+    """
+    Obtains the IP address of the server. It used to just be a lookup for the public IP, but this didn't make sense in
+    context of the visualization as we had the public IP going to a private IP address (i.e. router or gateway).
+    In devices where the public IP address is used, we still get this value. This is more complicated than the previous
+    method, but it's more robust and works (as far as I've tested it) in all cases.
+    :return: String representative of the IP address for the local machine.
+    """
+    global _my_ip_cached
+    # Return cached value if present.
+    if _my_ip_cached is not None:
+        return _my_ip_cached
+
+    # Find default interface
+    default_interface = subprocess.run(['awk', '$2 == 00000000 { print $1 }', '/proc/net/route'],
+                                       stdout=subprocess.PIPE, encoding='utf8').stdout.splitlines()[0]
+    # Get IP information for the default interface.
+    ip_addr_out = subprocess.run(['ip', 'addr', 'show', 'dev', default_interface], encoding='utf8',
+                                 stdout=subprocess.PIPE)
+    # Filter to get only the IP address.
+    my_ip_test = subprocess.run(['awk', '$1 == \"inet\"' '{ sub("/.*", "", $2); print $2 }'], input=ip_addr_out.stdout,
+                                stdout=subprocess.PIPE, encoding='utf8').stdout.splitlines()[0]
+    if len(my_ip_test) > 0:
+        _my_ip_cached = my_ip_test
+    return _my_ip_cached
 
 
 def ip_to_asn(ip):
+    """
+    Looks up ASN from IP address.
+    :param ip: IP address to lookup.
+    :return: ASN as JSON/dictionary.
+    """
     if ip_validation_regex.match(ip):
         return requests.get(f'https://api.iptoasn.com/v1/as/ip/{ip}', timeout=6).json()
     else:
         return None
 
-
-# TODO: REMOVE THIS AND REPLACE WITH WHOIS LOOKUP
-def rdap_org_lookup(ip):
-    not_found = {"org": None, "domain": None}
-
-    if ip not in rdap_cache:
-        if ip_validation_regex.match(ip):
-            print(f"Requesting Org of {ip}")
-            try:
-                response = requests.get(f'https://rdap.arin.net/registry/ip/{ip}')
-                if response.status_code != 200:
-                    return not_found
-                # ARIN managed networks
-                if response.url.__contains__('arin'):
-                    print('Received response from ARIN')
-                    for ntt in response.json()['entities']:
-                        try:
-                            rdap_cache[ip] = {"org": ntt['vcardArray'][1][1][3]}
-                            break
-                        except:
-                            pass
-                    for ntt in response.json()['entities']:
-                        try:
-                            rdap_cache[ip]["domain"] = ntt['vcardArray'][1][5][3].split('@')[-1]
-                            print(rdap_cache[ip])
-                            break
-                        except:
-                            pass
-                    if "domain" not in rdap_cache[ip]:
-                        for ntt in response.json()['entities'][0]['entities']:
-                            try:
-                                rdap_cache[ip]["domain"] = ntt['vcardArray'][1][5][3].split('@')[-1]
-                                break
-                            except:
-                                pass
-                # RIPE managed networks
-                elif response.url.__contains__('ripe'):
-                    print('Received response from RIPE')
-                    for ntt in response.json()['entities']:
-                        try:
-                            if 'registrant' in ntt['roles']:
-                                rdap_cache[ip] = {"org": ntt['handle'], "domain": "unknown"}
-                                break
-                        except:
-                            pass
-                else:
-                    print(f'Received response from unknown NCC; {response.url}')
-                    return not_found
-            except requests.exceptions.ConnectionError:
-                return not_found
-        else:
-            return not_found
-    return rdap_cache[ip]
 
 def check_pscheduler(endpoint):
     """

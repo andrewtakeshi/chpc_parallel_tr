@@ -2,7 +2,7 @@ let visibleNTTs = ({"traceroutes": []});
 let hiddenNTTs = ({"traceroutes": []});
 // Timeout values - pscheduler is 40 sec, system is 20 sec
 const pscheduler_timeout = 40000;
-const system_timeout = 20000;
+const system_timeout = 40000;
 let inQueue = 0;
 
 // function formLogger(form) {
