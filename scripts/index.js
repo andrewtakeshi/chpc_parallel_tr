@@ -2,80 +2,47 @@ let visibleNTTs = ({"traceroutes": []});
 let hiddenNTTs = ({"traceroutes": []});
 // Timeout values - pscheduler is 40 sec, system is 20 sec
 const pscheduler_timeout = 40000;
-const system_timeout = 40000;
+const system_timeout = 20000;
 let inQueue = 0;
 
-// function formLogger(form) {
-//     if (validate(form)) {
-//         let text = "";
-//         for (let i = 0; i < form.length; i++) {
-//             if (form.elements[i].tagName != "BUTTON") {
-//                 text += form.elements[i].name + ": " + form.elements[i].value + "\n";
-//             }
-//         }
-//         console.log(text);
-//     }
-// }
-//
-// function validate(form) {
-//     let accepted = true;
-//     for (let i = 0; i < form.length; i++) {
-//         if (form.elements[i].tagName == "INPUT") {
-//
-//             let name = form.elements[i].id;
-//             let spanName = name + "_warn";
-//             if (form.elements[i].value == "") {
-//                 accepted = false;
-//                 document.getElementById(spanName).hidden = false;
-//             } else {
-//                 document.getElementById(spanName).hidden = true;
-//             }
-//         }
-//     }
-//
-//     return accepted;
-// }
-
+/**
+ * Handles pressing the reset button. Calls updateViz() after reset.
+ */
 async function resetBtnHandler() {
+    // Reset forms.
     let forms = $("form");
     for (let form of forms) {
         form.reset();
     }
-    // for (let i = 0; i < forms.length; i++) {
-    //     forms[i].reset();
-    // }
 
-    let warnings = $("[name='warn']");
-    for (let warning of warnings) {
-        warning.hidden = true;
-    }
-    // for (let i = 0; i < warnings.length; i++) {
-    //     warnings[i].hidden = true;
-    // }
-
-    // Hide tables on reset.
+    // Hide and clear tables on reset.
     document.getElementById("current_run_table_area").style.visibility = "hidden";
     document.getElementById("netbeam_table_area").style.visibility = "hidden";
-    // Clear tables on reset.
     document.getElementById("cr_table").getElementsByTagName('tbody')[0].innerHTML = "";
     document.getElementById("netbeam_accordion").innerHTML = "";
 
+    // Remove all old traceroute data
     visibleNTTs.traceroutes = [];
     hiddenNTTs.traceroutes = [];
 
+    // Call to updateViz() removes the actual visualization
     return await updateViz();
 }
 
+/**
+ * Adds an entry to the current run table.
+ * @param uuid - ID associated with the current run.
+ */
 function addToCRTable(uuid) {
     if (document.getElementById("esmond_ip_dest").value === "")
         return;
 
     document.getElementById("current_run_table_area").style.visibility = "visible";
 
-    let numRows = document.getElementById('cr_table').rows.length - 1;
     let tbody = document.getElementById('cr_table').getElementsByTagName('tbody')[0];
     let cell_ids = ['type', 'source', 'dest', 'numRuns', 'status', 'selected']
 
+    // Add row and cells
     let row = tbody.insertRow();
     row.id = `${uuid}`;
     for (let i = 0; i < 6; i++) {
@@ -83,19 +50,22 @@ function addToCRTable(uuid) {
         row.cells[i].id = `${uuid}_${cell_ids[i]}`
     }
 
+    // Get cell data from DOM
     let source = document.getElementById("esmond_ip_source").value;
     let dest = document.getElementById("esmond_ip_dest").value;
     let type = source ? "pScheduler" : "System";
     let numRuns = document.getElementById("esmond_num_runs").value;
 
-
+    // Set cell data
     row.cells[0].innerHTML = type;
+    // Localhost or source host (pScheduler)
     row.cells[1].innerHTML = source ? source : self.location.hostname;
     row.cells[2].innerHTML = dest;
     row.cells[3].innerHTML = numRuns;
     row.cells[4].innerHTML = "Pending"
     row.cells[5].style.textAlign = "center";
 
+    // Add checkbox + ability to hide/show run via handler
     let checkbox = document.createElement('input');
     checkbox.type = 'checkbox';
     checkbox.checked = true;
@@ -105,12 +75,18 @@ function addToCRTable(uuid) {
     row.cells[5].appendChild(checkbox);
 }
 
-// Adds a timeout to the API calls - this can be adjusted above
+/**
+ * Adds a timeout to the API calls - this can be adjusted above
+ */
 const timeout = (prom, time) => Promise.race([prom, new Promise((res) => setTimeout(
     () => res({'error': 'Timed out'}),
     time))]);
 
+/**
+ * Helper method. Adds or updates the table entry for each host.
+ */
 let netbeamTableHelper = (ip, label, hops, speed) => {
+    // Add entry if it doesn't exist. Each entry is it's own table.
     if (!document.getElementById(`table_${ip}_${label}`)) {
         let collapse_body = document.getElementById(`collapse_body_${ip}`);
         collapse_body.innerHTML += `<table class="table table-bordered" id="table_${ip}_${label}">
@@ -131,11 +107,13 @@ let netbeamTableHelper = (ip, label, hops, speed) => {
 
     let tbody = document.getElementById(`table_body_${ip}_${label}`);
 
+    // Helper method to convert UTC to readable time
     let normalizeUTCTime = (inDate) => {
         let x = new Date(inDate);
         return `${x.getMonth() + 1}/${x.getDate()}/${x.getFullYear()} ${x.getHours()}:${("0" + x.getMinutes()).substr(-2)}:${("0" + x.getSeconds()).substr(-2)}`
     };
 
+    // Add each type of data to the table
     hops.forEach(hop => {
         // Checks to see if value is in table already (using time)
         let rows = tbody.getElementsByTagName('tr');
@@ -161,6 +139,9 @@ let netbeamTableHelper = (ip, label, hops, speed) => {
     })
 }
 
+/**
+ * Adds netbeam information to table (shown below viz)
+ */
 const netbeamTable = async (traceroutes) => {
     let accordion_div = document.getElementById('netbeam_accordion');
     document.getElementById('netbeam_table_area').style.visibility = "visible";
@@ -202,6 +183,9 @@ const netbeamTable = async (traceroutes) => {
     });
 }
 
+/**
+ * Packages the data in a way that is usable by the visualization (i.e. clustered into orgs)
+ */
 const updateViz = async () => {
     // Create new graph from
     let graph = await createInternetGraph(visibleNTTs.traceroutes);
@@ -214,9 +198,6 @@ const updateViz = async () => {
 
 /**
  * Handles checking/unchecking a box in the current run table.
- * @param id
- * @param shown
- * @returns {Promise<void>}
  */
 const checkHandler = async (id, shown) => {
     // List of entities to search and add to respectively
@@ -310,6 +291,10 @@ const e2eBtnHandler = async (source, dest, num_runs, uuid) => {
     return await updateViz();
 }
 
+/**
+ * Change the displayed map.
+ * @param selectedOption - Map to display (comes from map select dropdown 'value').
+ */
 function setTopojson(selectedOption) {
     let resourceString = '';
     switch (selectedOption) {
@@ -324,7 +309,7 @@ function setTopojson(selectedOption) {
             break;
     }
 
-
+    // Load the resource then perform any necessary filtering
     d3.json(resourceString).then(data => {
         data = topojson.feature(data, data.objects[Object.keys(data.objects)[0]]);
 
@@ -340,11 +325,15 @@ function setTopojson(selectedOption) {
             }
         }
 
+        // Set the topography in the force_map, then draw it
         force_map.setTopography(data);
         force_map.drawMap();
     });
 }
 
+/**
+ * Hides or shows the map.
+ */
 const toggleMapBtnHandler = async () => {
     force_map.showMap = !force_map.showMap;
     force_map.toggleMap();
@@ -355,6 +344,9 @@ const toggleMapBtnHandler = async () => {
     return await updateViz();
 }
 
+/**
+ * Handles changes to the map selector.
+ */
 const mapSelectHandler = async () => {
     if (!force_map.showMap) return;
     let selectedOption = document.getElementById('map_select').value;
@@ -363,5 +355,6 @@ const mapSelectHandler = async () => {
     return await updateViz();
 }
 
+// Create the force map. By default the map is shown and we shown the world map.
 const force_map = new ForceMap('#d3_vis');
 setTopojson('world');

@@ -2,7 +2,8 @@
 Author: Andrew Golightly
 """
 
-from os import path, stat
+from os import path, stat as osstat, chmod
+import stat
 import json
 import time
 import threading
@@ -68,7 +69,6 @@ def netbeam_traffic_by_time_range(resource: str, interval: str = "15m"):
     This will also work for SAPs. Resource for SAPs is devices/{host}/saps/{sap}.
     SAP resources can be gathered by looking at the file created by calling getSAPS(True). Same thing applies to SAPs as
     resources.
-    :param interval: Defaults to 15m. See timeInterval definition for acceptable time range formats.
     :return: Dictionary that maps request_type => [values], i.e. { traffic : [...], discards : [...], ... }
     """
 
@@ -135,38 +135,35 @@ def ip_to_resource_dict(filePath=None):
     :param filePath: Path to the file. By default this is interfaces.json.
     :return: None
     """
-    # TODO: Fix permissions for deployment. apache user can't access the interfaces.json file for whatever reason.
     if filePath is None:
-        f = open("interfaces.json", "wt")
-    else:
-        f = open(filePath, "wt")
+        filePath = 'interfaces.json'
 
-    res = {}
+    with open(filePath, 'wt') as f:
+        res = {}
+        try:
+            r = requests.get(f"{NETBEAM_URL}/api/network/esnet/prod/interfaces", timeout=5)
 
-    try:
-        r = requests.get(f"{NETBEAM_URL}/api/network/esnet/prod/interfaces", timeout=5)
+            if r.status_code == 200:
+                for item in r.json():
+                    # We only care about the link speed and the resource name - this is mapped to a dictionary (ip => prop)
+                    # that is later used to lookup the resource names and the link speeds, when applicable.
+                    if item['ipv4'] is not None:
+                        res[item['ipv4']] = \
+                            {
+                                'resource': item['resource'],
+                                'speed': item['speed']
+                            }
 
-        if r.status_code == 200:
-            for item in r.json():
-                # We only care about the link speed and the resource name - this is mapped to a dictionary (ip => prop)
-                # that is later used to lookup the resource names and the link speeds, when applicable.
-                if item['ipv4'] is not None:
-                    res[item['ipv4']] = \
-                        {
-                            'resource': item['resource'],
-                            'speed': item['speed']
-                        }
+            # Convert the speed to correct values. This can be verified by comparing link speed values found here to those
+            # found on my.es.net.
+            for key in res.keys():
+                if res.get(key)['speed'] is not None:
+                    res.get(key)['speed'] = res.get(key)['speed'] * 1000000
 
-        # Convert the speed to correct values. This can be verified by comparing link speed values found here to those
-        # found on my.es.net.
-        for key in res.keys():
-            if res.get(key)['speed'] is not None:
-                res.get(key)['speed'] = res.get(key)['speed'] * 1000000
-
-        f.write(json.dumps(res))
-        return
-    except requests.exceptions.Timeout:
-        return
+            f.write(json.dumps(res))
+        except requests.exceptions.Timeout:
+            print(f'Request for interfaces timed out')
+    chmod(filePath, stat.S_IROTH | stat.S_IWOTH)
 
 
 def load_netbeam_cache(source_path):
@@ -189,14 +186,15 @@ def load_netbeam_cache(source_path):
     if not path.exists(source_path):
         ip_to_resource_dict(source_path)
 
-    if time.time() - stat(source_path).st_mtime > 60 * 60 * 24:
+    if time.time() - osstat(source_path).st_mtime > 60 * 60 * 24:
         ip_to_resource_dict(source_path)
 
-    try:
-        netbeam_cache = json.loads(open(source_path, 'r').read())
-    except json.decoder.JSONDecodeError:
-        ip_to_resource_dict(source_path)
-        netbeam_cache = json.loads(open(source_path, 'r').read())
+    with open(source_path, 'r') as f:
+        try:
+            netbeam_cache = json.loads(f.read())
+        except json.decoder.JSONDecodeError:
+            ip_to_resource_dict(source_path)
+            netbeam_cache = json.loads(f.read())
 
     return netbeam_cache
 

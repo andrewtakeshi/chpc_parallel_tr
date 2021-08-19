@@ -131,6 +131,7 @@ class ForceMap {
     /************************************
      *********** Map Section ************
      ************************************/
+
     /**
      * Sets the topography - used for changing what map is shown.
      * @param geojson - Filtered and processed geojson.
@@ -185,7 +186,6 @@ class ForceMap {
             this.mapG.selectAll('path').remove();
         }
     }
-
 
     /**
      * Draws the map.
@@ -382,13 +382,17 @@ class ForceMap {
             .on('end', dragended);
     }
 
+    /**
+     * Set/update data for visualization. Calls update after data has been updated.
+     * This is another one of the functions I'm not super sure about as it's part of Paul's work.
+     * @param data: Data to set.
+     */
     setData(data) {
         if (data === undefined || data === null) {
             return;
         }
 
         this.node_data = data;
-
         this.all_nodes_flat = this.flattenNodeData();
 
         for (var [k, v] of this.node_data) {
@@ -607,7 +611,9 @@ class ForceMap {
         add_path_and_circs('traffic_out', colorScale('traffic_out'));
     }
 
-    // Finds overall max bandwidth to display on vis.
+    /**
+     * Finds overall max bandwidth to display on the graph.
+     */
     getOverallMaxBW() {
         let min_bw = Number.MAX_SAFE_INTEGER;
         let ip = null;
@@ -640,9 +646,14 @@ class ForceMap {
             });
     }
 
+    /**
+     * Updates the visualization.
+     * Contains all the handlers as well, although they could likely be moved outside of this function.
+     */
     update() {
         this.simulation.stop();
 
+        // Appends maxBW to the vis.
         this.getOverallMaxBW();
 
         this.nodeValues = Array.from(this.node_data.values());
@@ -676,6 +687,7 @@ class ForceMap {
         // Remove preloaded ATR Grafana iFrames
         this.floating_tooltip.selectAll('iframe').remove();
 
+        // Set up scale for nodes diameters.
         let nodeDiameterScale = d3.scaleLinear()
             .domain(d3.extent([...this.node_data.values()], v => v.packets.length))
             .range([16, 24]);
@@ -708,17 +720,22 @@ class ForceMap {
                         this.vLinks.push(({
                             source: d,
                             target: target,
+                            // TODO: Tweak value of packet_scale to make links more visible + easier to hover over.
+                            // Used to determine the width of the line.
                             packet_scale: Math.sqrt(target.packets.length),
+                            // Used to determine line color + append info on hover.
                             max_bandwidth: Math.min(d_mbw, t_mbw)
                         }));
                     }
                 }
             }
+
+            // Add diameter and radius properties to every node.
             d.diameter = nodeDiameterScale(d.packets.length);
             d.radius = d.diameter / 2;
         }
 
-        // Doesn't check for domains that are unknown or undefined
+        // Lambda to check for unknown or undefined domains
         let unknown = (domain) => domain !== 'unknown' && typeof domain !== 'undefined';
 
         // Create separate group for each node
@@ -727,14 +744,17 @@ class ForceMap {
             .join('g')
             .classed('single_node', true);
 
+        // Select a single node to get the zoom scale factor.
         let zoomNode = this.allNodes.selectAll('circle').node();
 
-        let zoomDenominator = 1;
+        // zoomDenominator is the zoom scale factor; by default this is 1.
+        let zoomDenominator = zoomNode ? d3.zoomTransform(zoomNode).k : 1;
 
-        if (zoomNode) {
-            zoomDenominator = d3.zoomTransform(zoomNode).k;
-        }
 
+        // TODO: Modify this to be a join. This will have to use the node id or something similar, as the default value
+        //  (index?) doesn't work correctly (i.e. nodes get overridden and theres a chance for missing data).
+
+        // Remove all images and circles (nodes) so we have a clean update.
         this.allNodes.selectAll('image').remove();
         this.allNodes.selectAll('circle').remove();
 
@@ -766,21 +786,26 @@ class ForceMap {
                 this.floating_tooltip.style('left', (d3.event.pageX + 10) + 'px').style('top', (d3.event.pageY + 10) + 'px')
             });
 
+        // Drag is called on the group to prevent jittering.
         d3.selectAll('.single_node')
             .call(this.nodeDrag());
 
-        // this.forceG.selectAll('defs').remove();
-
+        // Append defs so we can create our markers.
         if (this.forceG.select('defs').empty()) {
             this.forceG.append('defs');
         }
 
         let markerWidth = 6, markerHeight = 4;
 
+        // TODO: Fix marker positioning; I thought I fixed this, but apparently it was very late and my eyes are broken
+        //  because this is most certainly still broken. The end of the marker should always be at the edge of the node,
+        //  regardless of zoom level or line width.
+        // Add link-specific markers.
         this.forceG.selectAll('defs')
             .selectAll('marker')
             .data(this.vLinks)
             .join('marker')
+            // Every marker gets an ID so we can reference it later.
             .attr('id', (d, i) => `marker_${i}`)
             .attr('markerWidth', markerWidth)
             .attr('markerHeight', markerHeight)
@@ -797,13 +822,16 @@ class ForceMap {
                 this.floating_tooltip.style('left', (d3.event.pageX + 10) + 'px').style('top', (d3.event.pageY + 10) + 'px')
             });
 
+        // Add links.
         this.all_links = this.all_links
             .data(this.vLinks)
             .join('line')
             .classed('link', true)
             .attr('stroke-width', d => d.packet_scale)
             .attr('stroke', d => this.linkColorScale(d.max_bandwidth))
+            // Marker end using the markers defined above.
             .attr('marker-end', (d, i) => `url(#marker_${i})`)
+            // Add ability to view link speed on mouseover.
             .on('mouseover', linkMouseOverHandler)
             .on('mouseout', linkMouseOutHandler)
             .on('mousemove', () => {
@@ -846,17 +874,16 @@ class ForceMap {
             return trafficInfo;
         }
 
+        // Link handlers
         function generateTTSLink(d, selection) {
             selection.selectAll('text').remove();
             selection.append('text')
                 .text(`${d3.format('~s')(d.max_bandwidth)}bps`);
         }
-
         function linkMouseOverHandler(d) {
             that.floating_tooltip.transition().duration(200).style('opacity', 0.9);
             generateTTSLink(d, that.tooltip_stats);
         }
-
         function linkMouseOutHandler(d) {
             that.floating_tooltip.transition().duration(200).style('opacity', 0);
         }
@@ -870,7 +897,11 @@ class ForceMap {
                     `${d.max_bandwidth ? 'Max bandwidth: ' + d3.format('~s')(d.max_bandwidth) + 'bps |' : ''} ` +
                     `RTT (mean): ${d3.format('.3r')(d3.mean(packets, p => p.rtt))}`);
 
-            // TODO: Add notice if no graph is available.
+            // TODO: Add notice if no graph is available - this will require that the tooltip be changed or something
+            //  like that. The current method (appending text element) doesn't work because text is an SVG specific
+            //  thing and we're not appending to an SVG. Either the div will need hard constraints on size and HTML
+            //  added, or an SVG needs to be added. There may be other ways of doing it but that's what makes sense
+            //  off the top of my head.
         }
 
         // Shows the global tooltip on mouseover (if applicable)
@@ -948,6 +979,7 @@ class ForceMap {
                 initialY = 0;
             });
 
+            // TODO: Make dragging the iframes easier. Not sure what the best way to do that is.
             // 'Drag' the tooltip if draggable
             tooltip.on('mousemove', function () {
                 d3.event.preventDefault();

@@ -1,9 +1,11 @@
-// TODO: Not really a todo, but make sure you change this value when you deploy.
 //const api_server = 'network-viz.chpc.utah.edu:5000'
 const api_server = '127.0.0.1:8081';
 const tr_api = '/api/v1/resources/traceroutes';
 const rdap_api = '/api/v1/resources/iporgs'
 
+/**
+ * Requests data from the API server.
+ */
 const runTraceroute = async (source, dest, num_runs) => {
     let api_call = `http://${api_server}${tr_api}?dest=${dest}`;
     if (source) {
@@ -14,17 +16,17 @@ const runTraceroute = async (source, dest, num_runs) => {
     try {
         return await d3.json(api_call);
     } catch (e) {
+        // Return 'Network Error' if the request fails. This is displayed in the CR table.
         if (e instanceof TypeError) {
             return {'error': 'Network Error'};
         }
     }
 };
 
-const getOrgFromIP = async (ip) => {
-    let api_call = `http://${api_server}${rdap_api}?ip=${ip}`;
-    return await d3.json(api_call);
-}
-
+/**
+ * Get max bandwidth from GRNOC.
+ * @param ip - IP address, may or may not be part of GRNOC.
+ */
 const getMaxBWFromGRNOCIP = async (ip) => {
     // TODO: Better way of telling if it's part of GRNOC
     if (ip.startsWith('198') || ip.startsWith('162') || ip.startsWith('192')) {
@@ -35,6 +37,13 @@ const getMaxBWFromGRNOCIP = async (ip) => {
     }
 }
 
+/**
+ * Get GRNOC Grafana chart url.
+ * @param ip - IP address to lookup
+ * @param start - start time
+ * @param end - end time
+ * @returns URL of chart.
+ */
 const getATRChartURL = (ip, start = 1588478400000, end = 1588564799000) => {
     if (ip.startsWith('198') || ip.startsWith('162') || ip.startsWith('192')) {
         return `https://snapp-portal.grnoc.iu.edu/grafana/d-solo/f_KR9xeZk/ip-address-lookup?orgId=2&from=${start}&to=${end}&var-ip_addr=${ip}&panelId=2`;
@@ -42,7 +51,12 @@ const getATRChartURL = (ip, start = 1588478400000, end = 1588564799000) => {
     return '';
 }
 
-// Create "internet graph" using the visible entities.
+/**
+ * Create internet graph using "visible" entities
+ * @param traceroutes
+ * @param existing
+ * @returns {Promise<Map<any, any>>}
+ */
 const createInternetGraph = async (traceroutes, existing = undefined) => {
     let entities = existing;
     if (entities == undefined) {
@@ -62,21 +76,18 @@ const createInternetGraph = async (traceroutes, existing = undefined) => {
             let entity = entities.get(entity_id);
 
             if (!entity) {
-                // Calls the API
-                // const orgResult = await getOrgFromIP(packet.ip);
                 let maxBW = undefined;
                 const tsdsResult = await getMaxBWFromGRNOCIP(packet.ip);
                 if (tsdsResult.results.length > 0) {
                     maxBW = tsdsResult.results[0].max_bandwidth;
                 }
+                // Set properties for each node
                 entity = ({
                     id: entity_id,
                     ip: packet.ip,
                     org: packet.org,
                     domain: packet.domain,
                     ttl: packet.ttl,
-                    // org: orgResult.org,
-                    // domain: orgResult.domain,
                     max_bandwidth: packet.speed ? packet.speed : maxBW,
                     packets: new Array(),
                     source_ids: new Set(),
@@ -102,9 +113,11 @@ const createInternetGraph = async (traceroutes, existing = undefined) => {
     return entities;
 };
 
-// clusterBy takes a map of entities with an 'id' property and returns a map of new entities that reference
-// the input entities as children. Clustering is breadth-first driven by the given label equality, degree,
-// and relationship parameters.
+/**
+ * clusterBy takes a map of entities with an 'id' property and returns a map of new entities that reference
+ * the input entities as children. Clustering is breadth-first driven by the given label equality, degree,
+ * and relationship parameters.
+ */
 const clusterBy = (entities, getLabel, getRelationships, id_prefix = undefined, max_degree = 1) => {
     const result = new Map();
 
@@ -112,26 +125,11 @@ const clusterBy = (entities, getLabel, getRelationships, id_prefix = undefined, 
     const addToCluster = (cluster_id, entity) => {
         if (!result.has(cluster_id)) {
             // Use ES6 Proxy to recursively access properties of hierarchical clusters (see `handler` def)
-            result.set(cluster_id, new Proxy(({id: cluster_id, children: new Map()}), handler));
+            result.set(cluster_id, new Proxy(({id: cluster_id, children: new Map()}), propHandler));
         }
         // Set the children of the proxy to be the actual entity.
         result.get(cluster_id).children.set(entity.id, entity);
     }
-
-    // // If max_degree is 0, basically return the input
-    // if (max_degree == 0) {
-    //     for (var [id, entity] of entities) {
-    //         addToCluster(id, entity);
-    //     }
-    // }
-    // // If max_degree is Infinity, basically do a 'groupBy'
-    // else if (max_degree == Infinity) {
-    //     for (var [id, entity] of entities) {
-    //         addToCluster(getLabel(entity), entity);
-    //     }
-    // }
-    // // Otherwise, exhaustive search (depth-first) for connected clusters of degree `max_degree`
-    // else {
 
     const orphan_ids = [...entities.keys()];
     const cluster_count = new Map();
@@ -186,6 +184,11 @@ const clusterBy = (entities, getLabel, getRelationships, id_prefix = undefined, 
     return result;
 };
 
+/**
+ * Look up appropriate property reducer for getting specific property from Proxy (i.e. Org).
+ * @param property - Property to lookup
+ * @returns {function(*, *): Set<*>} - Function specifying how to handle lookup of the property
+ */
 const propReducer = (property) => {
     let f = null;
     switch (property) {
@@ -219,9 +222,11 @@ const propReducer = (property) => {
     return f;
 }
 
-// If property is not present and the object has an array of child nodes, return an appropriate reduction
-// of that property across all children
-const handler = ({
+/**
+ * If property is not present and the object has an array of child nodes, return an appropriate reduction of that
+ * property across all children
+ */
+const propHandler = ({
     get: (obj, property) => {
         if (property in obj) {
             return obj[property]

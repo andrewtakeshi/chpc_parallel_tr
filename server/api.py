@@ -44,7 +44,7 @@ def traceroutes():
 
     # Run remote traceroute
     if source:
-        # TODO: REPLACE PSCHEDULER - we can use our own API server to do this with minimal changes.
+        # pseudocode for replacing pscheduler
         # if d3_conversion_utils.check_api_server(source):
         #   response = requests... to server, with just the destination specified (to force a "system" tr from them)
         #   then just return the json() data retrieved.

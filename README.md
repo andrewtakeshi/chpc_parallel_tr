@@ -37,6 +37,7 @@ Center for Applied Internet Data Analysis (CAIDA) @ UCSD: https://www.caida.org/
 GlobalNOC @ Indiana University: https://globalnoc.iu.edu/
 
 ## Project Structure
+
 - deprecated: Old code, no longer used. Primarily contains an old webpage and the related code used to display and explore results from the Netbeam API.
 - external: Downloaded libraries. Currently only contains d3.js, but other libraries used should probably be added to improve portability. Right now CDNs are used to include the other libraries. 
 - literature: BibTex formatted files for different references?

@@ -16,8 +16,9 @@
 
 ## Demonstration Sites
 
-
 - 134.55.200.107: ESNet site. Goes through SIX (which also has Netbeam info) and 4 additional Netbeam enabled nodes. 
 - 8.8.8.8: Google DNS. This is used to demonstrate one of the key features of this project, the parallelization. By running multiple traceroutes here, we can view the load balancing done by seeing how many different paths are taken to the same IP address.
     - This hasn't been working recently, and I'm not sure why.
-- 
+    
+## Deployment Instructions (network-viz)
+
