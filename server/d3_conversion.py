@@ -1,3 +1,6 @@
+"""
+Author: Andrew Golightly
+"""
 import random
 import re
 import json

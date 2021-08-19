@@ -1,6 +1,5 @@
 """
-Used in conjunction with d3_conversion.py to add information from ESNet hosts running the Netbeam data collection API to
-traceroute data.
+Author: Andrew Golightly
 """
 
 from os import path, stat
@@ -136,6 +135,7 @@ def ip_to_resource_dict(filePath=None):
     :param filePath: Path to the file. By default this is interfaces.json.
     :return: None
     """
+    # TODO: Fix permissions for deployment. apache user can't access the interfaces.json file for whatever reason.
     if filePath is None:
         f = open("interfaces.json", "wt")
     else:
@@ -251,6 +251,8 @@ def add_netbeam_info_threaded(d3_json, source_path=None):
 ###### DB ########
 ##################
 
+# Database ended up being slower than just reading/writing a JSON file.
+
 def refresh_netbeam_db(db_path):
     """
     Experimental and likely buggy. Replaces ip_to_resource_dict.
@@ -327,7 +329,7 @@ def ip_to_netbeam_db(db_path='netbeam_ip_map.db'):
 
 def add_netbeam_info_db_naive(d3_json, db_path='netbeam_ip.db'):
     """
-    Naive implementation to add Netbeam data to a traceroute.
+    Naive implementation to add Netbeam data to a traceroute using a database.
 
     :param d3_json: Traceroute dictionary.
     :param db_path: Path to database file with Netbeam interface information.
@@ -356,7 +358,7 @@ def add_netbeam_info_db_naive(d3_json, db_path='netbeam_ip.db'):
 
 def add_netbeam_info_db_threaded(d3_json, db_path='netbeam_ip.db'):
     """
-    Threaded implementation to add Netbeam data to a traceroute.
+    Threaded implementation to add Netbeam data to a traceroute using a database.
 
     :param d3_json: Traceroute dictionary.
     :param db_path: Path to database file with Netbeam interface information.

@@ -1,3 +1,4 @@
+<!-- Author: Andrew Golightly -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -25,9 +26,6 @@
         <a class="navbar-brand" href="./index.html">Parallel Traceroute</a>
         <div class="collapse navbar-collapse">
             <ul class="navbar-nav mr-auto">
-                <!--                        <li class="nav-item">-->
-                <!--                            <a class="nav-link" href="./netbeam.html">Netbeam Test</a>-->
-                <!--                        </li>-->
                 <li class="nav-item">
                     <a class="nav-link" href="./about.html">About</a>
                 </li>
@@ -99,28 +97,53 @@
         system traceroutes take ~10 seconds to run, while the pScheduler traceroutes take ~20-30 seconds.
     </p>
     <p>
+        The visualisation is created using d3.js. By default, hops are clustered by their orgs. By double clicking on a
+        cluster, it is expanded into the individual hops for the organization. The size of the clusters/hops is
+        determined by the number of traceroutes that run through the specific point (i.e. a hop with 10
+        traceroutes running through it will appear larger than one with only 1 traceroute running through it). Links
+        are colored according to the known link speed. The known link speed is the minimum of the source and
+        destination nodes, as the minimum will give the fastest possible speed between the source and destination. If
+        a link speed is unknown, it is assumed to be 0bps.
+    </p>
+    <p>
+        The visualization has two "modes" - map and force. In map mode, the nodes will be placed according to their
+        location and overlaid on top of a map. The map displayed can be changed according to the dropdown in the top
+        right. Viewing the locations of nodes can be useful, but it comes with a large caveat; we are currently using an
+        external service to obtain the geoIP information which may be inaccurate for certain nodes. For example, running
+        a traceroute to the Google DNS server (8.8.8.8) typically gives the location as somewhere on the east coast.
+        However, (at least for our testing here in Utah) it's almost certain that the traceroute is going to somewhere
+        much, much closer than the east coast. Because we are using an external service to access an anycast address
+        it finds the server closest to the location of the service we are using, rather than the one actually being used.
+        Although this is an issue, it's relatively small and unlikely to be an issue under typical use as it really only
+        affects anycast addresses.
+    </p>
+    <p>
         Upon running a traceroute, a table will be generated with the traceroute information (i.e. type of
         traceroute, source, destination, and status). Subsequent runs will add on to the table, and by using the
         checkboxes on the right hand side of the table specific runs can be shown/run.
     </p>
     <p>
-        The visualisation is created using d3.js. By default, hops are clustered by their orgs. By double clicking on a
-        cluster, it is expanded into the individual hops for the organization. The size of the clusters/hops is
-        determined by the number of traceroutes that run through the specific point (i.e. a hop with 10
-        traceroutes running through it will appear larger than one with only 1 traceroute running through it).
-
+        Changing to force mode can be done by clicking the "Hide Map" button in the top row; similarly, exiting force
+        mode and returning to map mode can be done by clicking the same button (it should say "Show Map" in force mode).
+        Force mode doesn't use the geo information. Instead, it just places the nodes in a relatively straight line.
+        This is done to facilitate easier interaction, as in map mode the nodes can become clustered together leading to
+        more confusing visualizations.
     </p>
     <p>
         If an expanded hop is hovered over and additional information is available (i.e. the hop is contained
         within one of the auxiliary data sources), a graph will appear showing traffic information for that hop.
         At this time, auxiliary data sources include ESNet's Netbeam API and some information from GRNOC's data
         collection. Graphs for GRNOC appear as embedded iframes which pull from GRNOC's Grafana instance, while graphs
-        for
-        ESNet's Netbeam API are dynamically generated using d3.js. The difference in displaying the information
+        for ESNet's Netbeam API are dynamically generated using d3.js. The difference in displaying the information
         comes down to how we are able to access the information; with the Netbeam API, we have direct access to
         the information and can use that to generate our own graphs. In contrast, we have limited access to
         GRNOC's information and can only access their Grafana instance, and thus cannot create our own graphs from
         this data.
+    </p>
+    <p>
+        By double clicking on a node with additional information available, the graph/iframe is pinned and will not
+        disappear on hover. If the additional information comes from Netbeam, the type of data can be selected from the
+        checklist on the right side of the pinned graph.
     </p>
     <h1>
         Video

@@ -1,3 +1,6 @@
+"""
+Author: Andrew Golightly
+"""
 import requests
 import threading
 import re

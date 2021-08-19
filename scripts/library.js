@@ -1,3 +1,4 @@
+// TODO: Not really a todo, but make sure you change this value when you deploy.
 //const api_server = 'network-viz.chpc.utah.edu:5000'
 const api_server = '127.0.0.1:8081';
 const tr_api = '/api/v1/resources/traceroutes';

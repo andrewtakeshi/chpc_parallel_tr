@@ -1,3 +1,6 @@
+"""
+Author: Andrew Golightly
+"""
 import requests
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
 import subprocess
