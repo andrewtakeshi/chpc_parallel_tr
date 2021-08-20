@@ -1,7 +1,8 @@
-//const api_server = 'network-viz.chpc.utah.edu:5000'
+// TODO: Make these constants that are loaded from a config file. This should be done everywhere that constants like
+//  this are used.
+//const api_server = 'network-viz.chpc.utah.edu:8081'
 const api_server = '127.0.0.1:8081';
 const tr_api = '/api/v1/resources/traceroutes';
-const rdap_api = '/api/v1/resources/iporgs'
 
 /**
  * Requests data from the API server.
@@ -170,7 +171,8 @@ const clusterBy = (entities, getLabel, getRelationships, id_prefix = undefined, 
                     // Add neighbors as new search candidates
                     candidates = candidates.concat(neighbors);
 
-                    //TODO add support for max_degree > 1 (recursive neighbors), probably change candidates to a Set a the same time
+                    // TODO add support for max_degree > 1 (recursive neighbors), probably change candidates to a Set at
+                    //  the same time
 
                     // This entity now belongs to a cluster, so we remove orphans
                     orphan_ids.splice(orphan_ids.indexOf(candidate_id), 1);
