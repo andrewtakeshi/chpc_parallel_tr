@@ -695,13 +695,13 @@ class ForceMap {
         // Preload ATR Grafana iFrames for rendered IP nodes and generate links
         for (let d of this.nodeValues) {
             if (d.id.startsWith('ip') && !this.atr_iframes.has(d.id)) {
-                const URL = getATRChartURL(d.ip);
+                const URL = getATRChartURL(d.ip, d.org);
                 if (URL.length > 0) {
                     const iframe = this.floating_tooltip.append('iframe')
                         .attr('width', 600)
                         .attr('height', 300)
                         .style('display', 'none')
-                        .attr('src', getATRChartURL(d.ip));
+                        .attr('src', getATRChartURL(d.ip, d.org));
                     this.atr_iframes.set(d.id, iframe);
                 }
             }
@@ -1014,7 +1014,7 @@ class ForceMap {
                 tooltip.append('iframe')
                     .attr('width', 600)
                     .attr('height', 300)
-                    .attr('src', getATRChartURL(d.ip))
+                    .attr('src', getATRChartURL(d.ip, d.org))
                     .style('display', 'block');
             } else if (d.id.startsWith('ip') && trafficInfo.size > 0) {
                 // Add the d3 vis for netbeam info

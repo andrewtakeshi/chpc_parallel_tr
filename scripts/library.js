@@ -27,13 +27,23 @@ const runTraceroute = async (source, dest, num_runs) => {
 /**
  * Get max bandwidth from GRNOC.
  * @param ip - IP address, may or may not be part of GRNOC.
+ * @param org - Org of IP address
  */
-const getMaxBWFromGRNOCIP = async (ip) => {
-    // TODO: Better way of telling if it's part of GRNOC
-    if (ip.startsWith('198') || ip.startsWith('162') || ip.startsWith('192')) {
+const getMaxBWFromGRNOCIP = async (ip, org) => {
+    // TODO: Better way of telling if it's part of GRNOC - see also getATRChartURL
+    // if (ip.startsWith('198') || ip.startsWith('162') || ip.startsWith('192')) {
+    //     let api_call = `https://snapp-portal.grnoc.iu.edu/tsds-cross-domain/query.cgi?method=query;query=get%20max_bandwidth%20between(now-10m,%20now)%20from%20interface%20where%20interface_address.value%20=%20%22${ip}%22`;
+    //     return await d3.json(api_call);
+    // } else {
+    //     return {'results': []};
+    // }
+    // TODO: Add additional orgs (i.e. SIX)
+    if (org && org.toString() === 'Internet2') {
+        console.log(org);
         let api_call = `https://snapp-portal.grnoc.iu.edu/tsds-cross-domain/query.cgi?method=query;query=get%20max_bandwidth%20between(now-10m,%20now)%20from%20interface%20where%20interface_address.value%20=%20%22${ip}%22`;
         return await d3.json(api_call);
     } else {
+        console.log(org);
         return {'results': []};
     }
 }
@@ -41,12 +51,19 @@ const getMaxBWFromGRNOCIP = async (ip) => {
 /**
  * Get GRNOC Grafana chart url.
  * @param ip - IP address to lookup
- * @param start - start time
- * @param end - end time
+ * @param org - Org of IP address
  * @returns URL of chart.
  */
-const getATRChartURL = (ip, start = 1588478400000, end = 1588564799000) => {
-    if (ip.startsWith('198') || ip.startsWith('162') || ip.startsWith('192')) {
+const getATRChartURL = (ip, org) => {
+    //(ip, org, start = 1588478400000, end = 1588564799000) => {
+    // if (ip.startsWith('198') || ip.startsWith('162') || ip.startsWith('192')) {
+    //     return `https://snapp-portal.grnoc.iu.edu/grafana/d-solo/f_KR9xeZk/ip-address-lookup?orgId=2&from=${start}&to=${end}&var-ip_addr=${ip}&panelId=2`;
+    // }
+    let end = Date.now();
+    let start = end - 900000;
+
+    if (org.toString() === 'Internet2')
+    {
         return `https://snapp-portal.grnoc.iu.edu/grafana/d-solo/f_KR9xeZk/ip-address-lookup?orgId=2&from=${start}&to=${end}&var-ip_addr=${ip}&panelId=2`;
     }
     return '';
@@ -78,7 +95,7 @@ const createInternetGraph = async (traceroutes, existing = undefined) => {
 
             if (!entity) {
                 let maxBW = undefined;
-                const tsdsResult = await getMaxBWFromGRNOCIP(packet.ip);
+                const tsdsResult = await getMaxBWFromGRNOCIP(packet.ip, packet.org);
                 if (tsdsResult.results.length > 0) {
                     maxBW = tsdsResult.results[0].max_bandwidth;
                 }
