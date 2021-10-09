@@ -1,9 +1,10 @@
 let visibleNTTs = ({"traceroutes": []});
 let hiddenNTTs = ({"traceroutes": []});
-// Timeout values - pscheduler is 40 sec, system is 20 sec
-const pscheduler_timeout = 40000;
-const system_timeout = 20000;
+// Timeout values - pscheduler is 25 sec, system is 10 sec
+const pscheduler_timeout = 25000;
+const system_timeout = 10000;
 let inQueue = 0;
+
 
 /**
  * Handles pressing the reset button. Calls updateViz() after reset.
