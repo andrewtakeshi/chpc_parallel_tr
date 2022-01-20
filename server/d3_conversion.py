@@ -460,8 +460,9 @@ def system_to_d3(dest, numRuns=1):
     # Check to make sure we can run the traceroute according to limiter.
     lock.acquire()
     if limiter >= 10 or (limiter + numRuns) > 15:
-        print("Over the run limit. Please try again later.")
-        return None
+        return {'error': 'over run limit'}
+        # print("Over the run limit. Please try again later.")
+        # return None
     else:
         limiter += numRuns
     lock.release()
@@ -554,7 +555,7 @@ def add_additional_information(d3_json):
     functions called here should modify the JSON in place and should not return anything.
     :return: Modified version of d3_json.
     """
-    # remove_unknowns(d3_json)
+    remove_unknowns(d3_json)
     d3_netbeam.add_netbeam_info_threaded(d3_json)
     d3_geo_ip.add_geo_info_threaded(d3_json)
     d3_rdap.rdap_threaded(d3_json)

@@ -1,7 +1,7 @@
 // TODO: Make these constants that are loaded from a config file. This should be done everywhere that constants like
 //  this are used.
 //const api_server = 'network-viz.chpc.utah.edu:8081'
-const api_server = '127.0.0.1:8081';
+const api_server = '127.0.0.1:5000';
 const tr_api = '/api/v1/resources/traceroutes';
 
 /**
@@ -19,6 +19,7 @@ const runTraceroute = async (source, dest, num_runs) => {
     } catch (e) {
         // Return 'Network Error' if the request fails. This is displayed in the CR table.
         if (e instanceof TypeError) {
+            console.log('type error');
             return {'error': 'Network Error'};
         }
     }
@@ -62,7 +63,8 @@ const getATRChartURL = (ip, org) => {
     let end = Date.now();
     let start = end - 900000;
 
-    if (org.toString() === 'Internet2')
+    // TODO: check this org stuff.
+    if (org !== null && org.toString() === 'Internet2')
     {
         return `https://snapp-portal.grnoc.iu.edu/grafana/d-solo/f_KR9xeZk/ip-address-lookup?orgId=2&from=${start}&to=${end}&var-ip_addr=${ip}&panelId=2`;
     }

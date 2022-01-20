@@ -6,16 +6,19 @@ from requests.packages.urllib3.exceptions import InsecureRequestWarning
 import subprocess
 import re
 import socket
+import time
 
 # Disables warnings for insecure requests using requests package
 requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
 # Checks for valid IP
-ip_validation_regex = re.compile(r'^((25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9][0-9]|[0-9])\.)'
-                                 r'{3}(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9][0-9]|[0-9])$')
+ip_validation_regex = re.compile(r'^((25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9][0-9]|[1-9])\.)'
+                                 r'((25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9][0-9]|[0-9])\.){2}'
+                                 r'(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9][0-9]|[0-9])$')
 
 # Cached value of my_ip().
 _my_ip_cached = None
+_my_ip_cached_time = None
 
 
 def my_ip():
@@ -27,21 +30,21 @@ def my_ip():
     :return: String representative of the IP address for the local machine.
     """
     global _my_ip_cached
-    # Return cached value if present.
-    if _my_ip_cached is not None:
-        return _my_ip_cached
-
-    # Find default interface
-    default_interface = subprocess.run(['awk', '$2 == 00000000 { print $1 }', '/proc/net/route'],
-                                       stdout=subprocess.PIPE, encoding='utf8').stdout.splitlines()[0]
-    # Get IP information for the default interface.
-    ip_addr_out = subprocess.run(['ip', 'addr', 'show', 'dev', default_interface], encoding='utf8',
-                                 stdout=subprocess.PIPE)
-    # Filter to get only the IP address.
-    my_ip_test = subprocess.run(['awk', '$1 == \"inet\"' '{ sub("/.*", "", $2); print $2 }'], input=ip_addr_out.stdout,
-                                stdout=subprocess.PIPE, encoding='utf8').stdout.splitlines()[0]
-    if len(my_ip_test) > 0:
-        _my_ip_cached = my_ip_test
+    global _my_ip_cached_time
+    # Refresh cached value if it hasn't been set before OR if it's been a day since last cached.
+    if _my_ip_cached is None or _my_ip_cached_time < time.time() - 86400:
+        # Find default interface
+        default_interface = subprocess.run(['awk', '$2 == 00000000 { print $1 }', '/proc/net/route'],
+                                           stdout=subprocess.PIPE, encoding='utf8').stdout.splitlines()[0]
+        # Get IP information for the default interface.
+        ip_addr_out = subprocess.run(['ip', 'addr', 'show', 'dev', default_interface], encoding='utf8',
+                                     stdout=subprocess.PIPE)
+        # Filter to get only the IP address.
+        my_ip_test = subprocess.run(['awk', '$1 == \"inet\"' '{ sub("/.*", "", $2); print $2 }'], input=ip_addr_out.stdout,
+                                    stdout=subprocess.PIPE, encoding='utf8').stdout.splitlines()[0]
+        if len(my_ip_test) > 0:
+            _my_ip_cached = my_ip_test
+            _my_ip_cached_time = time.time()
     return _my_ip_cached
 
 
@@ -80,6 +83,10 @@ def target_to_ip(target):
     :return: IP address associated with target.
     """
     try:
-        return socket.gethostbyname(target)
+        ip = socket.gethostbyname(target)
+        if ip_validation_regex.match(ip):
+            return ip
+        else:
+            return None
     except:
         return None

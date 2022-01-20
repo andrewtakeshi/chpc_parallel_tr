@@ -82,7 +82,8 @@ class ForceMap {
             .selectAll('circle');
 
         this.linkColorScale = d3.scaleQuantile()
-            .domain([0, 100000000, 250000000, 500000000, 1000000000, 2000000000, 5000000000, 10000000000, 20000000000, 40000000000, 80000000000, 100000000000, 400000000000])
+            .domain([0, 100000000, 250000000, 500000000, 1000000000, 2000000000, 5000000000, 10000000000, 20000000000,
+                40000000000, 80000000000, 100000000000, 400000000000])
             // .domain(d3.extent(this.nodeValues, d => d.max_bandwidth ? d.max_bandwidth : 0))
             .range(['rgb(119, 190, 252)', 'rgb(55, 161, 251)', 'rgb(162, 254, 175)',
                 'rgb(118, 245, 136)', 'rgb(43, 230, 144)', 'rgb(255, 225, 59)',
@@ -157,7 +158,8 @@ class ForceMap {
         if (all_nodes.nodes().length > 0) {
             // Select image and circle and perform appropriate transforms
             all_nodes.selectAll('circle')
-                .attr('r', d => (d.radius) / d3.event.transform.k);
+                .attr('r', d => d.radius / d3.event.transform.k)
+                .attr('stroke-width', 1 / d3.event.transform.k);
             all_nodes.selectAll('image')
                 .attr('width', d => d.diameter / d3.event.transform.k)
                 .attr('height', d => d.diameter / d3.event.transform.k)
@@ -359,7 +361,6 @@ class ForceMap {
             d.fy = d.y;
         }
 
-        // TODO: Scale by the zoom factor.
         function dragged(d) {
             d.fx = clamp(d3.event.x, 0, width);
             d.fy = clamp(d3.event.y, 0, height);
@@ -376,7 +377,8 @@ class ForceMap {
         return d3.drag()
             // Needed for smooth dragging, along with calling drag from the group (i.e. g.single_node) rather than
             // calling on the circle
-            .container(d3.select('#mainVisSVG').node())
+            // Update: removed this to fix the issue with drag when zoomed. Still no jittering, so I'm not entirely sure why it was required before.
+            // .container(d3.select('#mainVisSVG').node())
             .on('start', dragstarted)
             .on('drag', dragged)
             .on('end', dragended);
@@ -651,6 +653,8 @@ class ForceMap {
      * Contains all the handlers as well, although they could likely be moved outside of this function.
      */
     update() {
+        console.log('performing update');
+
         this.simulation.stop();
 
         // Appends maxBW to the vis.
@@ -693,15 +697,16 @@ class ForceMap {
             .range([16, 24]);
 
         // Preload ATR Grafana iFrames for rendered IP nodes and generate links
+        // TODO: Fix preload of iframes, the url is broken for whatever reason.
         for (let d of this.nodeValues) {
             if (d.id.startsWith('ip') && !this.atr_iframes.has(d.id)) {
-                const URL = getATRChartURL(d.ip, d.org);
-                if (URL.length > 0) {
+                const url = getATRChartURL(d.ip, d.org);
+                if (url.length > 0) {
                     const iframe = this.floating_tooltip.append('iframe')
                         .attr('width', 600)
                         .attr('height', 300)
                         .style('display', 'none')
-                        .attr('src', getATRChartURL(d.ip, d.org));
+                        .attr('src', url);
                     this.atr_iframes.set(d.id, iframe);
                 }
             }
@@ -735,8 +740,8 @@ class ForceMap {
             d.radius = d.diameter / 2;
         }
 
-        // Lambda to check for unknown or undefined domains
-        let unknown = (domain) => domain !== 'unknown' && typeof domain !== 'undefined';
+        // Lambda to check for unknown or undefined domains - returns true if domain is known, false otherwise.
+        let known = (domain) => domain !== null && domain !== 'unknown' && typeof domain !== 'undefined';
 
         // Create separate group for each node
         this.allNodes = this.allNodes
@@ -744,11 +749,16 @@ class ForceMap {
             .join('g')
             .classed('single_node', true);
 
-        // Select a single node to get the zoom scale factor.
-        let zoomNode = this.allNodes.selectAll('circle').node();
+        // Select based on map instead of nodes because we don't zoom unless map is displayed
 
-        // zoomDenominator is the zoom scale factor; by default this is 1.
-        let zoomDenominator = zoomNode ? d3.zoomTransform(zoomNode).k : 1;
+        let zoomOutline = this.mapG.selectAll('path').node();
+        let zoomDenominator = zoomOutline ? d3.zoomTransform(zoomOutline).k : 1;
+
+        // // Select a single node to get the zoom scale factor.
+        // let zoomNode = this.allNodes.selectAll('circle').node();
+        //
+        // // zoomDenominator is the zoom scale factor; by default this is 1.
+        // let zoomDenominator = zoomNode ? d3.zoomTransform(zoomNode).k : 1;
 
 
         // TODO: Modify this to be a join. This will have to use the node id or something similar, as the default value
@@ -761,7 +771,7 @@ class ForceMap {
         // Add image (favicon) if we can find it using duckduckgo ico search.
         this.allNodes.append('image')
             .classed('single_node_img', true)
-            .attr('xlink:href', d => unknown(d.domain) ? `http://icons.duckduckgo.com/ip2/${d.domain}.ico` : '')
+            .attr('xlink:href', d => known(d.domain) ? `http://icons.duckduckgo.com/ip2/${d.domain}.ico` : '')
             .attr('draggable', false)
             .attr('width', d => (d.diameter) / zoomDenominator)
             .attr('height', d => (d.diameter) / zoomDenominator)
@@ -771,9 +781,11 @@ class ForceMap {
         // Always append circle - this will show if no favicon is retrieved, otherwise opacity = 0 and it's hidden.
         this.allNodes.append('circle')
             .classed('single_node_circle', true)
-            .attr('r', d => (d.radius) / zoomDenominator)
+            .attr('r', d => (d.diameter) / zoomDenominator / 2)
+            .attr('stroke', d => this.getNodeColorOrg(d))
+            .attr('stroke-width', 1 / zoomDenominator)
             .attr('fill', d => this.getNodeColorOrg(d))
-            .attr('opacity', d => unknown(d.domain) ? 0.0 : 1.0)
+            .attr('opacity', d => known(d.domain) ? 0.0 : 1.0)
             // Doubleclick 'pins' the charts
             .on('dblclick', nodeDblClickHandler)
             // Click to expand nodes
@@ -853,7 +865,6 @@ class ForceMap {
             let trafficInfo = new Map();
             for (let packet of packets) {
                 if (packet.resource && packet.traffic) {
-
                     let prop_adder = (prop) => {
                         for (let _prop of packet[prop]) {
                             if (!trafficInfo.has(_prop[0])) {
@@ -863,9 +874,7 @@ class ForceMap {
                             trafficInfo.get(_prop[0])[`${prop}_out`] = _prop[2];
                         }
                     }
-
                     let props = ['traffic', 'unicast_packets', 'errors', 'discards']
-
                     for (let prop of props) {
                         prop_adder(prop);
                     }
@@ -880,10 +889,12 @@ class ForceMap {
             selection.append('text')
                 .text(`${d3.format('~s')(d.max_bandwidth)}bps`);
         }
+
         function linkMouseOverHandler(d) {
             that.floating_tooltip.transition().duration(200).style('opacity', 0.9);
             generateTTSLink(d, that.tooltip_stats);
         }
+
         function linkMouseOutHandler(d) {
             that.floating_tooltip.transition().duration(200).style('opacity', 0);
         }
@@ -934,8 +945,9 @@ class ForceMap {
 
         // Expand nodes on single click (no drag)
         function nodeClickHandler(d) {
-            // d3.event.preventDefault();
+            d3.event.preventDefault();
             if (that.expandNode(d)) {
+                console.log('calling update from nodeClickHandler');
                 that.update();
             }
         }
@@ -1019,7 +1031,6 @@ class ForceMap {
             } else if (d.id.startsWith('ip') && trafficInfo.size > 0) {
                 // Add the d3 vis for netbeam info
                 that.netbeamGraph(trafficInfo, tooltip, true);
-
             } else {
                 // If neither data source is applicable, remove the tooltip
                 tooltip.remove();

@@ -55,7 +55,7 @@ If you run into any issues testing the API endpoint separately is a good place t
 There are lots of things left to do with this project; when I was going through and adding some basic documentation I left TODOs in places where there are potential improvements, additions, and bugs. The following lists are places that I think are the most important; however, Joe should be able to give some more guidance as to where time should be spent. 
 
 ### Core (Backend)
-- Fix pScheduler on network-viz. This has been on the backburner for me for a while, but it's something that needs to be done. If you talk to Paul he should be able to help or do it for you. 
+- Configure pScheduler/perfSONAR to restrict access to just the U of U subnet or something similar like that. It's too open right now. 
 - Read configuration settings from a config file. This will help in making this more portable and potentially something that could be containerized.
     - Examples of these settings include the API server address, the timeout periods, the default location used for geoIP lookups, and the number of max allowable traceroutes, among other things.
 - Find a better way to run the traceroutes. Currently subprocesses are being used but it's difficult to get truly parallel performance out of them. Additionally, if more than 5ish traceroutes are run simultaneously the data becomes unusable for the later traceroutes. I looked into using icmplib, but that has it's own set of issues; namely, routing was almost always the same and things like load balancing weren't shown. 
@@ -64,6 +64,6 @@ There are lots of things left to do with this project; when I was going through 
 ### Visualization (Frontend)
 - Find a way to limit searches for the GRNOC iframes. Right now it checks the first octet in the IP address, but this can be further limited by using something like a regex.
 - Make GRNOC iframes more reliable. Sometimes they load and other times they don't. 
-- Add a visual indicator to show that the visualization is processing; currently, the traceroute finishes and it takes several seconds for the visualization to show up. Similarly, optimizing the visualization (i.e. replacing remove/readd calls with joins, if possible) could help with this.
+- Add a visual indicator to show that the visualization is processing; currently, the traceroute finishes and it takes several seconds for the visualization to show up. Similarly, optimizing the visualization (i.e. replacing remove/read calls with joins, if possible) could help with this.
 - Add a way to collapse expanded nodes back into their org WITHOUT completely refreshing the visualization.
 - Stop updates on single org nodes from updating the entire visualization when "expanded".

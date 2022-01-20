@@ -89,6 +89,8 @@ def netbeam_traffic_by_time_range(resource: str, interval: str = "15m"):
     # rInfo = something like [traffic, True, Traffic]
     for rInfo in zip(request_types, units, proper_names):
         try:
+            if rInfo[0] == 'traffic':
+                print(f'Trying: {request_str(rInfo[0])}')
             r = requests.get(request_str(rInfo[0]), timeout=5)
 
             if r.status_code == 200 and len(r.content) != 0:
@@ -163,7 +165,8 @@ def ip_to_resource_dict(filePath=None):
             f.write(json.dumps(res))
         except requests.exceptions.Timeout:
             print(f'Request for interfaces timed out')
-    chmod(filePath, stat.S_IROTH | stat.S_IWOTH)
+
+    chmod(filePath, stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IWGRP)
 
 
 def load_netbeam_cache(source_path):

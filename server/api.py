@@ -20,6 +20,17 @@ def home():
 
 # TODO: Add a /api/v1/test page (or something like that) if pScheduler is replaced
 # This will be used to test to see if the API server is running on the server, similar to the pScheduler test.
+@app.route('/api/v1/test', methods=['GET'])
+def test():
+    """
+    Test endpoint - used to see if API server is running
+    :return:  JSON, content isn't super important. It's just examined to see if it exists.
+    """
+    response = {'success': 'api server running'}
+    response = jsonify(response)
+    response.headers.add('Access-Control-Allow-Origin', '*')
+    return response
+
 
 @app.route('/api/v1/resources/traceroutes', methods=['GET'])
 def traceroutes():
@@ -27,10 +38,15 @@ def traceroutes():
     Handles running traceroutes.
     :return: JSON string formatted for d3 with all additional information added.
     """
-    if "dest" in request.args:
-        dest = request.args["dest"]
-    else:
-        return "Error: No dest field provided. Please specify a destination address."
+    # if "dest" in request.args:
+    #     dest = request.args["dest"]
+    # else:
+    #     response = jsonify({'error': 'invalid destination'})
+    #     response.headers.add('Access-Control-Allow-Origin', '*')
+    #     return response
+
+    # Check for destination not being empty happens client side
+    dest = request.args['dest']
 
     # Checks for source for remote traceroute.
     source = None

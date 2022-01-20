@@ -1,8 +1,8 @@
 let visibleNTTs = ({"traceroutes": []});
 let hiddenNTTs = ({"traceroutes": []});
 // Timeout values - pscheduler is 25 sec, system is 10 sec
-const pscheduler_timeout = 25000;
-const system_timeout = 10000;
+const pscheduler_timeout = 250000;
+const system_timeout = 250000;
 let inQueue = 0;
 
 
@@ -235,6 +235,11 @@ const checkHandler = async (id, shown) => {
  * Runs an end to end traceroute.
  */
 const e2eBtnHandler = async (source, dest, num_runs, uuid) => {
+    // Handle undefined destination
+    if (dest === null || dest === undefined || dest === '')
+    {
+        return;
+    }
     let updateInQueue = () => {
         let innerHTML = '';
         if (inQueue > 0) {
