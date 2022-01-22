@@ -178,8 +178,9 @@ class ForceMap {
      */
     toggleMap() {
         if (this.showMap) {
-            // Draw the map and enable zoom.
+            // Draw the map, enable and reset zoom.
             this.zoom.on('zoom', this.zoomHandler);
+            this.svg.call(this.zoom.transform, d3.zoomIdentity);
             this.drawMap();
         } else {
             // Reset zoom, disable it, and then remove the map.
@@ -193,16 +194,15 @@ class ForceMap {
      * Draws the map.
      */
     drawMap() {
-        // Don't do anything if the geojson isn't present.
-        if (!this.geojson) {
+        // Don't do anything if the geojson isn't present or map should be hidden.
+        if (!this.geojson || !this.showMap) {
             return;
         }
-
-        this.svg.call(this.zoom);
 
         // Set up the projection and path.
         this.projection = d3.geoEquirectangular()
             .fitSize([this.width, this.height], this.geojson);
+
         let path = d3.geoPath().projection(this.projection);
 
         // Remove any existing map - we want to redraw entirely instead of joining
@@ -216,6 +216,13 @@ class ForceMap {
             .attr('id', d => `${d.id}_map`)
             .classed('outline', true)
             .attr('d', path);
+
+        // Reset zoom when we draw/redraw the map.
+        this.svg.call(this.zoom).call(this.zoom.transform, d3.zoomIdentity);
+
+        // We call update directly so that we don't "collapse" any nodes + it's easier than figuring out why calling it
+        // the same way that all the other updates are done doesn't work.
+        this.update();
     }
 
     /************************************
@@ -407,7 +414,7 @@ class ForceMap {
                 }
             }
         }
-
+        
         this.update();
     }
 
@@ -654,7 +661,6 @@ class ForceMap {
      */
     update() {
         console.log('performing update');
-
         this.simulation.stop();
 
         // Appends maxBW to the vis.
@@ -750,16 +756,8 @@ class ForceMap {
             .classed('single_node', true);
 
         // Select based on map instead of nodes because we don't zoom unless map is displayed
-
         let zoomOutline = this.mapG.selectAll('path').node();
         let zoomDenominator = zoomOutline ? d3.zoomTransform(zoomOutline).k : 1;
-
-        // // Select a single node to get the zoom scale factor.
-        // let zoomNode = this.allNodes.selectAll('circle').node();
-        //
-        // // zoomDenominator is the zoom scale factor; by default this is 1.
-        // let zoomDenominator = zoomNode ? d3.zoomTransform(zoomNode).k : 1;
-
 
         // TODO: Modify this to be a join. This will have to use the node id or something similar, as the default value
         //  (index?) doesn't work correctly (i.e. nodes get overridden and theres a chance for missing data).

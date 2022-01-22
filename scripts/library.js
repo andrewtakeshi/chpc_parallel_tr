@@ -13,13 +13,13 @@ const runTraceroute = async (source, dest, num_runs) => {
         api_call += `&source=${source}`;
     }
     api_call += `&num_runs=${num_runs}`;
-    console.log(`Requesting ${api_call}`);
+    // console.log(`Requesting ${api_call}`);
     try {
         return await d3.json(api_call);
     } catch (e) {
         // Return 'Network Error' if the request fails. This is displayed in the CR table.
         if (e instanceof TypeError) {
-            console.log('type error');
+            // console.log('type error');
             return {'error': 'Network Error'};
         }
     }
@@ -40,11 +40,9 @@ const getMaxBWFromGRNOCIP = async (ip, org) => {
     // }
     // TODO: Add additional orgs (i.e. SIX)
     if (org && org.toString() === 'Internet2') {
-        console.log(org);
         let api_call = `https://snapp-portal.grnoc.iu.edu/tsds-cross-domain/query.cgi?method=query;query=get%20max_bandwidth%20between(now-10m,%20now)%20from%20interface%20where%20interface_address.value%20=%20%22${ip}%22`;
         return await d3.json(api_call);
     } else {
-        console.log(org);
         return {'results': []};
     }
 }

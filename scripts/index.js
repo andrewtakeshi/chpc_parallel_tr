@@ -1,10 +1,9 @@
 let visibleNTTs = ({"traceroutes": []});
 let hiddenNTTs = ({"traceroutes": []});
 // Timeout values - pscheduler is 25 sec, system is 10 sec
-const pscheduler_timeout = 250000;
-const system_timeout = 250000;
+const pscheduler_timeout = 25000;
+const system_timeout = 10000;
 let inQueue = 0;
-
 
 /**
  * Handles pressing the reset button. Calls updateViz() after reset.
@@ -236,8 +235,7 @@ const checkHandler = async (id, shown) => {
  */
 const e2eBtnHandler = async (source, dest, num_runs, uuid) => {
     // Handle undefined destination
-    if (dest === null || dest === undefined || dest === '')
-    {
+    if (dest === null || dest === undefined || dest === '') {
         return;
     }
     let updateInQueue = () => {
@@ -354,11 +352,8 @@ const toggleMapBtnHandler = async () => {
  * Handles changes to the map selector.
  */
 const mapSelectHandler = async () => {
-    if (!force_map.showMap) return;
     let selectedOption = document.getElementById('map_select').value;
-
     setTopojson(selectedOption);
-    return await updateViz();
 }
 
 // Create the force map. By default the map is shown and we shown the world map.

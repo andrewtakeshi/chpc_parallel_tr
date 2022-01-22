@@ -4,10 +4,11 @@ Authors: Andrew Golightly, Paul Fischer
 import flask
 from flask import request, jsonify
 from server import d3_conversion, d3_conversion_utils
+from flask_cors import CORS
 
 app = flask.Flask(__name__)
 app.config["DEBUG"] = True
-
+cors = CORS(app)
 
 @app.route('/', methods=['GET'])
 def home():

@@ -60,8 +60,7 @@
             word-wrap: break-word;
         }
 
-        div.checks
-        {
+        div.checks {
             position: relative;
         }
 
@@ -166,7 +165,7 @@
                 <div class="btn-group col-4 float-right">
 
                     <select id="map_select" class="form-select w-100"
-                            onchange="mapSelectHandler().then(data => force_map.setData(data));">
+                            onchange="mapSelectHandler();">
                         <option selected value="world">World</option>
                         <option value="us">Contiguous United States</option>
                         <option value="eu">Europe</option>
