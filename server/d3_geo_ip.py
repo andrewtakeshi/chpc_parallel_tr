@@ -4,7 +4,7 @@ Author: Andrew Golightly
 import requests
 import threading
 import re
-from server import d3_conversion_utils
+from server import d3_conversion_utils, config
 
 geo_cache = dict()
 
@@ -118,12 +118,7 @@ def add_geo_info_threaded(d3_json):
 
     for tr in d3_json['traceroutes']:
         # Use the UU Bookstore as an arbitrary "default" until a better one is found
-        last_known = {
-            'lat': 40.7637,
-            'lon': -111.8475,
-            'city': 'Salt Lake City',
-            'region': 'UT'
-        }
+        last_known = config.variables['default_location']
 
         # TODO: Assign undefined packets as average of the previous and next defined ones.
         for packet in tr['packets']:

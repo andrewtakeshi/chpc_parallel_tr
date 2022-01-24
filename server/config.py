@@ -1,10 +1,8 @@
 import yaml
 
-variables = {}
-
-defaults = {
-    'concurrent_run_current_limit': 10,
-    'concurrent_run_future_limit': 15,
+# Load sane defaults, will be replaced by the file.
+variables = {
+    'concurrent_run_limit': 10,
     'default_location': {
         'lat': 40.7637,
         'lon': -111.8475,
@@ -12,19 +10,13 @@ defaults = {
         'region': 'UT'
     },
     'interface_file': 'interfaces.json',
-    'interface_file_refresh_interval': 86400,
-    'test': 'foo',
-    'test2': 'bar'
+    'interface_refresh_interval': 86400
 }
 
-with open('server_conf.yaml', 'r') as stream:
-    for k, v in yaml.safe_load(stream).items():
+# Need the server/... when running as part of flask; not needed when running directly.
+# Load new values.
+with open('config.yaml', 'r') as stream:
+# with open('../config.yaml', 'r') as stream:
+    confs = yaml.safe_load_all(stream)
+    for k, v in next(confs).items():
         variables[k] = v
-
-variables_keys = variables.keys()
-
-for dk, dv in defaults.items():
-    if dk not in variables_keys:
-        variables[dk] = dv
-
-print(variables)

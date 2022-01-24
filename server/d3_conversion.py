@@ -9,7 +9,7 @@ import subprocess
 import requests
 import threading
 from icmplib import traceroute
-from server import d3_netbeam, d3_conversion_utils, d3_geo_ip, d3_rdap
+from server import d3_netbeam, d3_conversion_utils, d3_geo_ip, d3_rdap, config
 
 # TODO: Add locks to everything, and variabalize the max and min limit values.
 # lock + limiter are used to limit the number of concurrent traceroutes running
@@ -37,12 +37,12 @@ def pscheduler_to_d3(source, dest, num_runs=1):
 
     # Schedule traceroute using pscheduler (allows for remote sources)
     lock.acquire()
-    if limiter >= 10 or (limiter + num_runs) > 15:
-        print("Over the run limit. Please try again later.")
-        return None
+    if (limiter + num_runs) > config.variables['concurrent_run_limit']:
+        lock.release()
+        return {'error': 'over run limit'}
     else:
         limiter += num_runs
-    lock.release()
+        lock.release()
 
     for _ in range(num_runs):
         process_list.append(subprocess.Popen(['pscheduler', 'task', 'trace', '-s', source, '-d', dest],
@@ -273,13 +273,13 @@ def esmond_to_d3(source=None, dest=None, ts_min=None, ts_max=None,
         return None
 
 
-def system_copy_to_d3(trIn):
+def system_copy_to_d3(tr_in):
     """
     Takes a previously run traceroute and creates the appropriate JSON.
     Does not include source information (as source information is not provided by system traceroute).
     Accepts both Linux and Windows traceroute formats.
     No limiting in place, and quite possibly buggy. Just updated to work with the new schema.
-    :param trIn: Copied traceroute information.
+    :param tr_in: Copied traceroute information.
     :return: JSON ingestible by the d3 visualisation.
     """
     output = []
@@ -288,7 +288,7 @@ def system_copy_to_d3(trIn):
 
     linux = True
 
-    for line in trIn.splitlines():
+    for line in tr_in.splitlines():
         # For processing multiple traceroutes (i.e. pasting multiple runs in at once)
         if line.__contains__("Tracing") or line.__contains__("traceroute"):
             i += 1
@@ -356,11 +356,11 @@ def system_copy_to_d3(trIn):
         return None
 
 
-def system_to_d3_tw(dest, returnArray):
+def system_to_d3_tw(dest, return_array):
     """
     Thread specific work for system_to_d3_threaded. Each thread runs a single traceroute.
     :param dest: Traceroute destination
-    :param returnArray: Array to write results into
+    :param return_array: Array to write results into
     """
     # Run traceroute as subprocess - only do 1 time/hop to reduce time required.
     sp_stdout = subprocess.run(['traceroute', dest, '-q', '1'], stdout=subprocess.PIPE, universal_newlines=True).stdout
@@ -409,14 +409,14 @@ def system_to_d3_tw(dest, returnArray):
                 toAdd["ip"] = ip
                 toAdd["rtt"] = rtt.__round__(3)
                 res['packets'].append(toAdd)
-    returnArray.append(res)
+    return_array.append(res)
 
 
-def system_to_d3_threaded(dest, numRuns=1):
+def system_to_d3_threaded(dest, num_runs=1):
     """
     Runs a system traceroute to the desired destination - threaded.
     :param dest: Traceroute destination.
-    :param numRuns: Number of runs.
+    :param num_runs: Number of runs.
     :return: JSON ingestible by d3.
     """
     threads = []
@@ -426,11 +426,11 @@ def system_to_d3_threaded(dest, numRuns=1):
     if dest_ip is None:
         return {'error': 'Cannot resolve destination'}
 
-    if numRuns > 1:
-        for i in range(numRuns):
+    if num_runs > 1:
+        for i in range(num_runs):
             threads.append(threading.Thread(target=system_to_d3_tw, args=(dest_ip, returnArray,)))
             threads[i].start()
-        for i in range(numRuns):
+        for i in range(num_runs):
             threads[i].join()
     else:
         system_to_d3_tw(dest_ip, returnArray)
@@ -439,12 +439,12 @@ def system_to_d3_threaded(dest, numRuns=1):
     return add_additional_information(output)
 
 
-def system_to_d3(dest, numRuns=1):
+def system_to_d3(dest, num_runs=1):
     """
     Runs a system traceroute to the desired destination. Single threaded, but uses multiple subprocesses so it may
     actually be multithreaded under the hood, so to speak.
     :param dest: Traceroute destination.
-    :param numRuns: Number of runs.
+    :param num_runs: Number of runs.
     :return: JSON ingestible by the d3.
     """
 
@@ -459,26 +459,23 @@ def system_to_d3(dest, numRuns=1):
 
     # Check to make sure we can run the traceroute according to limiter.
     lock.acquire()
-    if limiter >= 10 or (limiter + numRuns) > 15:
+
+    if (limiter + num_runs) > config.variables['concurrent_run_limit']:
+        lock.release()
         return {'error': 'over run limit'}
         # print("Over the run limit. Please try again later.")
         # return None
     else:
-        limiter += numRuns
-    lock.release()
+        limiter += num_runs
+        lock.release()
 
     # Run each traceroute as a subprocess - Popen runs it in the background.
-    for _ in range(numRuns):
+    for _ in range(num_runs):
         processList.append(subprocess.Popen(['traceroute', dest], stdout=subprocess.PIPE, universal_newlines=True))
 
     # Wait for each subprocess to finish.
     for process in processList:
         process.wait()
-
-    # Decrement limiter after we have finished running the traceroutes.
-    lock.acquire()
-    limiter -= numRuns
-    lock.release()
 
     output = []
 
@@ -529,6 +526,11 @@ def system_to_d3(dest, numRuns=1):
         process.kill()
 
     output = {'traceroutes': output}
+
+    # Decrement limiter after we have finished running the traceroutes.
+    lock.acquire()
+    limiter -= num_runs
+    lock.release()
 
     return add_additional_information(output)
 

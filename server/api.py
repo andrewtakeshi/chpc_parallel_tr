@@ -3,17 +3,18 @@ Authors: Andrew Golightly, Paul Fischer
 """
 import flask
 from flask import request, jsonify
-from server import d3_conversion, d3_conversion_utils
+from server import d3_conversion, d3_conversion_utils, config
 from flask_cors import CORS
 import logging, sys
 
-logging.basicConfig(stream=sys.stderr, level=logging.DEBUG)
+logging.basicConfig(stream=sys.stderr, level=logging.INFO)
 
 app = flask.Flask(__name__)
+# Changed from True
 app.config["DEBUG"] = True
 cors = CORS(app)
 
-logging.debug('running api.py NOT MAIN')
+logging.info(config.variables)
 
 @app.route('/', methods=['GET'])
 def home():
