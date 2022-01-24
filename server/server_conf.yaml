@@ -1,0 +1,17 @@
+---
+concurrent_run_current_limit: 10
+concurrent_run_future_limit: 15
+default_location:
+  lat: 40.7637
+  lon: -111.8475
+  city: "Salt Lake City"
+  region: "UT"
+interface_file: "interfaces.json"
+interface_file_refresh_interval: 86400
+
+# Debatable whether these should be configurable.
+# geo_url: "http://ipwhois.app/json/"
+# netbeam_url: "http://netbeam.es.net"
+# asn_url: "https://api.iptoasn.com/v1/as/ip/"
+# rdap_url: "https://rdap.arin.net/registry/ip/"
+

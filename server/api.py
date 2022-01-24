@@ -5,10 +5,15 @@ import flask
 from flask import request, jsonify
 from server import d3_conversion, d3_conversion_utils
 from flask_cors import CORS
+import logging, sys
+
+logging.basicConfig(stream=sys.stderr, level=logging.DEBUG)
 
 app = flask.Flask(__name__)
 app.config["DEBUG"] = True
 cors = CORS(app)
+
+logging.debug('running api.py NOT MAIN')
 
 @app.route('/', methods=['GET'])
 def home():
@@ -88,4 +93,5 @@ def traceroutes():
 
 
 if __name__ == '__main__':
+    logging.debug('running api.py from main')
     app.run(host='0.0.0.0')
