@@ -1,4 +1,4 @@
-## Folder Structure
+## Contents
 
 - api.py: Flask app used to host a REST API with which users (most typically the accompanying frontend to this project) can query to run traceroutes.
 - d3_conversion.py: Code pertaining to converting traceroute output to format ingestible by d3. Functions here should return a python dictionary which is then converted to actual JSON inside of api.py. The about page (about.html) contains the basic structure of the expected JSON. 

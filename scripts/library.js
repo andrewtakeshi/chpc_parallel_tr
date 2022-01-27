@@ -1,5 +1,3 @@
-// TODO: Make these constants that are loaded from a config file. This should be done everywhere that constants like
-//  this are used.
 //const api_server = 'network-viz.chpc.utah.edu:8081'
 const api_server = '127.0.0.1:5000';
 const tr_api = '/api/v1/resources/traceroutes';
