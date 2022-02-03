@@ -1,5 +1,7 @@
 """
 Author: Andrew Golightly
+Deprecated - see d3_stardust instead. Functionally the two are the same, however due to ESNet deprecating the Netbeam
+API we have moved to Stardust, their Elasticsearch based replacement for Netbeam.
 """
 
 from os import path, stat as osstat, chmod
@@ -391,3 +393,4 @@ def add_netbeam_info_db_threaded(d3_json, db_path='netbeam_ip.db'):
         thread.join()
 
     con.close()
+

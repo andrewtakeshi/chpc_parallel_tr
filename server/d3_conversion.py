@@ -9,7 +9,7 @@ import subprocess
 import requests
 import threading
 from icmplib import traceroute
-from server import d3_netbeam, d3_conversion_utils, d3_geo_ip, d3_rdap, config
+from server import d3_conversion_utils, d3_geo_ip, d3_rdap, config, d3_stardust #d3_netbeam
 
 # TODO: Add locks to everything, and variabalize the max and min limit values.
 # lock + limiter are used to limit the number of concurrent traceroutes running
@@ -268,7 +268,7 @@ def esmond_to_d3(source=None, dest=None, ts_min=None, ts_max=None,
 
     # Return output if captured. Return none otherwise.
     if len(output) != 0:
-        return d3_netbeam.add_netbeam_info_threaded({'traceroutes': output})
+        return add_additional_information(output)
     else:
         return None
 
@@ -351,7 +351,7 @@ def system_copy_to_d3(tr_in):
                     output[i]["packets"].append(toAdd)
             output[i]["target_address"] = ip
     if len(output) != 0:
-        return d3_netbeam.add_netbeam_info_threaded({'traceroutes': output})
+        return add_additional_information(output)
     else:
         return None
 
@@ -557,10 +557,12 @@ def add_additional_information(d3_json):
     functions called here should modify the JSON in place and should not return anything.
     :return: Modified version of d3_json.
     """
+    # TODO: Compare cost of parallel => sequential to parallel => parallel and (current) sequential => parallel.
     remove_unknowns(d3_json)
-    d3_netbeam.add_netbeam_info_threaded(d3_json)
+    d3_stardust.add_sd_info_threaded(d3_json)
     d3_geo_ip.add_geo_info_threaded(d3_json)
     d3_rdap.rdap_threaded(d3_json)
+    # d3_netbeam.add_netbeam_info_threaded(d3_json)
     # d3_json = d3_rdap.rdap_cache_threaded(d3_json)
     # d3_json = d3_geo_ip.add_geo_info_naive(d3_json)
     # d3_json = d3_netbeam.add_netbeam_info_db_naive(d3_json)

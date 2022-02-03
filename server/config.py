@@ -10,13 +10,14 @@ variables = {
         'region': 'UT'
     },
     'interface_file': 'interfaces.json',
+    'sd_interface_file': 'sd_interfaces.json',
     'interface_refresh_interval': 86400
 }
 
 # Need the server/... when running as part of flask; not needed when running directly.
 # Load new values.
-with open('config.yaml', 'r') as stream:
-# with open('../config.yaml', 'r') as stream:
+# with open('config.yaml', 'r') as stream:
+with open('../config.yaml', 'r') as stream:
     confs = yaml.safe_load_all(stream)
     for k, v in next(confs).items():
         variables[k] = v

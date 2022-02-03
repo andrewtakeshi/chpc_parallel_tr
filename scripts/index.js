@@ -4,28 +4,6 @@ let hiddenNTTs = ({"traceroutes": []});
 // const pscheduler_timeout = 25000;
 // const system_timeout = 10000;
 let inQueue = 0;
-let config = {};
-
-/**
- * Load some variables from config file.
- * TODO: Think about using JSON instead so we don't need to pull in jsyaml for this small thing.
- */
-$.get('config.yaml')
-    .done(data => {
-        config = jsyaml.loadAll(data)[1];
-    })
-    .fail(_ => {
-        config = {
-            'api_server': '127.0.0.1:5000',
-            'tr_api': '/api/v1/resources/traceroutes',
-            'remote_timeout': 25000,
-            'system_timeout': 10000
-        }
-    })
-    .always(_ => {
-        Object.freeze(config);
-    });
-
 
 /**
  * Handles pressing the reset button. Calls updateViz() after reset.
@@ -378,8 +356,9 @@ const mapSelectHandler = async () => {
     setTopojson(selectedOption);
 }
 
-// Create the force map. By default the map is shown and we shown the world map.
 const force_map = new ForceMap('#d3_vis');
 setTopojson('world');
+
+
 
 
