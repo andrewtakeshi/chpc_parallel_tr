@@ -1,0 +1,28 @@
+# Server side (i.e. backend) variables
+---
+concurrent_run_limit: 10
+default_location:
+  lat: 40.7637
+  lon: -111.8475
+  city: "Salt Lake City"
+  region: "UT"
+interface_file: "interfaces.json"
+sd_interface_file: "sd_interfaces.json"
+interface_refresh_interval: 86400
+
+# Debatable whether these should be configurable.
+# geo_url: "http://ipwhois.app/json/"
+# netbeam_url: "http://netbeam.es.net"
+# asn_url: "https://api.iptoasn.com/v1/as/ip/"
+# rdap_url: "https://rdap.arin.net/registry/ip/"
+...
+
+# Client side (i.e. frontend) variables
+---
+api_server: "127.0.0.1:5000"
+tr_api: "/api/v1/resources/traceroutes"
+remote_timeout: 25000
+system_timeout: 10000
+min_zoom: 1
+max_zoom: 10
+...

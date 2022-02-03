@@ -1,4 +1,4 @@
-## Folder Structure
+## Contents
 
 - api.py: Flask app used to host a REST API with which users (most typically the accompanying frontend to this project) can query to run traceroutes.
 - d3_conversion.py: Code pertaining to converting traceroute output to format ingestible by d3. Functions here should return a python dictionary which is then converted to actual JSON inside of api.py. The about page (about.html) contains the basic structure of the expected JSON. 
@@ -41,14 +41,14 @@ git pull
 # Make api.wsgi executable
 chmod +x api.wsgi
 # Make interfaces.json read/write accessible to everyone
-chmod 666 interfaces.json
-```
-Use your favorite text editor to change `/var/www/html/demo/scripts/library` to point to the correct API server address. If deploying on network-viz this can be done by uncommenting the first line and commenting out the second; however, on other systems the actual API server will need to be specified.
-```
+chmod 660 interfaces.json
+chown apache interfaces.json && chgrp apache interfaces.json
 systemctl restart httpd
 ```
 
-If you run into any issues testing the API endpoint separately is a good place to start (located on port 8081). From there, reading the log (`/var/log/httpd/error.log`) should be enough to find the source of any issues. 
+Change `/var/www/html/demo/scripts/library.js` to point to the correct API server address, if needed. By default it uses `127.0.0.1:8081` (i.e. `localhost:8081`); this should be sufficient for most use cases. However, it can be helpful to use a different API server especially when debugging. It may also be beneficial or desired to split the frontend from the backend and this allows us to do so. 
+
+If you run into any issues testing the API endpoint separately is a good place to start (located on port 8081). From there, reading the log (`/var/log/httpd/error.log`) should be enough to find the source of any issues.
 
 ## Future Steps
 

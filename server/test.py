@@ -5,6 +5,7 @@ from server import d3_conversion as d3c
 from server import d3_conversion_utils
 from server import d3_netbeam
 from server import d3_geo_ip
+from server import d3_stardust
 import time
 import difflib
 import datetime
@@ -34,16 +35,28 @@ import subprocess
 
 # print(d3_conversion_utils.ip_to_geo('155.101.8.18'))
 
-d3_json = {'traceroutes': [{'ts': 1624404238, 'source_address': '199.192.103.26', 'target_address': '134.55.200.107',
-                            'packets': [{'ttl': 0, 'ip': '199.192.103.26', 'rtt': 0},
-                                        {'ttl': 1, 'ip': '192.168.0.1', 'rtt': 0.497}, {'ttl': 2}, {'ttl': 3},
-                                        {'ttl': 4, 'ip': '162.252.180.54', 'rtt': 3.617},
-                                        {'ttl': 5, 'ip': '206.81.81.102', 'rtt': 23.235},
-                                        {'ttl': 6, 'ip': '134.55.42.38', 'rtt': 46.971},
-                                        {'ttl': 7, 'ip': '134.55.49.58', 'rtt': 56.925},
-                                        {'ttl': 8, 'ip': '134.55.43.81', 'rtt': 67.723},
-                                        {'ttl': 9, 'ip': '134.55.36.46', 'rtt': 82.676},
-                                        {'ttl': 10, 'ip': '134.55.200.107', 'rtt': 83.436}]}]}
+# d3_json = {'traceroutes': [{'ts': 1624404238, 'source_address': '199.192.103.26', 'target_address': '134.55.200.107',
+#                             'packets': [{'ttl': 0, 'ip': '199.192.103.26', 'rtt': 0},
+#                                         {'ttl': 1, 'ip': '192.168.0.1', 'rtt': 0.497}, {'ttl': 2}, {'ttl': 3},
+#                                         {'ttl': 4, 'ip': '162.252.180.54', 'rtt': 3.617},
+#                                         {'ttl': 5, 'ip': '206.81.81.102', 'rtt': 23.235},
+#                                         {'ttl': 6, 'ip': '134.55.42.38', 'rtt': 46.971},
+#                                         {'ttl': 7, 'ip': '134.55.49.58', 'rtt': 56.925},
+#                                         {'ttl': 8, 'ip': '134.55.43.81', 'rtt': 67.723},
+#                                         {'ttl': 9, 'ip': '134.55.36.46', 'rtt': 82.676},
+#                                         {'ttl': 10, 'ip': '134.55.200.107', 'rtt': 83.436}]}]}
+
+d3_json = {'traceroutes': [{'ts': 1643913620, 'source_address': '192.168.1.121', 'target_address': '134.55.220.77',
+                            'packets': [{'ttl': 0, 'ip': '192.168.1.121', 'rtt': 0},
+                                        {'ttl': 1, 'ip': '192.168.1.1', 'rtt': 0.51}, {'ttl': 2}, {'ttl': 3},
+                                        {'ttl': 4, 'ip': '162.252.180.54', 'rtt': 3.241},
+                                        {'ttl': 5, 'ip': '206.81.81.102', 'rtt': 39.399},
+                                        {'ttl': 6, 'ip': '134.55.56.15', 'rtt': 38.692},
+                                        {'ttl': 7, 'ip': '134.55.57.44', 'rtt': 48.453},
+                                        {'ttl': 8, 'ip': '134.55.56.242', 'rtt': 52.209},
+                                        {'ttl': 9, 'ip': '134.55.56.163', 'rtt': 65.207},
+                                        {'ttl': 10, 'ip': '134.55.56.12', 'rtt': 151.206},
+                                        {'ttl': 11, 'ip': '134.55.220.77', 'rtt': 151.613}]}]}
 
 # print(d3c.system_to_d3_old('8.8.8.8'))
 
@@ -172,3 +185,9 @@ url = 'http://netbeam.es.net/api/network/esnet/prod/interfaces'
 #                         print(f'{i}.{j}.{k}.{l}')
 # print(counter)
 # assert(counter == pow(2, 24) + pow(2, 20) + pow(2, 16))
+
+d3_json_clean = d3_json.copy()
+d3_stardust.add_sd_info_threaded(d3_json_clean)
+print(d3_json_clean)
+d3_netbeam.add_netbeam_info_threaded(d3_json)
+print(d3_json)

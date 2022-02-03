@@ -1,8 +1,11 @@
 """
 Author: Andrew Golightly
+Deprecated - see d3_stardust instead. Functionally the two are the same, however due to ESNet deprecating the Netbeam
+API we have moved to Stardust, their Elasticsearch based replacement for Netbeam.
 """
 
 from os import path, stat as osstat, chmod
+from server import config
 import stat
 import json
 import time
@@ -11,6 +14,7 @@ import requests
 import re
 import sqlite3
 import calendar
+
 
 NETBEAM_URL = "http://netbeam.es.net"
 
@@ -138,7 +142,7 @@ def ip_to_resource_dict(filePath=None):
     :return: None
     """
     if filePath is None:
-        filePath = 'interfaces.json'
+        filePath = config.variables['interface_file']
 
     with open(filePath, 'wt') as f:
         res = {}
@@ -185,11 +189,11 @@ def load_netbeam_cache(source_path):
     :return: Dictionary that maps IP => { resource : <value>, speed : <value> }.
     """
     if source_path is None:
-        source_path = 'interfaces.json'
+        source_path = config.variables['interface_file']
     if not path.exists(source_path):
         ip_to_resource_dict(source_path)
 
-    if time.time() - osstat(source_path).st_mtime > 60 * 60 * 24:
+    if time.time() - osstat(source_path).st_mtime > config.variables['interface_refresh_interval']:
         ip_to_resource_dict(source_path)
 
     with open(source_path, 'r') as f:
@@ -389,3 +393,4 @@ def add_netbeam_info_db_threaded(d3_json, db_path='netbeam_ip.db'):
         thread.join()
 
     con.close()
+

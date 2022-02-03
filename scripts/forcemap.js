@@ -30,6 +30,7 @@ class ForceMap {
             .style('margin', 'auto');
 
         this.zoom = d3.zoom()
+            // TODO: possibly get working w/ config file - currently load of config happens after load of this for whatever reason.
             .scaleExtent([1, 10])
             .translateExtent([[-this.width + 150, -this.height + 150], [2 * this.width - 150, 2 * this.width - 150]])
             // We use double click for something else, so we override the zoom behaviour for this event.
@@ -171,6 +172,11 @@ class ForceMap {
             d3.select('#forceGroup')
                 .attr('transform', d3.event.transform);
         }
+    }
+
+    clamp(v, lo, hi)
+    {
+        return v < lo ? lo : v > hi ? hi : v;
     }
 
     /**
@@ -353,9 +359,7 @@ class ForceMap {
         let simulation = this.simulation;
         let width = this.width;
         let height = this.height;
-
-        // Prevent dragging beyond the width and height of the SVG.
-        let clamp = (v, lo, hi) => v < lo ? lo : v > hi ? hi : v;
+        let that = this;
 
         function dragstarted(d) {
             if (!d3.event.active) {
@@ -369,8 +373,8 @@ class ForceMap {
         }
 
         function dragged(d) {
-            d.fx = clamp(d3.event.x, 0, width);
-            d.fy = clamp(d3.event.y, 0, height);
+            d.fx = that.clamp(d3.event.x, 0, width);
+            d.fy = that.clamp(d3.event.y, 0, height);
         }
 
         function dragended(d) {
@@ -414,7 +418,7 @@ class ForceMap {
                 }
             }
         }
-        
+
         this.update();
     }
 
@@ -755,7 +759,6 @@ class ForceMap {
             .join('g')
             .classed('single_node', true);
 
-        // Select based on map instead of nodes because we don't zoom unless map is displayed
         let zoomOutline = this.mapG.selectAll('path').node();
         let zoomDenominator = zoomOutline ? d3.zoomTransform(zoomOutline).k : 1;
 
@@ -859,6 +862,7 @@ class ForceMap {
         /* ###### Helpers and Handlers ####### */
 
         // Helper method to get traffic info from Netbeam-polled nodes into acceptable format for secondary d3 vis.
+        // TODO: with move to stardust, change format of incoming packets and remove this
         function generateTrafficInfo(packets) {
             let trafficInfo = new Map();
             for (let packet of packets) {

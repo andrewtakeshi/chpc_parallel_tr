@@ -1,8 +1,8 @@
 let visibleNTTs = ({"traceroutes": []});
 let hiddenNTTs = ({"traceroutes": []});
 // Timeout values - pscheduler is 25 sec, system is 10 sec
-const pscheduler_timeout = 25000;
-const system_timeout = 10000;
+// const pscheduler_timeout = 25000;
+// const system_timeout = 10000;
 let inQueue = 0;
 
 /**
@@ -248,7 +248,7 @@ const e2eBtnHandler = async (source, dest, num_runs, uuid) => {
     inQueue += parseInt(num_runs);
     updateInQueue();
     // Run the traceroute (with timeout)
-    let result = await timeout(runTraceroute(source, dest, num_runs), source ? pscheduler_timeout : system_timeout)
+    let result = await timeout(runTraceroute(source, dest, num_runs), source ? config.remote_timeout : config.system_timeout)
         .then(
             // OnFulfillment
             (value) => {
@@ -356,6 +356,9 @@ const mapSelectHandler = async () => {
     setTopojson(selectedOption);
 }
 
-// Create the force map. By default the map is shown and we shown the world map.
 const force_map = new ForceMap('#d3_vis');
 setTopojson('world');
+
+
+
+
