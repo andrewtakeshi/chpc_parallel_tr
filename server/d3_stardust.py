@@ -59,8 +59,13 @@ def sd_traffic_by_time_range(resource='wash-cr6::atla-bb-a'):
         for hit in hits:
             fields = hit['fields']
             ts = hit['sort'][0]
-            traffic.append([ts, fields['values.in_bits.delta'][0], fields['values.out_bits.delta'][0]])
-
+            if 'values.in_bits.delta' in fields.keys():
+                traffic.append([ts, fields['values.in_bits.delta'][0], fields['values.out_bits.delta'][0]])
+            if 'values.in_discards.delta' in fields.keys():
+                discards.append([ts, fields['values.in_discards.delta'][0], fields['values.out_discards.delta'][0]])
+                errors.append([ts, fields['values.in_errors.delta'][0], fields['values.out_errors.delta'][0]])
+                unicast_packets.append(
+                    [ts, fields['values.in_ucast_pkts.delta'][0], fields['values.out_ucast_pkts.delta'][0]])
         return {'traffic': traffic,
                 'unicast_packets': unicast_packets,
                 'errors': errors,

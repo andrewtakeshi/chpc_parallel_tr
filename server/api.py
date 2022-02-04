@@ -3,7 +3,7 @@ Authors: Andrew Golightly, Paul Fischer
 """
 import flask
 from flask import request, jsonify
-from server import d3_conversion, d3_conversion_utils, config
+from server import config, d3_conversion_utils, d3_conversion
 from flask_cors import CORS
 import logging, sys
 

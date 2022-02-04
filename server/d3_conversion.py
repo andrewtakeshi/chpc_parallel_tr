@@ -9,7 +9,7 @@ import subprocess
 import requests
 import threading
 from icmplib import traceroute
-from server import d3_conversion_utils, d3_geo_ip, d3_rdap, config, d3_stardust #d3_netbeam
+from server import config, d3_conversion_utils, d3_geo_ip, d3_rdap, d3_stardust  # d3_netbeam
 
 # TODO: Add locks to everything, and variabalize the max and min limit values.
 # lock + limiter are used to limit the number of concurrent traceroutes running
@@ -562,8 +562,4 @@ def add_additional_information(d3_json):
     d3_stardust.add_sd_info_threaded(d3_json)
     d3_geo_ip.add_geo_info_threaded(d3_json)
     d3_rdap.rdap_threaded(d3_json)
-    # d3_netbeam.add_netbeam_info_threaded(d3_json)
-    # d3_json = d3_rdap.rdap_cache_threaded(d3_json)
-    # d3_json = d3_geo_ip.add_geo_info_naive(d3_json)
-    # d3_json = d3_netbeam.add_netbeam_info_db_naive(d3_json)
     return d3_json

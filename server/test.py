@@ -186,8 +186,10 @@ url = 'http://netbeam.es.net/api/network/esnet/prod/interfaces'
 # print(counter)
 # assert(counter == pow(2, 24) + pow(2, 20) + pow(2, 16))
 
-d3_json_clean = d3_json.copy()
-d3_stardust.add_sd_info_threaded(d3_json_clean)
-print(d3_json_clean)
-d3_netbeam.add_netbeam_info_threaded(d3_json)
-print(d3_json)
+# d3_json_clean = d3_json.copy()
+# d3_stardust.add_sd_info_threaded(d3_json_clean)
+# print(d3_json_clean)
+# d3_netbeam.add_netbeam_info_threaded(d3_json)
+# print(d3_json)
+
+d3_stardust.sd_traffic_by_time_range()
