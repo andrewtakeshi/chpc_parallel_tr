@@ -16,8 +16,8 @@ variables = {
 
 # Need the server/... when running as part of flask; not needed when running directly.
 # Load new values.
-# with open('config.yaml', 'r') as stream:
-with open('../config.yaml', 'r') as stream:
+with open('config.yaml', 'r') as stream:
+# with open('../config.yaml', 'r') as stream:
     confs = yaml.safe_load_all(stream)
     for k, v in next(confs).items():
         variables[k] = v

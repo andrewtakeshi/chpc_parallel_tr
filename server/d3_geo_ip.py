@@ -4,7 +4,7 @@ Author: Andrew Golightly
 import requests
 import threading
 import re
-from server import d3_conversion_utils, config
+from server import config, d3_conversion_utils
 
 geo_cache = dict()
 
