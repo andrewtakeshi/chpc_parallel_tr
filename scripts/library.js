@@ -13,6 +13,7 @@ const runTraceroute = async (source, dest, num_runs) => {
     api_call += `&num_runs=${num_runs}`;
     // console.log(`Requesting ${api_call}`);
     try {
+        // TODO: Look @ adding callback function to stop spinner
         return await d3.json(api_call);
     } catch (e) {
         // Return 'Network Error' if the request fails. This is displayed in the CR table.

@@ -1,5 +1,5 @@
-let visibleNTTs = ({"traceroutes": []});
-let hiddenNTTs = ({"traceroutes": []});
+let visibleNTTs = ({ "traceroutes": [] });
+let hiddenNTTs = ({ "traceroutes": [] });
 // Timeout values - pscheduler is 25 sec, system is 10 sec
 // const pscheduler_timeout = 25000;
 // const system_timeout = 10000;
@@ -79,7 +79,7 @@ function addToCRTable(uuid) {
  * Adds a timeout to the API calls - this can be adjusted above
  */
 const timeout = (prom, time) => Promise.race([prom, new Promise((res) => setTimeout(
-    () => res({'error': 'Timed out'}),
+    () => res({ 'error': 'Timed out' }),
     time))]);
 
 /**
@@ -313,6 +313,8 @@ function setTopojson(selectedOption) {
             break;
     }
 
+    console.log(`selected ${resourceString}`);
+
     // Load the resource then perform any necessary filtering
     d3.json(resourceString).then(data => {
         data = topojson.feature(data, data.objects[Object.keys(data.objects)[0]]);
@@ -343,7 +345,8 @@ const toggleMapBtnHandler = async () => {
     force_map.toggleMap();
     force_map.setSimulation();
 
-    document.getElementById('map_toggle_btn').innerHTML = force_map.showMap ? 'Hide Map' : 'Show Map';
+    document.getElementById('map_toggle_btn').innerHTML = force_map.showMap ? '<i class="fas fa-project-diagram"></i> Network View' : '<i class="fas fa-map"></i> Map View';
+    document.getElementById('map_select').classList = force_map.showMap ? 'form-select col-12' : 'd-none';
 
     return await updateViz();
 }
@@ -356,9 +359,61 @@ const mapSelectHandler = async () => {
     setTopojson(selectedOption);
 }
 
-const force_map = new ForceMap('#d3_vis');
+/**
+ * waiter
+ * Borrowed from https://stackoverflow.com/questions/2854407/javascript-jquery-window-resize-how-to-fire-after-the-resize-is-completed
+ */
+let waitForFinalEvent = (function () {
+    let timers = {};
+    return function (callback, ms, uniqueId) {
+      if (!uniqueId) {
+        uniqueId = "Don't call this twice without a uniqueId";
+      }
+      if (timers[uniqueId]) {
+        clearTimeout (timers[uniqueId]);
+      }
+      timers[uniqueId] = setTimeout(callback, ms);
+    };
+  })();
+
+$(window).resize(function () {
+    waitForFinalEvent(function(){
+        let newWidth = d3.select('#d3_vis').node().clientWidth;
+        force_map.resize(newWidth, 0.75 * newWidth);
+    }, 50, "windowResize");
+});
+
+function resizeHandler() {
+    // document.getElementById('d3_vis').innerHTML = '';
+    // force_map = new ForceMap('#d3_vis', force_map.geojson);
+    // updateViz().then(data => force_map.setData(data));
+    let force_parent = d3.select('#d3_vis').node();
+    force_map.resize(force_parent.clientWidth, 0.75 * force_parent.clientWidth);
+}
+
+function checkZoomLevels(newZoom)
+{
+    let extent = force_map.zoom.scaleExtent();
+    console.log(extent[1]);
+    if (newZoom == extent[0])
+    {
+        d3.select('#zoom_out').attr('disabled', true);
+        d3.select('#zoom_reset').attr('disabled', true);
+        d3.select('#zoom_in').attr('disabled', null);
+    }
+    else if (newZoom === extent[1])
+    {
+        d3.select('#zoom_in').attr('disabled', true);
+        d3.select('#zoom_out').attr('disabled', null);
+    }
+    else
+    {
+        d3.select('#zoom_out').attr('disabled', null);
+        d3.select('#zoom_in').attr('disabled', null);
+        d3.select('#zoom_reset').attr('disabled', null);
+    }
+}
+
+// Create the force map. By default the map is shown and we shown the world map.
+let force_map = new ForceMap('#d3_vis');
 setTopojson('world');
-
-
-
-
