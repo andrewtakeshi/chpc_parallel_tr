@@ -174,8 +174,7 @@ class ForceMap {
         }
     }
 
-    clamp(v, lo, hi)
-    {
+    clamp(v, lo, hi) {
         return v < lo ? lo : v > hi ? hi : v;
     }
 
@@ -430,6 +429,7 @@ class ForceMap {
      * errors, and unicast packets) should be added. By default this is false, and should only be set to true for the
      * pinned tooltips.
      */
+    // TODO: Add second scale for packet & error data.
     netbeamGraph(trafficInfo, div, checks = false) {
         let margin = {top: 30, right: 200, bottom: 30, left: 60};
 
@@ -470,19 +470,36 @@ class ForceMap {
 
         let valsArr = [...trafficInfo.values()];
 
-        let ts_filter = (obj) => {
-            let vals = [];
-            for (let key of Object.keys(obj)) {
-                if (key !== 'ts') {
-                    vals.push(obj[key]);
+        let ts_filter = (valsArr) => {
+            let retArr = [];
+            for (let val of valsArr) {
+                for (let key of Object.keys(val)) {
+                    if (key !== 'ts') {
+                        retArr.push(val[key]);
+                    }
                 }
             }
-            return vals;
+            return retArr;
         }
 
-        // Combined min/max of all properties - time stamp.
-        let min = d3.min(valsArr.map(d => d3.min(ts_filter(d))));
-        let max = d3.max(valsArr.map(d => d3.max(ts_filter(d))));
+        let other_filter = (valsArr) => {
+            let retArr = [];
+            for (let val of valsArr) {
+                let keys = Object.keys(val);
+                if (keys.includes("errors_in")) {
+                    for (let key of keys) {
+                        if (key !== 'ts' && !key.includes('traffic')) {
+                            retArr.push(val[key]);
+                        }
+                    }
+                }
+            }
+            return retArr;
+        }
+
+        // Combined min/max of all properties minus time stamp.
+        let min = d3.min(ts_filter(valsArr));
+        let max = d3.max(ts_filter(valsArr));
 
         let yScale = d3.scaleLinear()
             .domain([min, max])
@@ -493,6 +510,11 @@ class ForceMap {
                 .ticks(6)
                 .tickFormat(d => d3.format('~s')(d) + 'bps'));
 
+        let other_min = d3.min(other_filter(valsArr));
+        let other_max = d3.max(other_filter(valsArr));
+
+        let other_yscale = d3.scaleLinear().domain([other_min, other_max]).range([height, 0]);
+
         let add_path_and_circs = (measurement, color) => {
 
             if (d3.select(`#${measurement}_line_${div.attr('id')}`).node() !== null) {
@@ -500,6 +522,15 @@ class ForceMap {
                 d3.select(`#${measurement}_circs_${div.attr('id')}`).remove();
                 return;
             }
+
+            let selectedYScale;
+
+            if (measurement.includes("traffic")) {
+                selectedYScale = yScale;
+            } else {
+                selectedYScale = other_yscale;
+            }
+
 
             trafficGraph.append('path')
                 .attr('id', `${measurement}_line_${div.attr('id')}`)
@@ -509,8 +540,9 @@ class ForceMap {
                 .attr('stroke-width', 1.5)
                 .attr('d', d3.line()
                     .x(d => xScale(d.ts))
-                    .y(d => yScale(d[measurement]))
-                    .curve(d3.curveMonotoneX));
+                    .y(d => selectedYScale(d[measurement]))
+                    .curve(d3.curveMonotoneX)
+                );
 
             trafficGraph.append('g')
                 .attr('id', `${measurement}_circs_${div.attr('id')}`)
@@ -520,7 +552,7 @@ class ForceMap {
                 .attr('r', 1.5)
                 .attr('fill', color)
                 .attr('cx', d => xScale(d.ts))
-                .attr('cy', d => yScale(d[measurement]));
+                .attr('cy', d => selectedYScale(d[measurement]));
 
         }
 
@@ -532,6 +564,11 @@ class ForceMap {
             .range(['steelblue', 'red', 'blue', 'crimson', 'cadetblue', 'darksalmon', 'skyblue', 'violet']);
 
         if (checks) {
+
+            // trafficGraph.append('g')
+            //     .attr('id', 'otheryaxis')
+            //     .call(d3.axisRight(other_yscale));
+
             let boxes = div.append('div')
                 .style('position', 'absolute')
                 .style('top', `${margin.top}px`)
@@ -863,6 +900,7 @@ class ForceMap {
 
         // Helper method to get traffic info from Netbeam-polled nodes into acceptable format for secondary d3 vis.
         // TODO: with move to stardust, change format of incoming packets and remove this
+        // TODO: Scale the traffic data?
         function generateTrafficInfo(packets) {
             let trafficInfo = new Map();
             for (let packet of packets) {
@@ -882,6 +920,7 @@ class ForceMap {
                     }
                 }
             }
+            // console.log(trafficInfo);
             return trafficInfo;
         }
 

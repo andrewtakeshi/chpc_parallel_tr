@@ -25,8 +25,18 @@
 - [UU DataVis Course](https://www.dataviscourse.net/2020/schedule/) - I highly recommend this. Prof. Lex does an excellent job of making D3 accessible and easy to understand. Hopefully the videos stay online, but if they go down for whatever reason the D3 related pages linked in the schedule should stay up and be accessible. 
 - [D3 API Reference](https://github.com/d3/d3/blob/main/API.md) - If you have questions on how to use something, the API reference is a good place to start. Each submodule (i.e. d3-geo) is also linked here, so it's easier to go here and search than to try and track down the appropriate submodule.
 - I don't have any particularly great examples; however, if you search what you're trying to do, typically [bost.ocks.org](https://bost.ocks.org/mike/) (created by Mike Bostock, the creator of D3) has good examples. I think starting with D3V5 he has been putting more of his work on [Observable](https://observablehq.com/@mbostock), so that's a good place to look as well. The D3 community has done incredible things with the library, so it's hard to find something that someone somewhere hasn't already tried to do (or at least something similar). 
-- For Python, I recommend that you use PyCharm. The community version is free, but as a student Jetbrains allows access to the professional version. 
+- For Python, I recommend that you use PyCharm. The community version is free, but as a student Jetbrains allows access to the professional version. VS Code is also an excellent alternative. 
 - If you use a virtual environment with python (highly recommended) you can install all the required packages by loading the venv and running `pip3 install -r requirements.txt` while in the root folder of this project. For reference, I have been using Python3.6, although newer versions should also work.
+
+## Local Testing
+### Backend
+- Pycharm: Create a new run configuration. This can be done by clicking on the dropdown next to the run button in the top right corner and then selecting "Edit Configurations". Alternatively, in the top toolbar, select Run > Edit Configurations. Then, click the "+" button to add a new configuration and select "Flask server" as the configuration type. Set the target to `<path_to_root_folder>/server/api.py`, and change the working directory to be just the path to the root folder. 
+- Other: First, we must load the virtual environment (if using one). To do so, run `. <path_to_venv_root>/bin/activate`. Once the virtual environment is loaded, we have to set the `FLASK_APP` variable. Assuming you're in the root folder for this project, you can do so by running `export FLASK_APP='server/api'`. Then, just run `flask run` to run the API server. If you would like to  specify a different port, run `flask run -p <port>`.
+
+###Frontend
+- Pycharm: Open `index.html`, and select the browser icon in the top right corner that you want to open the frontend in. Pycharm will automatically run a server to open the page. 
+- Other: In the root directory of the project, run `python -m http.server`. By default, this will run on port 8000; however, if you'd like to run it on a different port, use `python -m http.server <port>`. Then, using your browser of choice, navigate to `0.0.0.0:<port>` and the frontend should load automatically. 
+
     
 ## Deployment Instructions (network-viz)
 
@@ -40,9 +50,9 @@ cd demo
 git pull
 # Make api.wsgi executable
 chmod +x api.wsgi
-# Make interfaces.json read/write accessible to everyone
-chmod 660 interfaces.json
-chown apache interfaces.json && chgrp apache interfaces.json
+# Make sd_interfaces.json read/write accessible to everyone
+chmod 660 sd_interfaces.json
+chown apache sd_interfaces.json && chgrp apache sd_interfaces.json
 systemctl restart httpd
 ```
 
@@ -67,3 +77,4 @@ There are lots of things left to do with this project; when I was going through 
 - Add a visual indicator to show that the visualization is processing; currently, the traceroute finishes and it takes several seconds for the visualization to show up. Similarly, optimizing the visualization (i.e. replacing remove/read calls with joins, if possible) could help with this.
 - Add a way to collapse expanded nodes back into their org WITHOUT completely refreshing the visualization.
 - Stop updates on single org nodes from updating the entire visualization when "expanded".
+- Separate the d3 vis. Consider loading them as iframes in the tooltip. Also explore doing a "streaming" load of the data in a seperate "more info" page similar to the way that esNet does it. 

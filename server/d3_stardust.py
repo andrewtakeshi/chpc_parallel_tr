@@ -2,6 +2,7 @@ import json
 import stat
 import threading
 import time
+from datetime import datetime
 from os import chmod, path, stat as osstat
 
 import elasticsearch
@@ -11,7 +12,7 @@ from server import config
 es = elasticsearch.Elasticsearch(hosts=['https://el.gc1.prod.stardust.es.net:9200'], timeout=30)
 
 
-def sd_traffic_by_time_range(resource='wash-cr6::atla-bb-a'):
+def sd_traffic_by_time_range(resource='lond-cr5::to_tenet_ip-b'):
     try:
         r = es.search(index='sd_public_interfaces',
                       body=
@@ -34,7 +35,12 @@ def sd_traffic_by_time_range(resource='wash-cr6::atla-bb-a'):
                               'values.out_bits.delta',
                               'values.out_discards.delta',
                               'values.out_errors.delta',
-                              'values.out_ucast_pkts.delta'
+                              'values.out_ucast_pkts.delta',
+
+                              'values.in_bcast_pkts.delta',
+                              'values.in_mcast_pkts.delta',
+                              'values.in_pkts.delta',
+                              'values.in_v4_pkts.delta'
                           ],
                           'query': {
                               'bool': {
@@ -51,21 +57,38 @@ def sd_traffic_by_time_range(resource='wash-cr6::atla-bb-a'):
 
         hits = r['hits']['hits']
 
+        # for hit in hits:
+        #     _time = hit["sort"][0] / 1000
+        #     print(f'{datetime.utcfromtimestamp(_time)}: {hit["fields"]}')
+
         discards = []
         errors = []
         traffic = []
         unicast_packets = []
 
+        divisor = 1
+
+        # TODO: Figure out why there is a 30x scaling between input and output data.
         for hit in hits:
             fields = hit['fields']
+
+            # todo scale fields b4 sending.
+            for key in fields.keys():
+                print(fields[key])
+                # fields[key] = fields[key] / 30
             ts = hit['sort'][0]
             if 'values.in_bits.delta' in fields.keys():
-                traffic.append([ts, fields['values.in_bits.delta'][0], fields['values.out_bits.delta'][0]])
+                traffic.append(
+                    [ts, fields['values.in_bits.delta'][0] / divisor, fields['values.out_bits.delta'][0] / divisor])
             if 'values.in_discards.delta' in fields.keys():
-                discards.append([ts, fields['values.in_discards.delta'][0], fields['values.out_discards.delta'][0]])
-                errors.append([ts, fields['values.in_errors.delta'][0], fields['values.out_errors.delta'][0]])
+                discards.append([ts, fields['values.in_discards.delta'][0] / divisor,
+                                 fields['values.out_discards.delta'][0] / divisor])
+                errors.append(
+                    [ts, fields['values.in_errors.delta'][0] / divisor, fields['values.out_errors.delta'][0] / divisor])
                 unicast_packets.append(
-                    [ts, fields['values.in_ucast_pkts.delta'][0], fields['values.out_ucast_pkts.delta'][0]])
+                    [ts, fields['values.in_ucast_pkts.delta'][0] / divisor,
+                     fields['values.out_ucast_pkts.delta'][0] / divisor])
+
         return {'traffic': traffic,
                 'unicast_packets': unicast_packets,
                 'errors': errors,
