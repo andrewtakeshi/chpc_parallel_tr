@@ -15,36 +15,18 @@ class ForceMap {
      * is configured to use lat/lon to map the nodes to their respective locations if the map is shown, or to place the
      * nodes in a roughly straight line if it is hidden.
      */
-    constructor(root_element, width = 1200, height = 800, showMap = true) {
+    constructor(root_element, old_geo = null, showMap = true) {
+        if (old_geo)
+        {
+            this.geojson = old_geo;
+        }
         // Common elements
-        this.width = width;
-        this.height = height;
         this.showMap = showMap;
         this.rootElement = root_element;
-        this.svg = d3.select(this.rootElement)
-            .append('svg')
-            .attr('width', this.width)
-            .attr('height', this.height)
-            .attr('id', 'mainVisSVG')
-            .style('display', 'block')
-            .style('margin', 'auto');
-
-        this.zoom = d3.zoom()
-            // TODO: possibly get working w/ config file - currently load of config happens after load of this for whatever reason.
-            .scaleExtent([1, 10])
-            .translateExtent([[-this.width + 150, -this.height + 150], [2 * this.width - 150, 2 * this.width - 150]])
-            // We use double click for something else, so we override the zoom behaviour for this event.
-            .filter(() => !(d3.event.type === 'dblclick'))
-            .on('zoom', this.zoomHandler);
-
-        // All d3-force related things go to forceG.
-        this.forceG = this.svg.append('g')
-            .attr('id', 'forceGroup');
-
-        // All d3-geo (the map) related things go to mapG
-        this.mapG = this.svg.append('g')
-            .attr('id', 'mapGroup');
-
+        this.rootElementElement = d3.select(root_element).node();
+        this.width = this.rootElementElement.clientWidth;
+        this.height = 0.75 * this.rootElementElement.clientWidth;
+        
         // Map specific - see d3-geo for more information.
         // this.projection = d3.geoEquirectangular();
         // this.path = d3.geoPath().projection(this.projection);
@@ -55,6 +37,24 @@ class ForceMap {
         this.node_visual_alias = new Map();
         this.atr_iframes = new Map();
 
+        this.linkColorScale = d3.scaleQuantile()
+            .domain([0, 100000000, 250000000, 500000000, 1000000000, 2000000000, 5000000000, 10000000000, 20000000000,
+                40000000000, 80000000000, 100000000000, 400000000000])
+            // .domain(d3.extent(this.nodeValues, d => d.max_bandwidth ? d.max_bandwidth : 0))
+            .range([
+                'rgb(194, 211, 231)',
+                'rgb(197, 194, 208)',
+                'rgb(198, 178, 185)',
+                'rgb(198, 161, 163)',
+                'rgb(196, 145, 142)',
+                'rgb(193, 128, 121)',
+                'rgb(189, 112, 100)',
+                'rgb(184, 95, 80)',
+                'rgb(177, 78, 61)',
+                'rgb(170, 59, 41)',
+                'rgb(163, 37, 22)',
+                'rgb(154, 0, 0)']);
+
         // Global tooltip - this is different from the "pinned" tooltips.
         this.floating_tooltip = d3.select(root_element)
             .append('div')
@@ -62,6 +62,37 @@ class ForceMap {
             .classed('tooltip', true);
         this.tooltip_stats = this.floating_tooltip
             .append('div');
+
+        this.setup();
+    }
+
+    setup()
+    {
+        this.svg = d3.select(this.rootElement)
+            .append('svg')
+            .attr('width', this.width)
+            .attr('height', this.height)
+            .attr('id', 'mainVisSVG')
+            .style('stroke', 'black')
+            .style('stroke-width', '1.8')
+            .style('display', 'block')
+            .style('margin', 'auto');
+
+        this.zoom = d3.zoom()
+            // TODO: possibly get working w/ config file - currently load of config happens after load of this for whatever reason.
+            .scaleExtent([1, 10])
+            .translateExtent([[-this.width + 150, -this.height + 150], [2 * this.width - 150, 2 * this.width - 150]])
+            // We use double click for something else, so we override the zoom behaviour for this event.
+            .filter(() => !(d3.event.type === 'dblclick' || d3.event.type === 'wheel'))
+            .on('zoom', this.zoomHandler);
+
+        // All d3-force related things go to forceG.
+        this.forceG = this.svg.append('g')
+            .attr('id', 'forceGroup');
+
+        // All d3-geo (the map) related things go to mapG
+        this.mapG = this.svg.append('g')
+            .attr('id', 'mapGroup');
 
         // Max bandwidth group overlay on top of the map/force vis.
         this.maxBW = this.svg.append('g');
@@ -81,16 +112,6 @@ class ForceMap {
             .attr('stroke', '#fff')
             .attr('stroke-width', 1.5)
             .selectAll('circle');
-
-        this.linkColorScale = d3.scaleQuantile()
-            .domain([0, 100000000, 250000000, 500000000, 1000000000, 2000000000, 5000000000, 10000000000, 20000000000,
-                40000000000, 80000000000, 100000000000, 400000000000])
-            // .domain(d3.extent(this.nodeValues, d => d.max_bandwidth ? d.max_bandwidth : 0))
-            .range(['rgb(119, 190, 252)', 'rgb(55, 161, 251)', 'rgb(162, 254, 175)',
-                'rgb(118, 245, 136)', 'rgb(43, 230, 144)', 'rgb(255, 225, 59)',
-                'rgb(242, 210, 54)', 'rgb(242, 168, 42)', 'rgb(255, 84, 89)',
-                'rgb(242, 5, 68)', 'rgb(232, 70, 165)', 'rgb(191, 112, 249)']);
-
 
         // Add link legend
         // Append a group for the legend
@@ -129,6 +150,14 @@ class ForceMap {
         this.setSimulation();
     }
 
+    resize(width, height)
+    {
+        this.width = width;
+        this.height = height;
+        d3.select(this.rootElement).selectAll('svg').remove();
+        this.setup();
+        // this.simulation.alphaTarget(0.3).restart();
+    }
 
     /************************************
      *********** Map Section ************
@@ -140,6 +169,39 @@ class ForceMap {
      */
     setTopography(geojson) {
         this.geojson = geojson;
+    }
+
+    /**
+     * get the current zoom level
+     * @returns 
+     */
+    zoomInfo() {
+        let zoomOutline = this.mapG.selectAll('path').node();
+        return zoomOutline ? d3.zoomTransform(zoomOutline).k : 1;
+    }
+
+    zoomIn()
+    {
+        let newZoom = this.getNewZoomLevel(true);
+        this.zoom.scaleTo(this.svg, newZoom);
+        return newZoom;
+    }
+
+    zoomOut()
+    {
+        let newZoom = this.getNewZoomLevel(false);
+        this.zoom.scaleTo(this.svg, newZoom);
+        return newZoom;
+    }
+
+    getNewZoomLevel(zoomIn = false) {
+        let oldZoom = this.zoomInfo();
+        let scaleExtent = this.zoom.scaleExtent();
+        let clamp = (v, lo, hi) => v < lo ? lo : v > hi ? hi : v;
+
+        let newZoom = zoomIn ? 1.5 * oldZoom : 0.66 * oldZoom;
+
+        return clamp(newZoom, scaleExtent[0], scaleExtent[1]);
     }
 
     /**
@@ -199,6 +261,9 @@ class ForceMap {
      * Draws the map.
      */
     drawMap() {
+
+        console.log('drawing map');
+
         // Don't do anything if the geojson isn't present or map should be hidden.
         if (!this.geojson || !this.showMap) {
             return;
@@ -431,7 +496,7 @@ class ForceMap {
      */
     // TODO: Add second scale for packet & error data.
     netbeamGraph(trafficInfo, div, checks = false) {
-        let margin = {top: 30, right: 200, bottom: 30, left: 60};
+        let margin = { top: 30, right: 200, bottom: 30, left: 60 };
 
         let oWidth = 850;
         let oHeight = 350;
@@ -908,7 +973,7 @@ class ForceMap {
                     let prop_adder = (prop) => {
                         for (let _prop of packet[prop]) {
                             if (!trafficInfo.has(_prop[0])) {
-                                trafficInfo.set(_prop[0], {'ts': _prop[0]});
+                                trafficInfo.set(_prop[0], { 'ts': _prop[0] });
                             }
                             trafficInfo.get(_prop[0])[`${prop}_in`] = _prop[1];
                             trafficInfo.get(_prop[0])[`${prop}_out`] = _prop[2];
