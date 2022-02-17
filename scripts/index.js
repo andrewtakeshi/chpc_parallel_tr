@@ -139,6 +139,7 @@ let netbeamTableHelper = (ip, label, hops, speed) => {
     })
 }
 
+// todo: update table to work with stardust
 /**
  * Adds netbeam information to table (shown below viz)
  */
@@ -189,11 +190,10 @@ const netbeamTable = async (traceroutes) => {
 const updateViz = async () => {
     // Create new graph from
     let graph = await createInternetGraph(visibleNTTs.traceroutes);
-    let org_graph = clusterBy(graph,
+    return clusterBy(graph,
         (entity) => entity.org,
         (entity) => new Set([...entity.source_ids, ...entity.target_ids]),
         "Org");
-    return org_graph;
 }
 
 /**
@@ -287,7 +287,7 @@ const e2eBtnHandler = async (source, dest, num_runs, uuid) => {
     }
 
     // Add to the netbeam table
-    netbeamTable(result.traceroutes);
+    await netbeamTable(result.traceroutes);
 
     // Update the visualization
     visibleNTTs.traceroutes = visibleNTTs.traceroutes.concat(result.traceroutes);
@@ -383,19 +383,11 @@ $(window).resize(function () {
     }, 50, "windowResize");
 });
 
-function resizeHandler() {
-    // document.getElementById('d3_vis').innerHTML = '';
-    // force_map = new ForceMap('#d3_vis', force_map.geojson);
-    // updateViz().then(data => force_map.setData(data));
-    let force_parent = d3.select('#d3_vis').node();
-    force_map.resize(force_parent.clientWidth, 0.75 * force_parent.clientWidth);
-}
-
 function checkZoomLevels(newZoom)
 {
     let extent = force_map.zoom.scaleExtent();
     console.log(extent[1]);
-    if (newZoom == extent[0])
+    if (newZoom === extent[0])
     {
         d3.select('#zoom_out').attr('disabled', true);
         d3.select('#zoom_reset').attr('disabled', true);
@@ -415,5 +407,5 @@ function checkZoomLevels(newZoom)
 }
 
 // Create the force map. By default the map is shown and we shown the world map.
-let force_map = new ForceMap('#d3_vis');
+const force_map = new ForceMap('#d3_vis');
 setTopojson('world');

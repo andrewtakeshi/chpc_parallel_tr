@@ -9,24 +9,18 @@ class ForceMap {
      * Constructs a new force map.
      * @param root_element  Path or ID. Must be selectable by d3. Typically this is just the div where the force map
      * visualization should go.
-     * @param width         Width of the SVG.
-     * @param height        Height of the SVG.
      * @param showMap       Boolean which determines if the map should be initially shown or hidden. The force map
      * is configured to use lat/lon to map the nodes to their respective locations if the map is shown, or to place the
      * nodes in a roughly straight line if it is hidden.
      */
-    constructor(root_element, old_geo = null, showMap = true) {
-        if (old_geo)
-        {
-            this.geojson = old_geo;
-        }
+    constructor(root_element, showMap = true) {
         // Common elements
         this.showMap = showMap;
         this.rootElement = root_element;
         this.rootElementElement = d3.select(root_element).node();
         this.width = this.rootElementElement.clientWidth;
         this.height = 0.75 * this.rootElementElement.clientWidth;
-        
+
         // Map specific - see d3-geo for more information.
         // this.projection = d3.geoEquirectangular();
         // this.path = d3.geoPath().projection(this.projection);
@@ -66,15 +60,14 @@ class ForceMap {
         this.setup();
     }
 
-    setup()
-    {
+    setup() {
         this.svg = d3.select(this.rootElement)
             .append('svg')
             .attr('width', this.width)
             .attr('height', this.height)
             .attr('id', 'mainVisSVG')
-            .style('stroke', 'black')
-            .style('stroke-width', '1.8')
+            // .style('stroke', 'black')
+            // .style('stroke-width', '1.8')
             .style('display', 'block')
             .style('margin', 'auto');
 
@@ -150,8 +143,7 @@ class ForceMap {
         this.setSimulation();
     }
 
-    resize(width, height)
-    {
+    resize(width, height) {
         this.width = width;
         this.height = height;
         d3.select(this.rootElement).selectAll('svg').remove();
@@ -173,22 +165,20 @@ class ForceMap {
 
     /**
      * get the current zoom level
-     * @returns 
+     * @returns
      */
     zoomInfo() {
         let zoomOutline = this.mapG.selectAll('path').node();
         return zoomOutline ? d3.zoomTransform(zoomOutline).k : 1;
     }
 
-    zoomIn()
-    {
+    zoomIn() {
         let newZoom = this.getNewZoomLevel(true);
         this.zoom.scaleTo(this.svg, newZoom);
         return newZoom;
     }
 
-    zoomOut()
-    {
+    zoomOut() {
         let newZoom = this.getNewZoomLevel(false);
         this.zoom.scaleTo(this.svg, newZoom);
         return newZoom;
@@ -261,9 +251,6 @@ class ForceMap {
      * Draws the map.
      */
     drawMap() {
-
-        console.log('drawing map');
-
         // Don't do anything if the geojson isn't present or map should be hidden.
         if (!this.geojson || !this.showMap) {
             return;
@@ -495,8 +482,8 @@ class ForceMap {
      * pinned tooltips.
      */
     // TODO: Add second scale for packet & error data.
-    netbeamGraph(trafficInfo, div, checks = false) {
-        let margin = { top: 30, right: 200, bottom: 30, left: 60 };
+    auxGraph(trafficInfo, div, checks = false) {
+        let margin = {top: 30, right: 200, bottom: 30, left: 60};
 
         let oWidth = 850;
         let oHeight = 350;
@@ -510,10 +497,34 @@ class ForceMap {
             .append('g')
             .attr('transform', `translate(${margin.left}, ${margin.top})`);
 
+        let timestamps = Object.keys(trafficInfo).map(d => parseInt(d));
+        let allValArr = Object.values(trafficInfo);
+
+        let types = ['Traffic In', 'Traffic Out', 'Unicast Packets In', 'Unicast Packets Out',
+            'Errors In', 'Errors Out', 'Discards In', 'Discards Out'];
+
+        let colorScale = d3.scaleOrdinal()
+            .domain(types)
+            .range(['steelblue', 'red', 'blue', 'crimson', 'cadetblue', 'darksalmon', 'skyblue', 'violet']);
+
+        let measurement_filter = (valArr, measurement) => {
+            let retArr = []
+            for (let val of valArr) {
+                let valKeys = Object.keys(val)
+                if (valKeys.includes(`${measurement}_in`) || valKeys.includes(`${measurement}_packets_in`)) {
+                    let iomeasures = valKeys.filter(d => d.includes(measurement));
+                    for (let title of iomeasures) {
+                        retArr.push(val[title]);
+                    }
+                }
+            }
+            return retArr;
+        }
+
         // Set up scales
         // xScale is time, yScale is bandwidth
         let xScale = d3.scaleLinear()
-            .domain(d3.extent([...trafficInfo.keys()]))
+            .domain(d3.extent(timestamps))
             .range([0, width]);
         let xaxis = trafficGraph.append('g')
             .attr('id', 'xaxis')
@@ -533,52 +544,17 @@ class ForceMap {
             .attr('text-anchor', 'middle')
             .text('time');
 
-        let valsArr = [...trafficInfo.values()];
-
-        let ts_filter = (valsArr) => {
-            let retArr = [];
-            for (let val of valsArr) {
-                for (let key of Object.keys(val)) {
-                    if (key !== 'ts') {
-                        retArr.push(val[key]);
-                    }
-                }
-            }
-            return retArr;
+        let yScales = {};
+        for (let measurement of new Set(types.map(d => d.split(' ')[0].toLowerCase()))) {
+            yScales[measurement] = d3.scaleLinear()
+                .domain(d3.extent(measurement_filter(allValArr, measurement)))
+                .range([height, 0]);
         }
-
-        let other_filter = (valsArr) => {
-            let retArr = [];
-            for (let val of valsArr) {
-                let keys = Object.keys(val);
-                if (keys.includes("errors_in")) {
-                    for (let key of keys) {
-                        if (key !== 'ts' && !key.includes('traffic')) {
-                            retArr.push(val[key]);
-                        }
-                    }
-                }
-            }
-            return retArr;
-        }
-
-        // Combined min/max of all properties minus time stamp.
-        let min = d3.min(ts_filter(valsArr));
-        let max = d3.max(ts_filter(valsArr));
-
-        let yScale = d3.scaleLinear()
-            .domain([min, max])
-            .range([height, 0]);
         trafficGraph.append('g')
             .attr('id', 'yaxis')
-            .call(d3.axisLeft(yScale)
+            .call(d3.axisLeft(yScales['traffic'])
                 .ticks(6)
                 .tickFormat(d => d3.format('~s')(d) + 'bps'));
-
-        let other_min = d3.min(other_filter(valsArr));
-        let other_max = d3.max(other_filter(valsArr));
-
-        let other_yscale = d3.scaleLinear().domain([other_min, other_max]).range([height, 0]);
 
         let add_path_and_circs = (measurement, color) => {
 
@@ -588,18 +564,11 @@ class ForceMap {
                 return;
             }
 
-            let selectedYScale;
-
-            if (measurement.includes("traffic")) {
-                selectedYScale = yScale;
-            } else {
-                selectedYScale = other_yscale;
-            }
-
+            let selectedYScale = yScales[`${measurement.split('_')[0]}`];
 
             trafficGraph.append('path')
                 .attr('id', `${measurement}_line_${div.attr('id')}`)
-                .datum(valsArr.filter(d => `${measurement}` in d))
+                .datum(allValArr.filter(d => `${measurement}` in d))
                 .attr('fill', 'none')
                 .attr('stroke', color)
                 .attr('stroke-width', 1.5)
@@ -612,27 +581,16 @@ class ForceMap {
             trafficGraph.append('g')
                 .attr('id', `${measurement}_circs_${div.attr('id')}`)
                 .selectAll('circle')
-                .data(valsArr.filter(d => `${measurement}` in d))
+                .data(allValArr.filter(d => `${measurement}` in d))
                 .join('circle')
                 .attr('r', 1.5)
                 .attr('fill', color)
                 .attr('cx', d => xScale(d.ts))
-                .attr('cy', d => selectedYScale(d[measurement]));
-
+                .attr('cy', d => selectedYScale(d[measurement]))
+                .on('mouseover', d => console.log(d[measurement]));
         }
 
-        let types = ['Traffic In', 'Traffic Out', 'Unicast Packets In', 'Unicast Packets Out',
-            'Errors In', 'Errors Out', 'Discards In', 'Discards Out'];
-
-        let colorScale = d3.scaleOrdinal()
-            .domain(types)
-            .range(['steelblue', 'red', 'blue', 'crimson', 'cadetblue', 'darksalmon', 'skyblue', 'violet']);
-
         if (checks) {
-
-            // trafficGraph.append('g')
-            //     .attr('id', 'otheryaxis')
-            //     .call(d3.axisRight(other_yscale));
 
             let boxes = div.append('div')
                 .style('position', 'absolute')
@@ -732,6 +690,11 @@ class ForceMap {
     getOverallMaxBW() {
         let min_bw = Number.MAX_SAFE_INTEGER;
         let ip = null;
+
+        if (!this.all_nodes_flat) {
+            return;
+        }
+
         // Select all nodes that are actual nodes (not abstracted org nodes)
         let nodes = Array.from(this.all_nodes_flat.values()).filter(d => d.id.startsWith('ip'));
 
@@ -766,7 +729,6 @@ class ForceMap {
      * Contains all the handlers as well, although they could likely be moved outside of this function.
      */
     update() {
-        console.log('performing update');
         this.simulation.stop();
 
         // Appends maxBW to the vis.
@@ -964,28 +926,18 @@ class ForceMap {
         /* ###### Helpers and Handlers ####### */
 
         // Helper method to get traffic info from Netbeam-polled nodes into acceptable format for secondary d3 vis.
-        // TODO: with move to stardust, change format of incoming packets and remove this
-        // TODO: Scale the traffic data?
         function generateTrafficInfo(packets) {
-            let trafficInfo = new Map();
+            // let trafficInfo = new Map();
+
+            let trafficInfo = {};
+
             for (let packet of packets) {
-                if (packet.resource && packet.traffic) {
-                    let prop_adder = (prop) => {
-                        for (let _prop of packet[prop]) {
-                            if (!trafficInfo.has(_prop[0])) {
-                                trafficInfo.set(_prop[0], { 'ts': _prop[0] });
-                            }
-                            trafficInfo.get(_prop[0])[`${prop}_in`] = _prop[1];
-                            trafficInfo.get(_prop[0])[`${prop}_out`] = _prop[2];
-                        }
-                    }
-                    let props = ['traffic', 'unicast_packets', 'errors', 'discards']
-                    for (let prop of props) {
-                        prop_adder(prop);
-                    }
+                // Iteratively merge all the packets together
+                trafficInfo = {
+                    ...trafficInfo,
+                    ...packet['traffic_info']
                 }
             }
-            // console.log(trafficInfo);
             return trafficInfo;
         }
 
@@ -1023,6 +975,8 @@ class ForceMap {
 
         // Shows the global tooltip on mouseover (if applicable)
         function nodeMouseoverHandler(d) {
+            if (d3.select(`#tooltip${CSS.escape(d.id.replace(/(\s|\.|\(|\))+/g, '_'))}`).node() !== null) return;
+
             that.floating_tooltip.transition().duration(200).style('opacity', 0.9);
 
             let packets = d.packets;
@@ -1034,9 +988,9 @@ class ForceMap {
             if (d.id.startsWith('ip') && that.atr_iframes.has(d.id)) {
                 // Show grafana iframe
                 that.atr_iframes.get(d.id).style('display', 'block');
-            } else if (d.id.startsWith('ip') && trafficInfo.size > 0) {
+            } else if (d.id.startsWith('ip') && Object.keys(trafficInfo).length > 0) {
                 // Show d3 vis of netbeam data
-                that.netbeamGraph(trafficInfo, that.floating_tooltip);
+                that.auxGraph(trafficInfo, that.floating_tooltip);
             }
         }
 
@@ -1053,7 +1007,6 @@ class ForceMap {
         function nodeClickHandler(d) {
             d3.event.preventDefault();
             if (that.expandNode(d)) {
-                console.log('calling update from nodeClickHandler');
                 that.update();
             }
         }
@@ -1064,6 +1017,8 @@ class ForceMap {
 
             // Make sure that isn't already pinned
             if (d3.select(`#tooltip${CSS.escape(d.id.replace(/(\s|\.|\(|\))+/g, '_'))}`).node() !== null) return;
+
+            // todo: remove the floating tooltip before appending the new div
 
             // Create the tooltip div
             let tooltip = d3.select(that.rootElement)
@@ -1134,9 +1089,9 @@ class ForceMap {
                     .attr('height', 300)
                     .attr('src', getATRChartURL(d.ip, d.org))
                     .style('display', 'block');
-            } else if (d.id.startsWith('ip') && trafficInfo.size > 0) {
+            } else if (d.id.startsWith('ip') && Object.keys(trafficInfo).length > 0) {
                 // Add the d3 vis for netbeam info
-                that.netbeamGraph(trafficInfo, tooltip, true);
+                that.auxGraph(trafficInfo, tooltip, true);
             } else {
                 // If neither data source is applicable, remove the tooltip
                 tooltip.remove();

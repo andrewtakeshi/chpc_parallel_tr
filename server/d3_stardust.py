@@ -2,7 +2,6 @@ import json
 import stat
 import threading
 import time
-from datetime import datetime
 from os import chmod, path, stat as osstat
 
 import elasticsearch
@@ -17,7 +16,7 @@ def sd_traffic_by_time_range(resource='lond-cr5::to_tenet_ip-b'):
         r = es.search(index='sd_public_interfaces',
                       body=
                       {
-                          'size': 30,
+                          'size': 60,
                           '_source': False,
                           'sort': [
                               {
@@ -57,42 +56,37 @@ def sd_traffic_by_time_range(resource='lond-cr5::to_tenet_ip-b'):
 
         hits = r['hits']['hits']
 
-        # for hit in hits:
-        #     _time = hit["sort"][0] / 1000
-        #     print(f'{datetime.utcfromtimestamp(_time)}: {hit["fields"]}')
+        ret = {}
 
-        discards = []
-        errors = []
-        traffic = []
-        unicast_packets = []
+        # No idea why, but we need to scale everything down from stardust 30x.
+        denom = 30
 
-        divisor = 1
-
-        # TODO: Figure out why there is a 30x scaling between input and output data.
         for hit in hits:
             fields = hit['fields']
-
-            # todo scale fields b4 sending.
-            for key in fields.keys():
-                print(fields[key])
-                # fields[key] = fields[key] / 30
+            keys = fields.keys()
             ts = hit['sort'][0]
-            if 'values.in_bits.delta' in fields.keys():
-                traffic.append(
-                    [ts, fields['values.in_bits.delta'][0] / divisor, fields['values.out_bits.delta'][0] / divisor])
-            if 'values.in_discards.delta' in fields.keys():
-                discards.append([ts, fields['values.in_discards.delta'][0] / divisor,
-                                 fields['values.out_discards.delta'][0] / divisor])
-                errors.append(
-                    [ts, fields['values.in_errors.delta'][0] / divisor, fields['values.out_errors.delta'][0] / divisor])
-                unicast_packets.append(
-                    [ts, fields['values.in_ucast_pkts.delta'][0] / divisor,
-                     fields['values.out_ucast_pkts.delta'][0] / divisor])
 
-        return {'traffic': traffic,
-                'unicast_packets': unicast_packets,
-                'errors': errors,
-                'discards': discards}
+            if ts not in ret.keys():
+                ret[ts] = {'ts': ts,
+                           'traffic_in': 0,
+                           'traffic_out': 0}
+
+            if 'values.in_bits.delta' in keys:
+                ret[ts]['traffic_in'] += fields['values.in_bits.delta'][0] / denom
+                ret[ts]['traffic_out'] += fields['values.out_bits.delta'][0] / denom
+
+            if 'values.in_discards.delta' in keys:
+                ret[ts]['discards_in'] = fields['values.in_discards.delta'][0]
+                ret[ts]['discards_out'] = fields['values.in_discards.delta'][0]
+                ret[ts]['errors_in'] = fields['values.in_discards.delta'][0]
+                ret[ts]['errors_out'] = fields['values.in_discards.delta'][0]
+                ret[ts]['unicast_packets_in'] = fields['values.in_ucast_pkts.delta'][0]
+                ret[ts]['unicast_packets_out'] = fields['values.out_ucast_pkts.delta'][0]
+
+        if len(ret.keys()) == 0:
+            return None
+        else:
+            return ret
 
     except elasticsearch.exceptions.ConnectionTimeout:
         return None
@@ -111,10 +105,7 @@ def add_sd_info_tw(packet, sd_item):
     packet['speed'] = sd_item['speed']
     res = sd_traffic_by_time_range(sd_item['resource'])
     if res is not None:
-        packet['traffic'] = res['traffic']
-        packet['unicast_packets'] = res['unicast_packets']
-        packet['discards'] = res['discards']
-        packet['errors'] = res['errors']
+        packet['traffic_info'] = res
 
 
 def add_sd_info_threaded(d3_json, source_path=None):

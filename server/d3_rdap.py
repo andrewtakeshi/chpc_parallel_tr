@@ -193,6 +193,7 @@ def rdap_tw(packet):
                 except:
                     pass
             return
+        # TODO: Add lacnic NCC
         # Unknown managed networks. The list can be added to, but I only ran into RIPE and ARIN.
         else:
             print(f'Received response from unknown NCC; {response.url}')

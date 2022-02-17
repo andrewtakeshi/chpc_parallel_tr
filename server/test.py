@@ -192,4 +192,5 @@ url = 'http://netbeam.es.net/api/network/esnet/prod/interfaces'
 # d3_netbeam.add_netbeam_info_threaded(d3_json)
 # print(d3_json)
 
-d3_stardust.sd_traffic_by_time_range()
+js = json.dumps(d3_stardust.sd_traffic_by_time_range())
+print(js)
