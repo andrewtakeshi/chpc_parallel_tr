@@ -144,6 +144,7 @@ class ForceMap {
     }
 
     resize(width, height) {
+        // todo: remove or redraw any pinned nodes
         this.width = width;
         this.height = height;
         d3.select(this.rootElement).selectAll('svg').remove();
@@ -474,14 +475,13 @@ class ForceMap {
     }
 
     /**
-     * Creates traffic graph using info scraped through Netbeam API.
-     * @param trafficInfo - Traffic info gathered from Netbeam
-     * @param div - d3 selection corresponding to the root element to draw the Netbeam graph on.
+     * Creates traffic graph using info scraped through auxiliary API.
+     * @param trafficInfo - Traffic info gathered from auxiliary API
+     * @param div - d3 selection corresponding to the root element to draw the graph on.
      * @param checks - Boolean which determines if the checkboxes controlling the additional information (i.e. discards,
      * errors, and unicast packets) should be added. By default this is false, and should only be set to true for the
      * pinned tooltips.
      */
-    // TODO: Add second scale for packet & error data.
     auxGraph(trafficInfo, div, checks = false) {
         let margin = {top: 30, right: 200, bottom: 30, left: 60};
 
@@ -500,19 +500,38 @@ class ForceMap {
         let timestamps = Object.keys(trafficInfo).map(d => parseInt(d));
         let allValArr = Object.values(trafficInfo);
 
-        let types = ['Traffic In', 'Traffic Out', 'Unicast Packets In', 'Unicast Packets Out',
-            'Errors In', 'Errors Out', 'Discards In', 'Discards Out'];
+        let underscorinator = d => d.replace(/\s/g, '_').toLowerCase();
 
+        let keyify = (d, s) => {
+            let d_split = d.split(s);
+            let ret = d_split[0].toLowerCase();
+            for (let i = 1; i < d_split.length - 1; i++)
+            {
+                ret += `_${d_split[i].toLowerCase()}`;
+            }
+            return ret;
+        }
+
+        // Names here MUST correspond to keys in the auxiliary data dictionary (i.e. netbeam, stardust).
+        let types = ['Traffic In', 'Traffic Out', 'Unicast Packets In', 'Unicast Packets Out',
+            'Errors In', 'Errors Out', 'Discards In', 'Discards Out', 'Packets In', 'Packets Out'];
+
+        // types_set is used for setting up the different y scale values.
+        let types_set = new Set(types.map(d => keyify(d, ' ')));
+
+        // This should have at least as many values in the range as there are entries in types. If this has fewer entries
+        // it "wraps" around, which isn't the end of the world but it's not the desired behaviour.
         let colorScale = d3.scaleOrdinal()
-            .domain(types)
+            .domain(types.map(d => underscorinator(d)))
             .range(['steelblue', 'red', 'blue', 'crimson', 'cadetblue', 'darksalmon', 'skyblue', 'violet']);
 
+        // Measurement is just the first word, i.e. "traffic" or "errors"
         let measurement_filter = (valArr, measurement) => {
             let retArr = []
             for (let val of valArr) {
                 let valKeys = Object.keys(val)
                 if (valKeys.includes(`${measurement}_in`) || valKeys.includes(`${measurement}_packets_in`)) {
-                    let iomeasures = valKeys.filter(d => d.includes(measurement));
+                    let iomeasures = valKeys.filter(d => d.startsWith(measurement));
                     for (let title of iomeasures) {
                         retArr.push(val[title]);
                     }
@@ -526,8 +545,8 @@ class ForceMap {
         let xScale = d3.scaleLinear()
             .domain(d3.extent(timestamps))
             .range([0, width]);
-        let xaxis = trafficGraph.append('g')
-            .attr('id', 'xaxis')
+        let xAxis = trafficGraph.append('g')
+            .attr('id', `x_axis_${div.attr('id')}`)
             .attr('transform', `translate(0, ${height})`)
             .call(d3.axisBottom(xScale)
                 .ticks(10)
@@ -538,24 +557,30 @@ class ForceMap {
                 }));
 
         // Axis label
-        xaxis.append('text')
+        xAxis.append('text')
             .classed('axis-label-text', true)
             .attr('transform', `translate(${width / 2}, 25)`)
             .attr('text-anchor', 'middle')
             .text('time');
 
+        // Set up yScales
         let yScales = {};
-        for (let measurement of new Set(types.map(d => d.split(' ')[0].toLowerCase()))) {
+        for (let measurement of types_set) {
             yScales[measurement] = d3.scaleLinear()
-                .domain(d3.extent(measurement_filter(allValArr, measurement)))
+                // Use the max of 1 & measurement result to ensure that there is some difference for all measurements, i.e.
+                // discards are usually 0 but they should show up on the bottom
+                .domain([0, d3.max([1, d3.max(measurement_filter(allValArr, measurement))])])
+                // .domain(d3.extent(measurement_filter(allValArr, measurement)))
                 .range([height, 0]);
         }
-        trafficGraph.append('g')
-            .attr('id', 'yaxis')
-            .call(d3.axisLeft(yScales['traffic'])
-                .ticks(6)
-                .tickFormat(d => d3.format('~s')(d) + 'bps'));
 
+        let yAxis = trafficGraph.append('g')
+            .attr('id', `y_axis_${div.attr('id')}`);
+        yAxis.call(d3.axisLeft(yScales['traffic'])
+            .ticks(6)
+            .tickFormat(d => d3.format('~s')(d) + 'bps'));
+
+        // Measurement here is the full name (i.e. traffic_in or errors_out).
         let add_path_and_circs = (measurement, color) => {
 
             if (d3.select(`#${measurement}_line_${div.attr('id')}`).node() !== null) {
@@ -564,7 +589,9 @@ class ForceMap {
                 return;
             }
 
-            let selectedYScale = yScales[`${measurement.split('_')[0]}`];
+            // let selectedYScale = yScales[`${measurement.split('_')[0]}`];
+            // should be everything except for the first/last
+            let selectedYScale = yScales[keyify(measurement, '_')];
 
             trafficGraph.append('path')
                 .attr('id', `${measurement}_line_${div.attr('id')}`)
@@ -591,8 +618,7 @@ class ForceMap {
         }
 
         if (checks) {
-
-            let boxes = div.append('div')
+            let list_items = div.append('div')
                 .style('position', 'absolute')
                 .style('top', `${margin.top}px`)
                 .style('right', '20px')
@@ -600,41 +626,90 @@ class ForceMap {
                 .attr('width', `${margin.right - 20}px`)
                 .attr('height', `${height}px`);
 
-            if (boxes.selectAll('ul').nodes().length === 0) {
-                boxes.append('ul');
+            if (list_items.selectAll('ul').nodes().length === 0) {
+                list_items.append('ul');
             }
 
-            boxes.selectAll('ul')
+            // Bind data to the list items
+            list_items.selectAll('ul')
                 .selectAll('li')
                 .data(types)
                 .join('li')
                 .style('list-style-type', 'none');
 
-            let list_items = div.selectAll('div')
+            let checkboxes = div.selectAll('div.checkbox-area')
                 .selectAll('ul')
                 .selectAll('li');
 
-            list_items.append('input')
-                .attr('id', d => `checkbox_${d.replace(/\s/g, '')}_${div.attr('id')}`)
+            checkboxes.append('input')
+                .attr('id', d => `checkbox_${underscorinator(d)}_${div.attr('id')}`)
                 .attr('value', d => d)
                 .attr('type', 'checkbox')
                 .classed('form-check-input', true)
                 .on('click', function (d) {
                     d3.event.stopPropagation();
-                    let val = d.replace(/\s/g, '_').toLowerCase();
-                    add_path_and_circs(val, colorScale(d));
+                    let val = underscorinator(d);
+                    add_path_and_circs(val, colorScale(val));
                 })
                 // Prevent dblclick on checkbox from hiding the tooltip.
                 .on('dblclick', _ => d3.event.stopPropagation());
 
-            list_items.selectAll('input')
+            checkboxes.selectAll('input')
                 .filter(d => d === types[0] || d === types[1])
                 .property('checked', true);
 
-            list_items.append('label')
-                .attr('for', d => `checkbox_${d.replace(/\s/g, '')}_${div.attr('id')}`)
-                .style('color', d => colorScale(d))
+            checkboxes.append('label')
+                .attr('for', d => `checkbox_${underscorinator(d)}_${div.attr('id')}`)
+                .style('color', d => colorScale(underscorinator(d)))
                 .text(d => d);
+
+            let yScaleRow = div.append('div')
+                .classed('row', true)
+                .append('div')
+                .classed('col', true)
+                .classed('d-flex justify-content-center', true);
+
+            yScaleRow.append('label')
+                .attr('for', `y_axis_select_${div.attr('id')}`)
+                .text('y axis: ')
+                .attr('style', 'margin-bottom: 0rem');
+
+            let yScaleSelect = yScaleRow.append('select')
+                .attr('id', `y_axis_select_${div.attr('id')}`)
+                .attr('style', 'width: auto');
+
+            yScaleSelect.selectAll('option')
+                .data([...types_set])
+                .join('option')
+                .attr('value', d => d)
+                .text(d => d.replace('_', ' '));
+
+            yScaleSelect.on('change', _ => {
+                let key = d3.event.target.value;
+                if (key === 'traffic') {
+                    yAxis.call(d3.axisLeft(yScales[key])
+                        .ticks(6)
+                        .tickFormat(d => d3.format('~s')(d) + 'bps'));
+                } else {
+                    yAxis.call(d3.axisLeft(yScales[key]));
+                }
+
+                if (key === 'unicast') {
+                    key = 'unicast_packets';
+                }
+
+                let _in = d3.select(`#checkbox_${key}_in_${div.attr('id')}`);
+                let _out = d3.select(`#checkbox_${key}_out_${div.attr('id')}`);
+
+                if (!_in.property('checked')) {
+                    _in.node().click();
+                }
+                if (!_out.property('checked')) {
+                    _out.node().click();
+                }
+            });
+
+
         } else {
 
             let inLegend = trafficGraph.append('g')
@@ -679,7 +754,6 @@ class ForceMap {
                 .attr('fill', 'red')
                 .attr('r', 1.5);
         }
-
         add_path_and_circs('traffic_in', colorScale('traffic_in'));
         add_path_and_circs('traffic_out', colorScale('traffic_out'));
     }
@@ -927,12 +1001,10 @@ class ForceMap {
 
         // Helper method to get traffic info from Netbeam-polled nodes into acceptable format for secondary d3 vis.
         function generateTrafficInfo(packets) {
-            // let trafficInfo = new Map();
-
             let trafficInfo = {};
 
             for (let packet of packets) {
-                // Iteratively merge all the packets together
+                // Merge all the packets together
                 trafficInfo = {
                     ...trafficInfo,
                     ...packet['traffic_info']
@@ -1015,12 +1087,16 @@ class ForceMap {
         function nodeDblClickHandler(d) {
             d3.event.preventDefault();
 
-            // Make sure that isn't already pinned
-            if (d3.select(`#tooltip${CSS.escape(d.id.replace(/(\s|\.|\(|\))+/g, '_'))}`).node() !== null) return;
-
             // todo: remove the floating tooltip before appending the new div
+            // Make sure that isn't already pinned
+            if (d3.select(`#tooltip${CSS.escape(d.id.replace(/(\s|\.|\(|\))+/g, '_'))}`).node() !== null) {
+                return;
+            } else {
+                d3.select('#forcemap_tooltip').selectAll('div').remove();
+            }
 
             // Create the tooltip div
+            // todo: fix trailing underscore
             let tooltip = d3.select(that.rootElement)
                 .append('div')
                 .attr('id', `tooltip${CSS.escape(d.id.replace(/(\s|\.|\(|\))+/g, '_'))}`)
@@ -1038,7 +1114,7 @@ class ForceMap {
 
             // Make draggable on mousedown
             tooltip.on('mousedown', function () {
-                d3.event.preventDefault();
+                // d3.event.preventDefault();
                 d3.select(this).raise();
                 draggable = true;
                 initialX = d3.event.clientX;

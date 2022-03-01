@@ -27,19 +27,22 @@ def sd_traffic_by_time_range(resource='lond-cr5::to_tenet_ip-b'):
                           ],
                           'fields': [
                               'values.in_bits.delta',
-                              'values.in_discards.delta',
-                              'values.in_errors.delta',
-                              'values.in_ucast_pkts.delta',
-
                               'values.out_bits.delta',
+
+                              'values.in_discards.delta',
                               'values.out_discards.delta',
+
+                              'values.in_errors.delta',
                               'values.out_errors.delta',
+
+                              'values.in_ucast_pkts.delta',
                               'values.out_ucast_pkts.delta',
 
                               'values.in_bcast_pkts.delta',
                               'values.in_mcast_pkts.delta',
+
                               'values.in_pkts.delta',
-                              'values.in_v4_pkts.delta'
+                              'values.out_pkts.delta',
                           ],
                           'query': {
                               'bool': {
@@ -56,10 +59,31 @@ def sd_traffic_by_time_range(resource='lond-cr5::to_tenet_ip-b'):
 
         hits = r['hits']['hits']
 
+        # Goes from stardust api values to the values used by d3/other vis.
+        key_map = {
+            'values.in_bits.delta': 'traffic_in',
+            'values.out_bits.delta': 'traffic_out',
+
+            'values.in_discards.delta': 'discards_in',
+            'values.out_discards.delta': 'discards_out',
+
+            'values.in_errors.delta': 'errors_in',
+            'values.out_errors.delta': 'errors_out',
+
+            'values.in_ucast_pkts.delta': 'unicast_packets_in',
+            'values.out_ucast_pkts.delta': 'unicast_packets_out',
+
+            'values.in_bcast_pkts.delta': 'broadcast_packets_in',
+            'values.in_mcast_pkts.delta': 'multicast_packets_in',
+
+            'values.in_pkts.delta': 'packets_in',
+            'values.out_pkts.delta': 'packets_out'
+        }
+
         ret = {}
 
         # No idea why, but we need to scale everything down from stardust 30x.
-        denom = 30
+        denominator = 30
 
         for hit in hits:
             fields = hit['fields']
@@ -67,21 +91,22 @@ def sd_traffic_by_time_range(resource='lond-cr5::to_tenet_ip-b'):
             ts = hit['sort'][0]
 
             if ts not in ret.keys():
-                ret[ts] = {'ts': ts,
-                           'traffic_in': 0,
-                           'traffic_out': 0}
-
-            if 'values.in_bits.delta' in keys:
-                ret[ts]['traffic_in'] += fields['values.in_bits.delta'][0] / denom
-                ret[ts]['traffic_out'] += fields['values.out_bits.delta'][0] / denom
-
-            if 'values.in_discards.delta' in keys:
-                ret[ts]['discards_in'] = fields['values.in_discards.delta'][0]
-                ret[ts]['discards_out'] = fields['values.in_discards.delta'][0]
-                ret[ts]['errors_in'] = fields['values.in_discards.delta'][0]
-                ret[ts]['errors_out'] = fields['values.in_discards.delta'][0]
-                ret[ts]['unicast_packets_in'] = fields['values.in_ucast_pkts.delta'][0]
-                ret[ts]['unicast_packets_out'] = fields['values.out_ucast_pkts.delta'][0]
+                ret[ts] = {'ts': ts}
+            for key in keys:
+                ret_key = key_map[key]
+                if ret_key in ret[ts].keys():
+                    # On 5 minute intervals (i.e. xx:00, xx:05, etc) the discards, errors, etc. are available.
+                    # For whatever reason, there is a "preliminary" packet that contains roughly half the traffic
+                    # information, and only the traffic information. Then, after the discards & errors are available,
+                    # we get a second packet with the rest of the traffic information + the discards and everything else
+                    # If we don't do the += it's just inaccurate.
+                    ret[ts][ret_key] += fields[key][0]
+                else:
+                    ret[ts][ret_key] = fields[key][0]
+        for ts in ret.keys():
+            for key in ret[ts].keys():
+                if key.startswith('traffic'):
+                    ret[ts][key] /= denominator
 
         if len(ret.keys()) == 0:
             return None

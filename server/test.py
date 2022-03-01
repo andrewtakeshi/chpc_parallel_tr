@@ -192,5 +192,13 @@ url = 'http://netbeam.es.net/api/network/esnet/prod/interfaces'
 # d3_netbeam.add_netbeam_info_threaded(d3_json)
 # print(d3_json)
 
-js = json.dumps(d3_stardust.sd_traffic_by_time_range())
-print(js)
+def pretty_print_d3_json(in_dict):
+    for ts in in_dict.keys():
+        key_time = time.localtime(ts / 1000)
+        print(f'{key_time.tm_hour}:{format(key_time.tm_min, "02d")}:{format(key_time.tm_sec, "02d")}')
+        for val in in_dict[ts].keys():
+            print(f'\t{val}: {in_dict[ts][val]}')
+
+
+# js = json.dumps(d3_stardust.sd_traffic_by_time_range())
+pretty_print_d3_json(d3_stardust.sd_traffic_by_time_range())
