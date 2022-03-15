@@ -192,13 +192,30 @@ url = 'http://netbeam.es.net/api/network/esnet/prod/interfaces'
 # d3_netbeam.add_netbeam_info_threaded(d3_json)
 # print(d3_json)
 
-def pretty_print_d3_json(in_dict):
+def pretty_print_sd_info(in_dict):
     for ts in in_dict.keys():
         key_time = time.localtime(ts / 1000)
         print(f'{key_time.tm_hour}:{format(key_time.tm_min, "02d")}:{format(key_time.tm_sec, "02d")}')
         for val in in_dict[ts].keys():
             print(f'\t{val}: {in_dict[ts][val]}')
 
+def pretty_print_d3c_system(in_dict):
+    in_dict = in_dict['traceroutes']
+    for tr in in_dict:
+        for k in tr.keys():
+            # if k == 'ts':
+            #     ts = tr[k]
+            #     ts = time.localtime(ts)
+            #     print(f'{ts.tm_hour}:{format(ts.tm_min, "02d")}:{format(ts.tm_sec, "02d")}')
+            if k == 'packets':
+                packets = tr[k]
+                for packet in packets:
+                    for kk in packet.keys():
+                        print(f'{kk}: {packet[kk]}')
+                    print()
 
 # js = json.dumps(d3_stardust.sd_traffic_by_time_range())
-pretty_print_d3_json(d3_stardust.sd_traffic_by_time_range())
+# pretty_print_d3_json(d3_stardust.sd_traffic_by_time_range())
+
+# print(d3c.system_to_d3('155.101.8.18', 1))
+pretty_print_d3c_system(d3c.system_to_d3('155.101.8.18', 1))

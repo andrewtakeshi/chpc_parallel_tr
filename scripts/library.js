@@ -61,8 +61,7 @@ const getATRChartURL = (ip, org) => {
     let start = end - 900000;
 
     // TODO: check this org stuff.
-    if (org !== null && org.toString() === 'Internet2')
-    {
+    if (org !== null && org.toString() === 'Internet2') {
         return `https://snapp-portal.grnoc.iu.edu/grafana/d-solo/f_KR9xeZk/ip-address-lookup?orgId=2&from=${start}&to=${end}&var-ip_addr=${ip}&panelId=2`;
     }
     return '';
@@ -120,12 +119,37 @@ const createInternetGraph = async (traceroutes, existing = undefined) => {
             entity.packets.push(packet);
 
             // Add the previous packet as a source and next packet as a target.
-            if (i > 0)
+            if (i > 0) {
                 entity.source_ids.add(`ip(${packets[i - 1].ip})`);
-            if (i < packets.length - 1)
-                entity.target_ids.add(`ip(${packets[i + 1].ip})`);
+                // for (let j = i - 1; j >= 0; j--) {
+                //     if (packets[j].ttl !== packets[i].ttl) {
+                //         let ttl = packets[j].ttl;
+                //         while (packets[j].ttl === ttl) {
+                //             entity.source_ids.add(`ip(${packets[j].ip})`);
+                //             --j;
+                //         }
+                //         break;
+                //     }
+                // }
+            }
+            if (i < packets.length - 1) {
+                entity.target_ids.add(`ip(${packets[i + 1].ip})`)
+                // for (let j = i + 1; j < packets.length; j++) {
+                //     if (packets[j].ttl !== packets[i].ttl) {
+                //         let ttl = packets[j].ttl;
+                //         while (packets[j].ttl === ttl) {
+                //             entity.target_ids.add(`ip(${packets[j].ip})`);
+                //             ++j;
+                //         }
+                //         break;
+                //     }
+                // }
+            }
         }
     }
+
+    console.log('ntts');
+    console.log(entities);
 
     return entities;
 };
@@ -198,7 +222,8 @@ const clusterBy = (entities, getLabel, getRelationships, id_prefix = undefined, 
     }
 
     // Filter orgs with only one.
-
+    console.log('From clusterby');
+    console.log(result);
     return result;
 };
 

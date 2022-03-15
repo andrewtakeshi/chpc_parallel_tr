@@ -141,12 +141,17 @@ class ForceMap {
         this.toggleMap();
         // Sets the desired force behavior depending on the value of this.showMap.
         this.setSimulation();
+
+        // We call update directly so that we don't "collapse" any nodes + it's easier than figuring out why calling it
+        // the same way that all the other updates are done doesn't work.
+        this.update();
     }
 
     resize(width, height) {
         // todo: remove or redraw any pinned nodes
         this.width = width;
         this.height = height;
+        console.log(`w: ${width}, h: ${height}`);
         d3.select(this.rootElement).selectAll('svg').remove();
         this.setup();
         // this.simulation.alphaTarget(0.3).restart();
@@ -278,9 +283,9 @@ class ForceMap {
         // Reset zoom when we draw/redraw the map.
         this.svg.call(this.zoom).call(this.zoom.transform, d3.zoomIdentity);
 
-        // We call update directly so that we don't "collapse" any nodes + it's easier than figuring out why calling it
-        // the same way that all the other updates are done doesn't work.
-        this.update();
+        // // We call update directly so that we don't "collapse" any nodes + it's easier than figuring out why calling it
+        // // the same way that all the other updates are done doesn't work.
+        // this.update();
     }
 
     /************************************
@@ -306,7 +311,7 @@ class ForceMap {
                 .force('forceY', d3.forceY(d => this.projection([d.lon, d.lat])[1])
                     .strength(1));
         } else {
-            let denominator = () => d3.max(d3.selectAll('g.single_node').nodes(), d => d.__data__.ttl);
+            let denominator = d3.max(d3.selectAll('g.single_node').nodes(), d => d.__data__.ttl);
             let that = this;
 
             this.simulation = d3.forceSimulation()
@@ -316,7 +321,7 @@ class ForceMap {
                 .force('charge', d3.forceManyBody()
                     .distanceMax(100))
                 // .force('center', d3.forceCenter(this.width / 2, this.height / 2))
-                .force('forceX', d3.forceX(d => (d.ttl * ((that.width - 100) / denominator())) + 50))
+                .force('forceX', d3.forceX(d => (d.ttl * ((that.width - 100) / denominator)) + 50))
                 .force('forceY', d3.forceY(this.height / 2)
                     .strength(0.3))
                 .force('collision', d3.forceCollide()
@@ -485,19 +490,27 @@ class ForceMap {
     auxGraph(trafficInfo, div, checks = false) {
         let margin = {top: 30, right: 200, bottom: 30, left: 60};
 
+        // o* is the overall or outer width/height.
         let oWidth = 850;
         let oHeight = 350;
 
-        let width = oWidth - margin.left - margin.right;
-        let height = oHeight - margin.top - margin.bottom;
+        // i* is the inner width/height - i.e. o* - margins.
+        let iWidth = oWidth - margin.left - margin.right;
+        let iHeight = oHeight - margin.top - margin.bottom;
 
+        // Append a new SVG for the traffic graph.
         let trafficGraph = div.append('svg')
             .attr('width', oWidth)
             .attr('height', oHeight)
             .append('g')
             .attr('transform', `translate(${margin.left}, ${margin.top})`);
 
+        // timestamps used for setting up y axis.
         let timestamps = Object.keys(trafficInfo).map(d => parseInt(d));
+
+        // array of objects; each object should at least have the keys ts (timestamp), traffic_in, and traffic_out. other
+        // keys may be available depending on the data source and timestamp (i.e. stardust only sends certain metrics at
+        // 5 minute intervals).
         let allValArr = Object.values(trafficInfo);
 
         let underscorinator = d => d.replace(/\s/g, '_').toLowerCase();
@@ -505,8 +518,7 @@ class ForceMap {
         let keyify = (d, s) => {
             let d_split = d.split(s);
             let ret = d_split[0].toLowerCase();
-            for (let i = 1; i < d_split.length - 1; i++)
-            {
+            for (let i = 1; i < d_split.length - 1; i++) {
                 ret += `_${d_split[i].toLowerCase()}`;
             }
             return ret;
@@ -520,10 +532,10 @@ class ForceMap {
         let types_set = new Set(types.map(d => keyify(d, ' ')));
 
         // This should have at least as many values in the range as there are entries in types. If this has fewer entries
-        // it "wraps" around, which isn't the end of the world but it's not the desired behaviour.
+        // it "wraps" around, which isn't the desired behaviour.
         let colorScale = d3.scaleOrdinal()
             .domain(types.map(d => underscorinator(d)))
-            .range(['steelblue', 'red', 'blue', 'crimson', 'cadetblue', 'darksalmon', 'skyblue', 'violet']);
+            .range(['steelblue', 'red', 'blue', 'crimson', 'cadetblue', 'darksalmon', 'skyblue', 'violet', 'gray', 'darkmagenta']);
 
         // Measurement is just the first word, i.e. "traffic" or "errors"
         let measurement_filter = (valArr, measurement) => {
@@ -541,13 +553,13 @@ class ForceMap {
         }
 
         // Set up scales
-        // xScale is time, yScale is bandwidth
+        // xScale is time
         let xScale = d3.scaleLinear()
             .domain(d3.extent(timestamps))
-            .range([0, width]);
+            .range([0, iWidth]);
         let xAxis = trafficGraph.append('g')
             .attr('id', `x_axis_${div.attr('id')}`)
-            .attr('transform', `translate(0, ${height})`)
+            .attr('transform', `translate(0, ${iHeight})`)
             .call(d3.axisBottom(xScale)
                 .ticks(10)
                 // Use d3 built in tickFormat to make this pretty
@@ -559,11 +571,12 @@ class ForceMap {
         // Axis label
         xAxis.append('text')
             .classed('axis-label-text', true)
-            .attr('transform', `translate(${width / 2}, 25)`)
+            .attr('transform', `translate(${iWidth / 2}, 25)`)
             .attr('text-anchor', 'middle')
             .text('time');
 
-        // Set up yScales
+        // Set up yScales - we want a separate scale for each of the measurements b/c using a single scale for
+        // everything hides things like the packets in/out.
         let yScales = {};
         for (let measurement of types_set) {
             yScales[measurement] = d3.scaleLinear()
@@ -571,9 +584,10 @@ class ForceMap {
                 // discards are usually 0 but they should show up on the bottom
                 .domain([0, d3.max([1, d3.max(measurement_filter(allValArr, measurement))])])
                 // .domain(d3.extent(measurement_filter(allValArr, measurement)))
-                .range([height, 0]);
+                .range([iHeight, 0]);
         }
 
+        // Create a new group
         let yAxis = trafficGraph.append('g')
             .attr('id', `y_axis_${div.attr('id')}`);
         yAxis.call(d3.axisLeft(yScales['traffic'])
@@ -624,7 +638,7 @@ class ForceMap {
                 .style('right', '20px')
                 .classed('checkbox-area', true)
                 .attr('width', `${margin.right - 20}px`)
-                .attr('height', `${height}px`);
+                .attr('height', `${iHeight}px`);
 
             if (list_items.selectAll('ul').nodes().length === 0) {
                 list_items.append('ul');
@@ -712,9 +726,10 @@ class ForceMap {
 
         } else {
 
+            // TODO: Fix the legend line.
             let inLegend = trafficGraph.append('g')
                 .attr('id', 'inLegend')
-                .attr('transform', `translate(${width}, 10)`);
+                .attr('transform', `translate(${iWidth}, 10)`);
             inLegend.append('text')
                 .attr('style', 'font: 12px sans-serif;')
                 .attr('opacity', 0.75)
@@ -724,7 +739,7 @@ class ForceMap {
                 .attr('x2', 20)
                 .attr('y1', 0)
                 .attr('y2', 0)
-                .attr('stroke', 'steelblue')
+                .attr('stroke', colorScale('traffic_in'))
                 .attr('stroke-width', '1.5px')
                 .attr('transform', `translate(30, -5)`);
             inLegend.append('circle')
@@ -735,7 +750,7 @@ class ForceMap {
 
             let outLegend = trafficGraph.append('g')
                 .attr('id', 'outLegend')
-                .attr('transform', `translate(${width}, 20)`);
+                .attr('transform', `translate(${iWidth}, 20)`);
             outLegend.append('text')
                 .attr('style', 'font: 12px sans-serif;')
                 .attr('opacity', 0.75)
@@ -745,7 +760,7 @@ class ForceMap {
                 .attr('x2', 20)
                 .attr('y1', 0)
                 .attr('y2', 0)
-                .attr('stroke', 'red')
+                .attr('stroke', colorScale('traffic_out'))
                 .attr('stroke-width', '1.5px')
                 .attr('transform', `translate(30, -5)`);
             outLegend.append('circle')
@@ -1047,6 +1062,8 @@ class ForceMap {
 
         // Shows the global tooltip on mouseover (if applicable)
         function nodeMouseoverHandler(d) {
+            console.log(d.ttl);
+
             if (d3.select(`#tooltip${CSS.escape(d.id.replace(/(\s|\.|\(|\))+/g, '_'))}`).node() !== null) return;
 
             that.floating_tooltip.transition().duration(200).style('opacity', 0.9);
@@ -1092,7 +1109,7 @@ class ForceMap {
             if (d3.select(`#tooltip${CSS.escape(d.id.replace(/(\s|\.|\(|\))+/g, '_'))}`).node() !== null) {
                 return;
             } else {
-                d3.select('#forcemap_tooltip').selectAll('div').remove();
+                d3.select('#forcemap_tooltip').selectAll('div.removable').remove();
             }
 
             // Create the tooltip div
