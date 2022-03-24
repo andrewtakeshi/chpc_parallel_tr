@@ -538,7 +538,7 @@ def system_to_d3(dest, num_runs=1):
                         if re.match(d3_conversion_utils.ip_validation_regex, split[j]):
                             ip = split[j]
                             if ip not in ip_packets.keys():
-                                ip_packets[ip] = {'ttl': split[0],
+                                ip_packets[ip] = {'ttl': int(split[0]),
                                                   'rtts': [],
                                                   'ip': ip
                                                   }
@@ -556,6 +556,7 @@ def system_to_d3(dest, num_runs=1):
                 'ip': ip,
                 'rtt': m_rtt
             })
+        pkts.sort(key=lambda p: p['ttl'])
         i += 1
         proc.stdout.close()
         proc.kill()
@@ -593,8 +594,7 @@ def add_additional_information(d3_json):
     functions called here should modify the JSON in place and should not return anything.
     :return: Modified version of d3_json.
     """
-    # TODO: Compare cost of parallel => sequential to parallel => parallel and (current) sequential => parallel.
-    remove_unknowns(d3_json)
+    # remove_unknowns(d3_json)
     d3_stardust.add_sd_info_threaded(d3_json)
     d3_geo_ip.add_geo_info_threaded(d3_json)
     d3_rdap.rdap_threaded(d3_json)

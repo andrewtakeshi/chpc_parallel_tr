@@ -341,9 +341,7 @@ function setTopojson(selectedOption) {
  * Hides or shows the map.
  */
 const toggleMapBtnHandler = async () => {
-    force_map.showMap = !force_map.showMap;
     force_map.toggleMap();
-    force_map.setSimulation();
 
     document.getElementById('map_toggle_btn').innerHTML = force_map.showMap ? '<i class="fas fa-project-diagram"></i> Network View' : '<i class="fas fa-map"></i> Map View';
     document.getElementById('map_select').classList = force_map.showMap ? 'form-select col-12' : 'd-none';

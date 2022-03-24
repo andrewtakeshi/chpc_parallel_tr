@@ -105,7 +105,7 @@ const createInternetGraph = async (traceroutes, existing = undefined) => {
                     domain: packet.domain,
                     ttl: packet.ttl,
                     max_bandwidth: packet.speed ? packet.speed : maxBW,
-                    packets: new Array(),
+                    packets: [],
                     source_ids: new Set(),
                     target_ids: new Set(),
                     lat: packet.lat,

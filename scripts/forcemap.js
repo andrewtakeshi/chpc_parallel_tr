@@ -19,7 +19,7 @@ class ForceMap {
         this.rootElement = root_element;
         this.rootElementElement = d3.select(root_element).node();
         this.width = this.rootElementElement.clientWidth;
-        this.height = 0.75 * this.rootElementElement.clientWidth;
+        this.height = 0.75 * this.width;
 
         // Map specific - see d3-geo for more information.
         // this.projection = d3.geoEquirectangular();
@@ -57,7 +57,11 @@ class ForceMap {
         this.tooltip_stats = this.floating_tooltip
             .append('div');
 
+        // Need to call setup first so we have the svg to append to
         this.setup();
+
+        // Disables or enables the map, depending on the value of this.showMap.
+        this.toggleMap(this.showMap);
     }
 
     setup() {
@@ -137,8 +141,6 @@ class ForceMap {
             .attr('y', (_, i) => (this.height / 2) / 12 * (12 - i) + 4)
             .text(d => d3.format('~s')(d) + 'bps');
 
-        // Disables or enables the map, depending on the value of this.showMap.
-        this.toggleMap();
         // Sets the desired force behavior depending on the value of this.showMap.
         this.setSimulation();
 
@@ -239,7 +241,13 @@ class ForceMap {
     /**
      * Hide or show the map, depending on the value of this.showMap.
      */
-    toggleMap() {
+    toggleMap(forceDisplay = undefined) {
+        if (forceDisplay) {
+            this.showMap = Boolean(forceDisplay);
+        } else {
+            this.showMap = !this.showMap;
+        }
+
         if (this.showMap) {
             // Draw the map, enable and reset zoom.
             this.zoom.on('zoom', this.zoomHandler);
@@ -311,7 +319,10 @@ class ForceMap {
                 .force('forceY', d3.forceY(d => this.projection([d.lon, d.lat])[1])
                     .strength(1));
         } else {
-            let denominator = d3.max(d3.selectAll('g.single_node').nodes(), d => d.__data__.ttl);
+            let denominator = () => {
+                return d3.max(d3.selectAll('g.single_node').nodes(), d => d.__data__.ttl);
+            }
+
             let that = this;
 
             this.simulation = d3.forceSimulation()
@@ -321,8 +332,8 @@ class ForceMap {
                 .force('charge', d3.forceManyBody()
                     .distanceMax(100))
                 // .force('center', d3.forceCenter(this.width / 2, this.height / 2))
-                .force('forceX', d3.forceX(d => (d.ttl * ((that.width - 100) / denominator)) + 50))
-                .force('forceY', d3.forceY(this.height / 2)
+                .force('forceX', d3.forceX(d => (d.ttl * ((that.width - 100) / denominator())) + 15))
+                .force('forceY', d3.forceY(that.height / 2)
                     .strength(0.3))
                 .force('collision', d3.forceCollide()
                     .radius(d => d.diameter));
@@ -505,7 +516,7 @@ class ForceMap {
             .append('g')
             .attr('transform', `translate(${margin.left}, ${margin.top})`);
 
-        // timestamps used for setting up y axis.
+        // timestamps used for setting up x axis.
         let timestamps = Object.keys(trafficInfo).map(d => parseInt(d));
 
         // array of objects; each object should at least have the keys ts (timestamp), traffic_in, and traffic_out. other
@@ -515,6 +526,7 @@ class ForceMap {
 
         let underscorinator = d => d.replace(/\s/g, '_').toLowerCase();
 
+        // Underscorinator but it strips the last value (i.e. no 'in' or 'out')
         let keyify = (d, s) => {
             let d_split = d.split(s);
             let ret = d_split[0].toLowerCase();
@@ -595,8 +607,9 @@ class ForceMap {
             .tickFormat(d => d3.format('~s')(d) + 'bps'));
 
         // Measurement here is the full name (i.e. traffic_in or errors_out).
-        let add_path_and_circs = (measurement, color) => {
+        let paths_and_circs = (measurement, color) => {
 
+            // also removes :)
             if (d3.select(`#${measurement}_line_${div.attr('id')}`).node() !== null) {
                 d3.select(`#${measurement}_line_${div.attr('id')}`).remove();
                 d3.select(`#${measurement}_circs_${div.attr('id')}`).remove();
@@ -663,7 +676,7 @@ class ForceMap {
                 .on('click', function (d) {
                     d3.event.stopPropagation();
                     let val = underscorinator(d);
-                    add_path_and_circs(val, colorScale(val));
+                    paths_and_circs(val, colorScale(val));
                 })
                 // Prevent dblclick on checkbox from hiding the tooltip.
                 .on('dblclick', _ => d3.event.stopPropagation());
@@ -708,25 +721,18 @@ class ForceMap {
                     yAxis.call(d3.axisLeft(yScales[key]));
                 }
 
-                if (key === 'unicast') {
-                    key = 'unicast_packets';
-                }
 
-                let _in = d3.select(`#checkbox_${key}_in_${div.attr('id')}`);
-                let _out = d3.select(`#checkbox_${key}_out_${div.attr('id')}`);
-
-                if (!_in.property('checked')) {
-                    _in.node().click();
-                }
-                if (!_out.property('checked')) {
-                    _out.node().click();
-                }
+                // let _in = d3.select(`#checkbox_${key}_in_${div.attr('id')}`);
+                // let _out = d3.select(`#checkbox_${key}_out_${div.attr('id')}`);
+                //
+                // if (!_in.property('checked')) {
+                //     _in.node().click();
+                // }
+                // if (!_out.property('checked')) {
+                //     _out.node().click();
+                // }
             });
-
-
         } else {
-
-            // TODO: Fix the legend line.
             let inLegend = trafficGraph.append('g')
                 .attr('id', 'inLegend')
                 .attr('transform', `translate(${iWidth}, 10)`);
@@ -769,8 +775,8 @@ class ForceMap {
                 .attr('fill', 'red')
                 .attr('r', 1.5);
         }
-        add_path_and_circs('traffic_in', colorScale('traffic_in'));
-        add_path_and_circs('traffic_out', colorScale('traffic_out'));
+        paths_and_circs('traffic_in', colorScale('traffic_in'));
+        paths_and_circs('traffic_out', colorScale('traffic_out'));
     }
 
     /**
@@ -819,6 +825,8 @@ class ForceMap {
      */
     update() {
         this.simulation.stop();
+
+        this.setSimulation();
 
         // Appends maxBW to the vis.
         this.getOverallMaxBW();
@@ -878,6 +886,7 @@ class ForceMap {
             let target_aliases = new Set();
             if (d.target_ids) {
                 for (let t of d.target_ids) {
+                    // node_visual_alias contains mapping from ip=>cluster and cluster=>ip
                     target_aliases.add(this.node_visual_alias.get(t));
                 }
                 for (let t of target_aliases) {

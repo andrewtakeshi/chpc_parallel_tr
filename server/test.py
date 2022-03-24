@@ -1,22 +1,4 @@
-import sys
-import threading
-
-from server import d3_conversion as d3c
-from server import d3_conversion_utils
-from server import d3_netbeam
-from server import d3_geo_ip
-from server import d3_stardust
 import time
-import difflib
-import datetime
-import sqlite3
-import requests
-import json
-from server.d3_netbeam import ip_to_resource_dict
-from server.d3_netbeam import ip_to_netbeam_db
-from server.d3_netbeam import add_netbeam_info_db_naive
-from server import d3_rdap
-import subprocess
 
 # diff = difflib.Differ()
 #
@@ -75,6 +57,7 @@ url = 'http://netbeam.es.net/api/network/esnet/prod/interfaces'
 'connection': '', 'link': '', 'tags': [], 'sector': 'INTRACLOUD', 'site': '', 'lhcone': False, 'oscars': False, 
 'intercloud': False, 'intracloud': False, 'remoteDevice': None, 'remotePort': None, 'ipv4': None}
 """
+
 
 # st = time.time()
 # con = sqlite3.connect('test.db')
@@ -199,6 +182,7 @@ def pretty_print_sd_info(in_dict):
         for val in in_dict[ts].keys():
             print(f'\t{val}: {in_dict[ts][val]}')
 
+
 def pretty_print_d3c_system(in_dict):
     in_dict = in_dict['traceroutes']
     for tr in in_dict:
@@ -214,8 +198,12 @@ def pretty_print_d3c_system(in_dict):
                         print(f'{kk}: {packet[kk]}')
                     print()
 
+
 # js = json.dumps(d3_stardust.sd_traffic_by_time_range())
 # pretty_print_d3_json(d3_stardust.sd_traffic_by_time_range())
 
 # print(d3c.system_to_d3('155.101.8.18', 1))
-pretty_print_d3c_system(d3c.system_to_d3('155.101.8.18', 1))
+# pretty_print_d3c_system(d3c.system_to_d3('155.101.8.18', 1))
+
+# print(json.dumps(tst(d3_json)))
+# packet = d3_json['traceroutes'][0]['packets'][5]
