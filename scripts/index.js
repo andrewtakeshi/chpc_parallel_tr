@@ -62,7 +62,8 @@ function addToCRTable(uuid) {
     row.cells[1].innerHTML = source ? source : self.location.hostname;
     row.cells[2].innerHTML = dest;
     row.cells[3].innerHTML = numRuns;
-    row.cells[4].innerHTML = "Pending"
+    row.cells[4].innerHTML = `<div class="spinner-border spinner-border-sm" role="status"><span class="sr-only"></span></div>`
+    row.cells[4].style.textAlign = "center";
     row.cells[5].style.textAlign = "center";
 
     // Add checkbox + ability to hide/show run via handler
@@ -73,6 +74,50 @@ function addToCRTable(uuid) {
         checkHandler(uuid, checkbox.checked).then(data => force_map.setData(data));
     }
     row.cells[5].appendChild(checkbox);
+}
+
+function cardMaker(uuid, source, dest, type, numRuns) {
+    let newCard = document.createElement("div");
+    newCard.id = id = `${uuid}_card`;
+    newCard.classList = "card bg-light mb-2";
+    newCard.innerHTML = `<div class="card-header d-flex justify-content-between align-items-center text-start">
+                            <span id="${uuid}_status">
+                                <div class="spinner-border spinner-border-sm" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                                ${numRuns} ${type} traceroute${numRuns == 1 ? `` : `s`}
+                            </span>
+                            <span id="${uuid}_controls">
+                            </span>
+                        </div>
+                        <ul class="list-group list-group-flush">
+                            <li class="list-group-item text-center">
+                                ${source ? source : config.api_server} <i class="fas fa-arrow-right"></i> ${dest}
+                            </li>
+                        </ul>`
+    return newCard;
+}
+
+/**
+ * Adds a card to the current run deck.
+ * @param uuid - ID associated with the current run.
+ */
+function addToCRDeck(uuid) {
+    if (document.getElementById("esmond_ip_dest").value === "")
+        return;
+
+    document.getElementById("cr_deck").style.visibility = "visible";
+
+    let deck = document.getElementById('cr_deck');
+
+    // Get run data from DOM
+    let source = document.getElementById("esmond_ip_source").value;
+    let dest = document.getElementById("esmond_ip_dest").value;
+    let type = source ? "pScheduler" : "System";
+    let numRuns = document.getElementById("esmond_num_runs").value;
+
+    // Add new card with run data
+    document.getElementById("cr_deck").append(cardMaker(uuid, source, dest, type, numRuns));
 }
 
 /**
@@ -89,7 +134,7 @@ let netbeamTableHelper = (ip, label, hops, speed) => {
     // Add entry if it doesn't exist. Each entry is it's own table.
     if (!document.getElementById(`table_${ip}_${label}`)) {
         let collapse_body = document.getElementById(`collapse_body_${ip}`);
-        collapse_body.innerHTML += `<table class="table table-bordered" id="table_${ip}_${label}">
+        collapse_body.innerHTML += `<table class="table table-bordered table-condensed table-sm" id="table_${ip}_${label}">
                                         <thead>
                                             <tr>
                                                 <th colspan="4" style="text-align: center">${label}</th>
@@ -98,7 +143,6 @@ let netbeamTableHelper = (ip, label, hops, speed) => {
                                                 <th>TIME</th>
                                                 <th>IN</th>
                                                 <th>OUT</th>
-                                                <th>SPEED</th>
                                             </tr>
                                         </thead>
                                         <tbody id="table_body_${ip}_${label}"></tbody>
@@ -128,13 +172,17 @@ let netbeamTableHelper = (ip, label, hops, speed) => {
         // If hop is not extant in table, adds to table
         if (!hopExists) {
             let row = tbody.insertRow();
-            for (let i = 0; i < 4; i++) {
+            for (let i = 0; i < 3; i++) {
                 row.insertCell(i);
             }
             row.cells[0].innerHTML = normalizeUTCTime(hop[0]);
             row.cells[1].innerHTML = hop[1];
+            // row.cells[1].innerHTML = d3.format('~s')(hop[1]) + 'bits';
             row.cells[2].innerHTML = hop[2];
-            row.cells[3].innerHTML = speed;
+            // row.cells[2].innerHTML = d3.format('~s')(hop[2]) + 'bits';
+            // row.cells[3].innerHTML = speed;
+            document.getElementById(`speed_${ip.split(".").join("_")}`).innerHTML = d3.format('~s')(speed) + 'bps';
+
         }
     })
 }
@@ -153,20 +201,25 @@ const netbeamTable = async (traceroutes) => {
                 // Set up card for each individual IP address. Done in traffic because
                 // it's the first table generated.
                 if (accordion_div.getElementsByClassName('card').length === 0) {
-                    accordion_div.innerHTML += `<div class="card"><div class="card-header">Netbeam Info</div></div>`;
+                    // accordion_div.innerHTML += `<div class="card"><div class="card-header">Netbeam Info</div></div>`;
                 }
-                if (!document.getElementById(`collapse_${ip}`)) {
+                let css_safe_ip = `${ip.split(".").join("_")}`
+                if (!document.getElementById(`collapse_${css_safe_ip}`)) {
                     accordion_div.innerHTML +=
-                        `<div class="card">
-                            <div class="card-header">
-                                <a class="collapsed card-link" data-toggle="collapse" href="[id='collapse_${ip}']">
-                                    ${ip}
-                                </a>
-                            </div>
-                            <div id="collapse_${ip}" class="collapse" data-parent="#netbeam_accordion">
-                                <div class="card-body" id="collapse_body_${ip}"></div>
-                            </div>
-                        </div>`;
+                        // `<div class="accordion accordion-flush" id="accordionExample">
+                            `<div class="accordion-item col-12">
+                                <h2 class="accordion-header" id="heading_${css_safe_ip}">
+                                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse_${css_safe_ip}">
+                                        ${ip} &bull;&nbsp; <span id="speed_${css_safe_ip}" class="text-secondary"></span>
+                                    </button>
+                                </h2>
+                                <div id="collapse_${css_safe_ip}" class="accordion-collapse collapse" aria-labelledby="headingOne" data-bs-parent="#netbeam_accordion">
+                                    <div class="accordion-body">
+                                        <div class="card-body" id="collapse_body_${ip}"></div>
+                                    </div>
+                                </div>
+                            </div>`;
+                    //   </div>`;
                 }
                 netbeamTableHelper(ip, 'Traffic', packet.traffic, speed);
             }
@@ -241,7 +294,7 @@ const e2eBtnHandler = async (source, dest, num_runs, uuid) => {
     let updateInQueue = () => {
         let innerHTML = '';
         if (inQueue > 0) {
-            innerHTML = `<h3>${inQueue} ${inQueue > 1 ? 'Traceroutes' : 'Traceroute'} Running</h3>`;
+            innerHTML = `${inQueue} ${inQueue > 1 ? 'Traceroutes' : 'Traceroute'} Running`;
         }
         document.getElementById('inQueue_area').innerHTML = innerHTML;
     }
@@ -256,10 +309,30 @@ const e2eBtnHandler = async (source, dest, num_runs, uuid) => {
                 updateInQueue();
                 if (value.error) {
                     // This will be timeout or pScheduler
-                    document.getElementById(`${uuid}_status`).innerHTML = value.error;
+                    document.getElementById(`${uuid}_card`).classList = "card bg-warning mb-2";
+                    document.getElementById(`${uuid}_status`).innerHTML = `<i class="fas fa-exclamation-triangle"></i> ` + value.error;
+                    let removeCardBtn = document.createElement("button");
+                    removeCardBtn.classList = "btn btn-sm btn-danger";
+                    removeCardBtn.innerHTML = `<i class="fas fa-trash"></i>`;
+                    removeCardBtn.onclick = (() => document.getElementById(`${uuid}_card`).remove());
+                    document.getElementById(`${uuid}_controls`).appendChild(removeCardBtn);
+                    // document.getElementById(`${uuid}_controls`).innerHTML = `<button class="btn btn-sm btn-danger" onclick="document.getElementById(`${uuid}_card`).remove();"><i class="fas fa-trash"></i></button>`
                     return null;
                 } else {
-                    document.getElementById(`${uuid}_status`).innerHTML = 'Finished';
+                    document.getElementById(`${uuid}_status`).innerHTML = `${num_runs} ${source ? "pScheduler" : "System"} traceroute${num_runs == 1 ? "" : "s"}`;
+                    document.getElementById(`${uuid}_card`).classList = "card bg-primary text-light mb-2";
+                    let checkbox = document.createElement('input');
+                    checkbox.type = 'checkbox';
+                    checkbox.checked = true;
+                    checkbox.onchange = function () {
+                        if (checkbox.checked) {
+                            document.getElementById(`${uuid}_card`).classList = "card bg-primary text-light mb-2";
+                        } else {
+                            document.getElementById(`${uuid}_card`).classList = "card bg-light mb-2";
+                        }
+                        checkHandler(uuid, checkbox.checked).then(data => force_map.setData(data));
+                    }
+                    document.getElementById(`${uuid}_controls`).appendChild(checkbox);
                     return value;
                 }
             },
@@ -275,9 +348,9 @@ const e2eBtnHandler = async (source, dest, num_runs, uuid) => {
     // Error occured - either timed out or pscheduler error
     if (result == null) {
         // Disable checkbox to prevent further modification
-        let checkbox = document.getElementById(`${uuid}_selected`).children[0];
-        checkbox.checked = false;
-        checkbox.disabled = true;
+        // let checkbox = document.getElementById(`${uuid}_selected`).children[0];
+        // checkbox.checked = false;
+        // checkbox.disabled = true;
         return;
     }
 
@@ -341,13 +414,17 @@ function setTopojson(selectedOption) {
  * Hides or shows the map.
  */
 const toggleMapBtnHandler = async () => {
+    // toggler = force_map.showMap
     force_map.showMap = !force_map.showMap;
-    force_map.toggleMap();
-    force_map.setSimulation();
 
     document.getElementById('map_toggle_btn').innerHTML = force_map.showMap ? '<i class="fas fa-project-diagram"></i> Network View' : '<i class="fas fa-map"></i> Map View';
-    document.getElementById('map_select').classList = force_map.showMap ? 'form-select col-12' : 'd-none';
-
+    document.getElementById('map_select_wrapper').classList = force_map.showMap ? 'form-floating col-6' : 'd-none';
+    // console.log(toggler);
+    // document.getElementById('map_select_wrapper').classList = "form-floating btn-group d-none";
+    force_map.toggleMap();
+    force_map.setSimulation();
+    // console.log(force_map.showMap);
+    console.log("toggled");
     return await updateViz();
 }
 
@@ -366,18 +443,18 @@ const mapSelectHandler = async () => {
 let waitForFinalEvent = (function () {
     let timers = {};
     return function (callback, ms, uniqueId) {
-      if (!uniqueId) {
-        uniqueId = "Don't call this twice without a uniqueId";
-      }
-      if (timers[uniqueId]) {
-        clearTimeout (timers[uniqueId]);
-      }
-      timers[uniqueId] = setTimeout(callback, ms);
+        if (!uniqueId) {
+            uniqueId = "Don't call this twice without a uniqueId";
+        }
+        if (timers[uniqueId]) {
+            clearTimeout(timers[uniqueId]);
+        }
+        timers[uniqueId] = setTimeout(callback, ms);
     };
-  })();
+})();
 
 $(window).resize(function () {
-    waitForFinalEvent(function(){
+    waitForFinalEvent(function () {
         let newWidth = d3.select('#d3_vis').node().clientWidth;
         force_map.resize(newWidth, 0.75 * newWidth);
     }, 50, "windowResize");
@@ -391,23 +468,19 @@ function resizeHandler() {
     force_map.resize(force_parent.clientWidth, 0.75 * force_parent.clientWidth);
 }
 
-function checkZoomLevels(newZoom)
-{
+function checkZoomLevels(newZoom) {
     let extent = force_map.zoom.scaleExtent();
     console.log(extent[1]);
-    if (newZoom == extent[0])
-    {
+    if (newZoom == extent[0]) {
         d3.select('#zoom_out').attr('disabled', true);
         d3.select('#zoom_reset').attr('disabled', true);
         d3.select('#zoom_in').attr('disabled', null);
     }
-    else if (newZoom === extent[1])
-    {
+    else if (newZoom === extent[1]) {
         d3.select('#zoom_in').attr('disabled', true);
         d3.select('#zoom_out').attr('disabled', null);
     }
-    else
-    {
+    else {
         d3.select('#zoom_out').attr('disabled', null);
         d3.select('#zoom_in').attr('disabled', null);
         d3.select('#zoom_reset').attr('disabled', null);

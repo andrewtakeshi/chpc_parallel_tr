@@ -48,7 +48,7 @@ const getMaxBWFromGRNOCIP = async (ip, org) => {
 
 /**
  * Get GRNOC Grafana chart url.
- * @param ip - IP address to lookup
+ * @param ip - IP address to ltraceroute ruookup
  * @param org - Org of IP address
  * @returns URL of chart.
  */

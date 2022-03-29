@@ -25,7 +25,7 @@ class ForceMap {
         this.rootElement = root_element;
         this.rootElementElement = d3.select(root_element).node();
         this.width = this.rootElementElement.clientWidth;
-        this.height = 0.75 * this.rootElementElement.clientWidth;
+        this.height = 0.5 * this.rootElementElement.clientWidth;
         
         // Map specific - see d3-geo for more information.
         // this.projection = d3.geoEquirectangular();
