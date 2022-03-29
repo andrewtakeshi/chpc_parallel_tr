@@ -502,8 +502,8 @@ def system_to_d3(dest, num_runs=1):
         proc.wait()
 
     output = []
-
     my_ip = d3_conversion_utils.my_ip()
+    i = 0
 
     # Process output of each traceroute.
     for proc in processList:

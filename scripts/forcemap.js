@@ -59,9 +59,6 @@ class ForceMap {
 
         // Need to call setup first so we have the svg to append to
         this.setup();
-
-        // Disables or enables the map, depending on the value of this.showMap.
-        this.toggleMap(this.showMap);
     }
 
     setup() {
@@ -143,6 +140,8 @@ class ForceMap {
 
         // Sets the desired force behavior depending on the value of this.showMap.
         this.setSimulation();
+        // Disables or enables the map, depending on the value of this.showMap.
+        this.toggleMap(this.showMap);
 
         // We call update directly so that we don't "collapse" any nodes + it's easier than figuring out why calling it
         // the same way that all the other updates are done doesn't work.
@@ -150,13 +149,11 @@ class ForceMap {
     }
 
     resize(width, height) {
-        // todo: remove or redraw any pinned nodes
         this.width = width;
         this.height = height;
-        console.log(`w: ${width}, h: ${height}`);
-        d3.select(this.rootElement).selectAll('svg').remove();
+        d3.select(this.rootElement).select('#mainVisSVG').remove();
         this.setup();
-        // this.simulation.alphaTarget(0.3).restart();
+        // this.toggleMap(this.showMap);
     }
 
     /************************************
@@ -242,7 +239,7 @@ class ForceMap {
      * Hide or show the map, depending on the value of this.showMap.
      */
     toggleMap(forceDisplay = undefined) {
-        if (forceDisplay) {
+        if (forceDisplay !== undefined) {
             this.showMap = Boolean(forceDisplay);
         } else {
             this.showMap = !this.showMap;
@@ -721,7 +718,7 @@ class ForceMap {
                     yAxis.call(d3.axisLeft(yScales[key]));
                 }
 
-
+                // Uncomment to make boxes get checked when scale changes
                 // let _in = d3.select(`#checkbox_${key}_in_${div.attr('id')}`);
                 // let _out = d3.select(`#checkbox_${key}_out_${div.attr('id')}`);
                 //

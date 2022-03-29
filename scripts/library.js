@@ -220,10 +220,6 @@ const clusterBy = (entities, getLabel, getRelationships, id_prefix = undefined, 
             }
         }
     }
-
-    // Filter orgs with only one.
-    console.log('From clusterby');
-    console.log(result);
     return result;
 };
 

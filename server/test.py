@@ -1,4 +1,6 @@
+import json
 import time
+from server import d3_conversion
 
 # diff = difflib.Differ()
 #
@@ -207,3 +209,5 @@ def pretty_print_d3c_system(in_dict):
 
 # print(json.dumps(tst(d3_json)))
 # packet = d3_json['traceroutes'][0]['packets'][5]
+
+print(json.dumps(d3_conversion.system_to_d3('8.8.8.8', 6)))
