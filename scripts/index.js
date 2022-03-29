@@ -1,5 +1,5 @@
-let visibleNTTs = ({ "traceroutes": [] });
-let hiddenNTTs = ({ "traceroutes": [] });
+let visibleNTTs = ({"traceroutes": []});
+let hiddenNTTs = ({"traceroutes": []});
 // Timeout values - pscheduler is 25 sec, system is 10 sec
 // const pscheduler_timeout = 25000;
 // const system_timeout = 10000;
@@ -124,7 +124,7 @@ function addToCRDeck(uuid) {
  * Adds a timeout to the API calls - this can be adjusted above
  */
 const timeout = (prom, time) => Promise.race([prom, new Promise((res) => setTimeout(
-    () => res({ 'error': 'Timed out' }),
+    () => res({'error': 'Timed out'}),
     time))]);
 
 /**
@@ -187,6 +187,7 @@ let netbeamTableHelper = (ip, label, hops, speed) => {
     })
 }
 
+// todo: update table to work with stardust
 /**
  * Adds netbeam information to table (shown below viz)
  */
@@ -207,7 +208,7 @@ const netbeamTable = async (traceroutes) => {
                 if (!document.getElementById(`collapse_${css_safe_ip}`)) {
                     accordion_div.innerHTML +=
                         // `<div class="accordion accordion-flush" id="accordionExample">
-                            `<div class="accordion-item col-12">
+                        `<div class="accordion-item col-12">
                                 <h2 class="accordion-header" id="heading_${css_safe_ip}">
                                     <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse_${css_safe_ip}">
                                         ${ip} &bull;&nbsp; <span id="speed_${css_safe_ip}" class="text-secondary"></span>
@@ -242,11 +243,10 @@ const netbeamTable = async (traceroutes) => {
 const updateViz = async () => {
     // Create new graph from
     let graph = await createInternetGraph(visibleNTTs.traceroutes);
-    let org_graph = clusterBy(graph,
+    return clusterBy(graph,
         (entity) => entity.org,
         (entity) => new Set([...entity.source_ids, ...entity.target_ids]),
         "Org");
-    return org_graph;
 }
 
 /**
@@ -347,10 +347,6 @@ const e2eBtnHandler = async (source, dest, num_runs, uuid) => {
 
     // Error occured - either timed out or pscheduler error
     if (result == null) {
-        // Disable checkbox to prevent further modification
-        // let checkbox = document.getElementById(`${uuid}_selected`).children[0];
-        // checkbox.checked = false;
-        // checkbox.disabled = true;
         return;
     }
 
@@ -360,7 +356,7 @@ const e2eBtnHandler = async (source, dest, num_runs, uuid) => {
     }
 
     // Add to the netbeam table
-    netbeamTable(result.traceroutes);
+    await netbeamTable(result.traceroutes);
 
     // Update the visualization
     visibleNTTs.traceroutes = visibleNTTs.traceroutes.concat(result.traceroutes);
@@ -414,17 +410,10 @@ function setTopojson(selectedOption) {
  * Hides or shows the map.
  */
 const toggleMapBtnHandler = async () => {
-    // toggler = force_map.showMap
-    force_map.showMap = !force_map.showMap;
-
+    // force_map.showMap = !force_map.showMap;
+    force_map.toggleMap();
     document.getElementById('map_toggle_btn').innerHTML = force_map.showMap ? '<i class="fas fa-project-diagram"></i> Network View' : '<i class="fas fa-map"></i> Map View';
     document.getElementById('map_select_wrapper').classList = force_map.showMap ? 'form-floating col-6' : 'd-none';
-    // console.log(toggler);
-    // document.getElementById('map_select_wrapper').classList = "form-floating btn-group d-none";
-    force_map.toggleMap();
-    force_map.setSimulation();
-    // console.log(force_map.showMap);
-    console.log("toggled");
     return await updateViz();
 }
 
@@ -471,16 +460,14 @@ function resizeHandler() {
 function checkZoomLevels(newZoom) {
     let extent = force_map.zoom.scaleExtent();
     console.log(extent[1]);
-    if (newZoom == extent[0]) {
+    if (newZoom === extent[0]) {
         d3.select('#zoom_out').attr('disabled', true);
         d3.select('#zoom_reset').attr('disabled', true);
         d3.select('#zoom_in').attr('disabled', null);
-    }
-    else if (newZoom === extent[1]) {
+    } else if (newZoom === extent[1]) {
         d3.select('#zoom_in').attr('disabled', true);
         d3.select('#zoom_out').attr('disabled', null);
-    }
-    else {
+    } else {
         d3.select('#zoom_out').attr('disabled', null);
         d3.select('#zoom_in').attr('disabled', null);
         d3.select('#zoom_reset').attr('disabled', null);
@@ -488,5 +475,5 @@ function checkZoomLevels(newZoom) {
 }
 
 // Create the force map. By default the map is shown and we shown the world map.
-let force_map = new ForceMap('#d3_vis');
+const force_map = new ForceMap('#d3_vis');
 setTopojson('world');

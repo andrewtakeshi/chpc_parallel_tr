@@ -11,6 +11,8 @@ rdap_cache = dict()
 # Used to protect dictionary (cache) accesses across multiple threads
 rdap_lock = threading.Lock()
 
+# https://datatracker.ietf.org/doc/html/rfc7483
+
 
 def not_found(packet):
     """
@@ -193,7 +195,7 @@ def rdap_tw(packet):
                 except:
                     pass
             return
-        # Unknown managed networks. The list can be added to, but I only ran into RIPE and ARIN.
+        # TODO: Add lacnic, afrinic, apnic ncc/rir (https://www.iana.org/numbers)
         else:
             print(f'Received response from unknown NCC; {response.url}')
             not_found(packet)

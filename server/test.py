@@ -1,22 +1,6 @@
-import sys
-import threading
-
-from server import d3_conversion as d3c
-from server import d3_conversion_utils
-from server import d3_netbeam
-from server import d3_geo_ip
-from server import d3_stardust
-import time
-import difflib
-import datetime
-import sqlite3
-import requests
 import json
-from server.d3_netbeam import ip_to_resource_dict
-from server.d3_netbeam import ip_to_netbeam_db
-from server.d3_netbeam import add_netbeam_info_db_naive
-from server import d3_rdap
-import subprocess
+import time
+from server import d3_conversion
 
 # diff = difflib.Differ()
 #
@@ -75,6 +59,7 @@ url = 'http://netbeam.es.net/api/network/esnet/prod/interfaces'
 'connection': '', 'link': '', 'tags': [], 'sector': 'INTRACLOUD', 'site': '', 'lhcone': False, 'oscars': False, 
 'intercloud': False, 'intracloud': False, 'remoteDevice': None, 'remotePort': None, 'ipv4': None}
 """
+
 
 # st = time.time()
 # con = sqlite3.connect('test.db')
@@ -192,4 +177,37 @@ url = 'http://netbeam.es.net/api/network/esnet/prod/interfaces'
 # d3_netbeam.add_netbeam_info_threaded(d3_json)
 # print(d3_json)
 
-d3_stardust.sd_traffic_by_time_range()
+def pretty_print_sd_info(in_dict):
+    for ts in in_dict.keys():
+        key_time = time.localtime(ts / 1000)
+        print(f'{key_time.tm_hour}:{format(key_time.tm_min, "02d")}:{format(key_time.tm_sec, "02d")}')
+        for val in in_dict[ts].keys():
+            print(f'\t{val}: {in_dict[ts][val]}')
+
+
+def pretty_print_d3c_system(in_dict):
+    in_dict = in_dict['traceroutes']
+    for tr in in_dict:
+        for k in tr.keys():
+            # if k == 'ts':
+            #     ts = tr[k]
+            #     ts = time.localtime(ts)
+            #     print(f'{ts.tm_hour}:{format(ts.tm_min, "02d")}:{format(ts.tm_sec, "02d")}')
+            if k == 'packets':
+                packets = tr[k]
+                for packet in packets:
+                    for kk in packet.keys():
+                        print(f'{kk}: {packet[kk]}')
+                    print()
+
+
+# js = json.dumps(d3_stardust.sd_traffic_by_time_range())
+# pretty_print_d3_json(d3_stardust.sd_traffic_by_time_range())
+
+# print(d3c.system_to_d3('155.101.8.18', 1))
+# pretty_print_d3c_system(d3c.system_to_d3('155.101.8.18', 1))
+
+# print(json.dumps(tst(d3_json)))
+# packet = d3_json['traceroutes'][0]['packets'][5]
+
+print(json.dumps(d3_conversion.system_to_d3('8.8.8.8', 6)))

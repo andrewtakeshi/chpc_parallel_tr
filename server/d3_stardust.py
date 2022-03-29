@@ -11,12 +11,12 @@ from server import config
 es = elasticsearch.Elasticsearch(hosts=['https://el.gc1.prod.stardust.es.net:9200'], timeout=30)
 
 
-def sd_traffic_by_time_range(resource='wash-cr6::atla-bb-a'):
+def sd_traffic_by_time_range(resource='lond-cr5::to_tenet_ip-b'):
     try:
         r = es.search(index='sd_public_interfaces',
                       body=
                       {
-                          'size': 30,
+                          'size': 60,
                           '_source': False,
                           'sort': [
                               {
@@ -27,14 +27,22 @@ def sd_traffic_by_time_range(resource='wash-cr6::atla-bb-a'):
                           ],
                           'fields': [
                               'values.in_bits.delta',
-                              'values.in_discards.delta',
-                              'values.in_errors.delta',
-                              'values.in_ucast_pkts.delta',
-
                               'values.out_bits.delta',
+
+                              'values.in_discards.delta',
                               'values.out_discards.delta',
+
+                              'values.in_errors.delta',
                               'values.out_errors.delta',
-                              'values.out_ucast_pkts.delta'
+
+                              'values.in_ucast_pkts.delta',
+                              'values.out_ucast_pkts.delta',
+
+                              'values.in_bcast_pkts.delta',
+                              'values.in_mcast_pkts.delta',
+
+                              'values.in_pkts.delta',
+                              'values.out_pkts.delta',
                           ],
                           'query': {
                               'bool': {
@@ -51,25 +59,59 @@ def sd_traffic_by_time_range(resource='wash-cr6::atla-bb-a'):
 
         hits = r['hits']['hits']
 
-        discards = []
-        errors = []
-        traffic = []
-        unicast_packets = []
+        # Goes from stardust api values to the values used by d3/other vis.
+        key_map = {
+            'values.in_bits.delta': 'traffic_in',
+            'values.out_bits.delta': 'traffic_out',
+
+            'values.in_discards.delta': 'discards_in',
+            'values.out_discards.delta': 'discards_out',
+
+            'values.in_errors.delta': 'errors_in',
+            'values.out_errors.delta': 'errors_out',
+
+            'values.in_ucast_pkts.delta': 'unicast_packets_in',
+            'values.out_ucast_pkts.delta': 'unicast_packets_out',
+
+            'values.in_bcast_pkts.delta': 'broadcast_packets_in',
+            'values.in_mcast_pkts.delta': 'multicast_packets_in',
+
+            'values.in_pkts.delta': 'packets_in',
+            'values.out_pkts.delta': 'packets_out'
+        }
+
+        ret = {}
+
+        # No idea why, but we need to scale everything down from stardust 30x.
+        denominator = 30
 
         for hit in hits:
             fields = hit['fields']
+            keys = fields.keys()
             ts = hit['sort'][0]
-            if 'values.in_bits.delta' in fields.keys():
-                traffic.append([ts, fields['values.in_bits.delta'][0], fields['values.out_bits.delta'][0]])
-            if 'values.in_discards.delta' in fields.keys():
-                discards.append([ts, fields['values.in_discards.delta'][0], fields['values.out_discards.delta'][0]])
-                errors.append([ts, fields['values.in_errors.delta'][0], fields['values.out_errors.delta'][0]])
-                unicast_packets.append(
-                    [ts, fields['values.in_ucast_pkts.delta'][0], fields['values.out_ucast_pkts.delta'][0]])
-        return {'traffic': traffic,
-                'unicast_packets': unicast_packets,
-                'errors': errors,
-                'discards': discards}
+
+            if ts not in ret.keys():
+                ret[ts] = {'ts': ts}
+            for key in keys:
+                ret_key = key_map[key]
+                if ret_key in ret[ts].keys():
+                    # On 5 minute intervals (i.e. xx:00, xx:05, etc) the discards, errors, etc. are available.
+                    # For whatever reason, there is a "preliminary" packet that contains roughly half the traffic
+                    # information, and only the traffic information. Then, after the discards & errors are available,
+                    # we get a second packet with the rest of the traffic information + the discards and everything else
+                    # If we don't do the += it's just inaccurate.
+                    ret[ts][ret_key] += fields[key][0]
+                else:
+                    ret[ts][ret_key] = fields[key][0]
+        for ts in ret.keys():
+            for key in ret[ts].keys():
+                if key.startswith('traffic'):
+                    ret[ts][key] /= denominator
+
+        if len(ret.keys()) == 0:
+            return None
+        else:
+            return ret
 
     except elasticsearch.exceptions.ConnectionTimeout:
         return None
@@ -88,10 +130,7 @@ def add_sd_info_tw(packet, sd_item):
     packet['speed'] = sd_item['speed']
     res = sd_traffic_by_time_range(sd_item['resource'])
     if res is not None:
-        packet['traffic'] = res['traffic']
-        packet['unicast_packets'] = res['unicast_packets']
-        packet['discards'] = res['discards']
-        packet['errors'] = res['errors']
+        packet['traffic_info'] = res
 
 
 def add_sd_info_threaded(d3_json, source_path=None):

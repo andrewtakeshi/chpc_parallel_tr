@@ -1,15 +1,18 @@
 """
 Author: Andrew Golightly
 """
+import json
 import random
 import re
-import json
-import time
 import subprocess
-import requests
 import threading
+import time
+
+import requests
 from icmplib import traceroute
-from server import config, d3_conversion_utils, d3_geo_ip, d3_rdap, d3_stardust  # d3_netbeam
+
+from server import d3_conversion_utils, d3_geo_ip, d3_rdap, d3_stardust  # d3_netbeam
+from server.config import variables as config
 
 # TODO: Add locks to everything, and variabalize the max and min limit values.
 # lock + limiter are used to limit the number of concurrent traceroutes running
@@ -37,7 +40,7 @@ def pscheduler_to_d3(source, dest, num_runs=1):
 
     # Schedule traceroute using pscheduler (allows for remote sources)
     lock.acquire()
-    if (limiter + num_runs) > config.variables['concurrent_run_limit']:
+    if (limiter + num_runs) > config['concurrent_run_limit']:
         lock.release()
         return {'error': 'over run limit'}
     else:
@@ -421,21 +424,39 @@ def system_to_d3_threaded(dest, num_runs=1):
     """
     threads = []
     returnArray = []
+    global limiter, lock
 
     dest_ip = d3_conversion_utils.target_to_ip(dest)
     if dest_ip is None:
         return {'error': 'Cannot resolve destination'}
 
+    if (limiter + num_runs) > config['concurrent_run_limit']:
+        return {'error': 'over run limit'}
+    else:
+        lock.acquire()
+        limiter += num_runs
+        lock.release()
+
     if num_runs > 1:
         for i in range(num_runs):
             threads.append(threading.Thread(target=system_to_d3_tw, args=(dest_ip, returnArray,)))
             threads[i].start()
+        """
+        Think about doing something like:
+        for i in range(num_runs):
+            with threads[i] as td:
+                td.join(timeout=...)
+        """
         for i in range(num_runs):
             threads[i].join()
     else:
         system_to_d3_tw(dest_ip, returnArray)
 
     output = {'traceroutes': returnArray}
+
+    lock.acquire()
+    limiter -= num_runs
+    lock.release()
     return add_additional_information(output)
 
 
@@ -450,7 +471,7 @@ def system_to_d3(dest, num_runs=1):
 
     i = 0
     processList = []
-    global limiter
+    global limiter, lock
 
     dest_ip = d3_conversion_utils.target_to_ip(dest)
 
@@ -460,7 +481,7 @@ def system_to_d3(dest, num_runs=1):
     # Check to make sure we can run the traceroute according to limiter.
     lock.acquire()
 
-    if (limiter + num_runs) > config.variables['concurrent_run_limit']:
+    if (limiter + num_runs) > config['concurrent_run_limit']:
         lock.release()
         return {'error': 'over run limit'}
         # print("Over the run limit. Please try again later.")
@@ -470,19 +491,22 @@ def system_to_d3(dest, num_runs=1):
         lock.release()
 
     # Run each traceroute as a subprocess - Popen runs it in the background.
-    for _ in range(num_runs):
-        processList.append(subprocess.Popen(['traceroute', dest], stdout=subprocess.PIPE, universal_newlines=True))
+    for i in range(num_runs):
+        processList.append(
+            subprocess.Popen(['traceroute', dest, '-n', '-w 1.5', f'-p {(30 * i) + config["tr_start_port"]}', '-q 1'],
+                             stdout=subprocess.PIPE, universal_newlines=True))
+        # processList.append(subprocess.Popen(['traceroute', dest], stdout=subprocess.PIPE, universal_newlines=True))
 
     # Wait for each subprocess to finish.
-    for process in processList:
-        process.wait()
+    for proc in processList:
+        proc.wait()
 
     output = []
-
     my_ip = d3_conversion_utils.my_ip()
+    i = 0
 
     # Process output of each traceroute.
-    for process in processList:
+    for proc in processList:
         output.append(dict())
         output[i]['ts'] = int(time.time())
         output[i]['source_address'] = my_ip
@@ -493,7 +517,10 @@ def system_to_d3(dest, num_runs=1):
             'ip': my_ip,
             'rtt': 0
         })
-        for line in process.communicate()[0].splitlines():
+
+        ip_packets = {}
+
+        for line in proc.communicate()[0].splitlines():
             if re.match(r'^\s*[0-9]+\s+', line):
                 split = line.split()
 
@@ -506,24 +533,33 @@ def system_to_d3(dest, num_runs=1):
                     output[i]["packets"].append(toAdd)
                 # Hop replied; additional information available
                 else:
-                    ip = ""
-                    if re.match(r'([0-9]{1,3}\.){3}[0-9]{1,3}', split[1]):
-                        ip = split[1]
-                    else:
-                        ip = re.sub(r"[()]", "", split[2])
-
-                    rttArr = re.findall(r"[0-9]+\.?[0-9]* ms", line)
-                    rtt = 0
-                    for response in rttArr:
-                        rtt += float(re.sub(r"[ms]", "", response))
-                    rtt /= len(rttArr)
-
-                    toAdd["ip"] = ip
-                    toAdd["rtt"] = rtt.__round__(3)
-                    output[i]["packets"].append(toAdd)
+                    ip = ''
+                    for j in range(1, len(split)):
+                        if re.match(d3_conversion_utils.ip_validation_regex, split[j]):
+                            ip = split[j]
+                            if ip not in ip_packets.keys():
+                                ip_packets[ip] = {'ttl': int(split[0]),
+                                                  'rtts': [],
+                                                  'ip': ip
+                                                  }
+                        elif re.match(r'[0-9]+\.?[0-9]*', split[j]):
+                            ip_packets[ip]['rtts'].append(float(split[j]))
+        pkts = output[i]['packets']
+        for ip in ip_packets.keys():
+            pkt_info = ip_packets[ip]
+            m_rtt = 0
+            for rtt in pkt_info['rtts']:
+                m_rtt += rtt
+            m_rtt /= max(len(pkt_info['rtts']), 1)
+            pkts.append({
+                'ttl': pkt_info['ttl'],
+                'ip': ip,
+                'rtt': m_rtt
+            })
+        pkts.sort(key=lambda p: p['ttl'])
         i += 1
-        process.stdout.close()
-        process.kill()
+        proc.stdout.close()
+        proc.kill()
 
     output = {'traceroutes': output}
 
@@ -533,6 +569,7 @@ def system_to_d3(dest, num_runs=1):
     lock.release()
 
     return add_additional_information(output)
+    # return output
 
 
 def remove_unknowns(d3_json):
@@ -557,8 +594,7 @@ def add_additional_information(d3_json):
     functions called here should modify the JSON in place and should not return anything.
     :return: Modified version of d3_json.
     """
-    # TODO: Compare cost of parallel => sequential to parallel => parallel and (current) sequential => parallel.
-    remove_unknowns(d3_json)
+    # remove_unknowns(d3_json)
     d3_stardust.add_sd_info_threaded(d3_json)
     d3_geo_ip.add_geo_info_threaded(d3_json)
     d3_rdap.rdap_threaded(d3_json)
