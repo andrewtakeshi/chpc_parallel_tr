@@ -20,7 +20,7 @@ class ForceMap {
         this.rootElementElement = d3.select(root_element).node();
         this.width = this.rootElementElement.clientWidth;
         this.height = 0.5 * this.rootElementElement.clientWidth;
-
+        
         // Map specific - see d3-geo for more information.
         // this.projection = d3.geoEquirectangular();
         // this.path = d3.geoPath().projection(this.projection);
@@ -34,20 +34,7 @@ class ForceMap {
         this.linkColorScale = d3.scaleQuantile()
             .domain([0, 100000000, 250000000, 500000000, 1000000000, 2000000000, 5000000000, 10000000000, 20000000000,
                 40000000000, 80000000000, 100000000000, 400000000000])
-            // .domain(d3.extent(this.nodeValues, d => d.max_bandwidth ? d.max_bandwidth : 0))
-            .range([
-                'rgb(194, 211, 231)',
-                'rgb(197, 194, 208)',
-                'rgb(198, 178, 185)',
-                'rgb(198, 161, 163)',
-                'rgb(196, 145, 142)',
-                'rgb(193, 128, 121)',
-                'rgb(189, 112, 100)',
-                'rgb(184, 95, 80)',
-                'rgb(177, 78, 61)',
-                'rgb(170, 59, 41)',
-                'rgb(163, 37, 22)',
-                'rgb(154, 0, 0)']);
+            .range(d3.range(0, 1, 0.09)) //set range to 0-1 with 14 buckets for use with d3.interpolateViridis()
 
         // Global tooltip - this is different from the "pinned" tooltips.
         this.floating_tooltip = d3.select(root_element)
@@ -67,8 +54,6 @@ class ForceMap {
             .attr('width', this.width)
             .attr('height', this.height)
             .attr('id', 'mainVisSVG')
-            // .style('stroke', 'black')
-            // .style('stroke-width', '1.8')
             .style('display', 'block')
             .style('margin', 'auto');
 
@@ -77,7 +62,7 @@ class ForceMap {
             .scaleExtent([1, 10])
             .translateExtent([[-this.width + 150, -this.height + 150], [2 * this.width - 150, 2 * this.width - 150]])
             // We use double click for something else, so we override the zoom behaviour for this event.
-            .filter(() => !(d3.event.type === 'dblclick' || d3.event.type === 'wheel'))
+            .filter(() => !(d3.event.type === 'dblclick'))
             .on('zoom', this.zoomHandler);
 
         // All d3-force related things go to forceG.
@@ -124,7 +109,7 @@ class ForceMap {
             .attr('height', (this.height / 2) / 12)
             .attr('stroke', d => d)
             .attr('stroke-width', '1px')
-            .attr('fill', d => d)
+            .attr('fill', d => d3.interpolateViridis(d))
             .attr('x', 0)
             .attr('y', (_, i) => (this.height / 2) / 12 * (11 - i));
 
@@ -184,20 +169,22 @@ class ForceMap {
 
     /**
      * get the current zoom level
-     * @returns
+     * @returns 
      */
     zoomInfo() {
         let zoomOutline = this.mapG.selectAll('path').node();
         return zoomOutline ? d3.zoomTransform(zoomOutline).k : 1;
     }
 
-    zoomIn() {
+    zoomIn()
+    {
         let newZoom = this.getNewZoomLevel(true);
         this.zoom.scaleTo(this.svg, newZoom);
         return newZoom;
     }
 
-    zoomOut() {
+    zoomOut()
+    {
         let newZoom = this.getNewZoomLevel(false);
         this.zoom.scaleTo(this.svg, newZoom);
         return newZoom;
@@ -217,7 +204,6 @@ class ForceMap {
      * Defines zoom behavior.
      */
     zoomHandler() {
-        console.log('inside zoom handler');
         // Map transforms
         d3.select('#mapGroup')
             .selectAll('path')
@@ -621,25 +607,26 @@ class ForceMap {
             .tickFormat(d => d3.format('~s')(d) + 'bps'));
 
         // Measurement here is the full name (i.e. traffic_in or errors_out).
-        let paths_and_circs = (measurement, color) => {
+        let paths_and_circs = (measurement) => {
 
-            // also removes :)
             if (d3.select(`#${measurement}_line_${div.attr('id')}`).node() !== null) {
                 d3.select(`#${measurement}_line_${div.attr('id')}`).remove();
                 d3.select(`#${measurement}_circs_${div.attr('id')}`).remove();
                 return;
             }
 
-            // let selectedYScale = yScales[`${measurement.split('_')[0]}`];
+            let measure_key = keyify(measurement, '_');
+
             // should be everything except for the first/last
-            let selectedYScale = yScales[keyify(measurement, '_')];
+            let selectedYScale = yScales[measure_key];
 
             trafficGraph.append('path')
                 .attr('id', `${measurement}_line_${div.attr('id')}`)
                 .datum(allValArr.filter(d => `${measurement}` in d))
+                .classed('stardust_metrics', true)
+                .classed(`stardust_${measure_key}`, true)
+                .classed("stardust_out", measurement.includes("out"))
                 .attr('fill', 'none')
-                .attr('stroke', color)
-                .attr('stroke-width', 1.5)
                 .attr('d', d3.line()
                     .x(d => xScale(d.ts))
                     .y(d => selectedYScale(d[measurement]))
@@ -652,7 +639,6 @@ class ForceMap {
                 .data(allValArr.filter(d => `${measurement}` in d))
                 .join('circle')
                 .attr('r', 1.5)
-                .attr('fill', color)
                 .attr('cx', d => xScale(d.ts))
                 .attr('cy', d => selectedYScale(d[measurement]))
                 .on('mouseover', d => console.log(d[measurement]));
@@ -690,7 +676,7 @@ class ForceMap {
                 .on('click', function (d) {
                     d3.event.stopPropagation();
                     let val = underscorinator(d);
-                    paths_and_circs(val, colorScale(val));
+                    paths_and_circs(val);
                 })
                 // Prevent dblclick on checkbox from hiding the tooltip.
                 .on('dblclick', _ => d3.event.stopPropagation());
@@ -701,7 +687,9 @@ class ForceMap {
 
             checkboxes.append('label')
                 .attr('for', d => `checkbox_${underscorinator(d)}_${div.attr('id')}`)
-                .style('color', d => colorScale(underscorinator(d)))
+                .attr('class', d => `stardust_${keyify(d, '_')} stardust_metrics`)
+                .classed('stardust_out', d => d.toLowerCase().includes('out'))
+                // .style('color', d => colorScale(underscorinator(d)))
                 .text(d => d);
 
             let yScaleRow = div.append('div')
@@ -734,7 +722,6 @@ class ForceMap {
                 } else {
                     yAxis.call(d3.axisLeft(yScales[key]));
                 }
-
                 // Uncomment to make boxes get checked when scale changes
                 // let _in = d3.select(`#checkbox_${key}_in_${div.attr('id')}`);
                 // let _out = d3.select(`#checkbox_${key}_out_${div.attr('id')}`);
@@ -752,20 +739,18 @@ class ForceMap {
                 .attr('transform', `translate(${iWidth}, 10)`);
             inLegend.append('text')
                 .attr('style', 'font: 12px sans-serif;')
-                .attr('opacity', 0.75)
                 .text('in:');
             inLegend.append('line')
                 .attr('x1', 0)
-                .attr('x2', 20)
+                .attr('x2', 40)
                 .attr('y1', 0)
                 .attr('y2', 0)
-                .attr('stroke', colorScale('traffic_in'))
-                .attr('stroke-width', '1.5px')
+                .classed('stardust_traffic', true)
+                .classed('stardust_metrics', true)
                 .attr('transform', `translate(30, -5)`);
             inLegend.append('circle')
-                .attr('cx', 40)
+                .attr('cx', 50)
                 .attr('cy', -5)
-                .attr('fill', 'steelblue')
                 .attr('r', 1.5);
 
             let outLegend = trafficGraph.append('g')
@@ -773,24 +758,23 @@ class ForceMap {
                 .attr('transform', `translate(${iWidth}, 20)`);
             outLegend.append('text')
                 .attr('style', 'font: 12px sans-serif;')
-                .attr('opacity', 0.75)
                 .text('out:');
             outLegend.append('line')
                 .attr('x1', 0)
-                .attr('x2', 20)
+                .attr('x2', 40)
                 .attr('y1', 0)
                 .attr('y2', 0)
-                .attr('stroke', colorScale('traffic_out'))
-                .attr('stroke-width', '1.5px')
+                .classed('stardust_traffic', true)
+                .classed('stardust_metrics', true)
+                .classed('stardust_out', true)
                 .attr('transform', `translate(30, -5)`);
             outLegend.append('circle')
-                .attr('cx', 40)
+                .attr('cx', 50)
                 .attr('cy', -5)
-                .attr('fill', 'red')
                 .attr('r', 1.5);
         }
-        paths_and_circs('traffic_in', colorScale('traffic_in'));
-        paths_and_circs('traffic_out', colorScale('traffic_out'));
+        paths_and_circs('traffic_in');
+        paths_and_circs('traffic_out');
     }
 
     /**
@@ -882,6 +866,9 @@ class ForceMap {
             .domain(d3.extent([...this.node_data.values()], v => v.packets.length))
             .range([16, 24]);
 
+        let packet_scale_domain = [];
+
+
         // Preload ATR Grafana iFrames for rendered IP nodes and generate links
         // TODO: Fix preload of iframes, the url is broken for whatever reason.
         for (let d of this.nodeValues) {
@@ -909,14 +896,18 @@ class ForceMap {
                         let target = this.all_nodes_flat.get(t);
                         let d_mbw = d.max_bandwidth ? d.max_bandwidth : 0;
                         let t_mbw = target.max_bandwidth ? target.max_bandwidth : 0;
+                        let unknown_bw = !(d.max_bandwidth && target.max_bandwidth);
+                        packet_scale_domain.push(target.packets.length);
                         this.vLinks.push(({
                             source: d,
                             target: target,
                             // TODO: Tweak value of packet_scale to make links more visible + easier to hover over.
                             // Used to determine the width of the line.
                             packet_scale: Math.sqrt(target.packets.length),
+                            packet_count: target.packets.length, //
                             // Used to determine line color + append info on hover.
-                            max_bandwidth: Math.min(d_mbw, t_mbw)
+                            max_bandwidth: Math.min(d_mbw, t_mbw),
+                            unknown_bw: unknown_bw
                         }));
                     }
                 }
@@ -926,6 +917,8 @@ class ForceMap {
             d.diameter = nodeDiameterScale(d.packets.length);
             d.radius = d.diameter / 2;
         }
+
+        let packet_scale = d3.scaleLinear().domain(d3.extent(packet_scale_domain)).range([3, 7]);
 
         // Lambda to check for unknown or undefined domains - returns true if domain is known, false otherwise.
         let known = (domain) => domain !== null && domain !== 'unknown' && typeof domain !== 'undefined';
@@ -980,6 +973,8 @@ class ForceMap {
         d3.selectAll('.single_node')
             .call(this.nodeDrag());
 
+
+        // begin todo: attempt to make nodes appear in right place
         // let all_nodes = d3.select('#forceGroup')
         //     .selectAll('g.single_node');
 
@@ -1001,6 +996,9 @@ class ForceMap {
                 .attr('transform', d3.event.transform);
         }
 
+        // end todo
+
+
         // Append defs so we can create our markers.
         if (this.forceG.select('defs').empty()) {
             this.forceG.append('defs');
@@ -1020,12 +1018,13 @@ class ForceMap {
             .attr('id', (d, i) => `marker_${i}`)
             .attr('markerWidth', markerWidth)
             .attr('markerHeight', markerHeight)
-            .attr('refX', d => (d.target.radius / d.packet_scale) + markerWidth)
+            .attr('refX', d => (markerWidth*1.25))
+            // .attr('fake', (d => console.log(markerWidth*1.25)))
             .attr('refY', markerHeight / 2)
             .attr('orient', 'auto')
             .append('polygon')
             .attr('points', `0 0, ${markerWidth + ' ' + markerHeight / 2}, 0 ${markerHeight}`)
-            .attr('fill', d => this.linkColorScale(d.max_bandwidth))
+            .attr('fill', d => d3.interpolateViridis(this.linkColorScale(d.max_bandwidth))) //viridis is a color-blind accessible color scale
             .on('mouseover', linkMouseOverHandler)
             .on('mouseout', linkMouseOutHandler)
             .on('mousemove', () => {
@@ -1038,8 +1037,10 @@ class ForceMap {
             .data(this.vLinks)
             .join('line')
             .classed('link', true)
-            .attr('stroke-width', d => d.packet_scale)
-            .attr('stroke', d => this.linkColorScale(d.max_bandwidth))
+            .attr('stroke-width', d => packet_scale(d.packet_count))
+            .attr('stroke', d => d3.interpolateViridis(this.linkColorScale(d.max_bandwidth))) //viridis is a color-blind accessible color scale
+            // Should be dashed if the bandwidth is unknown
+            .classed('unknown_bw_dashed', d => d.unknown_bw)
             // Marker end using the markers defined above.
             .attr('marker-end', (d, i) => `url(#marker_${i})`)
             // Add ability to view link speed on mouseover.
@@ -1140,6 +1141,7 @@ class ForceMap {
         function nodeClickHandler(d) {
             d3.event.preventDefault();
             if (that.expandNode(d)) {
+                console.log('calling update from nodeClickHandler');
                 that.update();
             }
         }

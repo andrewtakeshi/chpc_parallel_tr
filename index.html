@@ -64,9 +64,15 @@
         div.tooltip {
             position: absolute;
             opacity: 0;
-            background-color: rgba(242, 242, 242, 0.8);
+            background-color: rgba(255, 255, 255, 0.9);
             border-radius: 10px;
             word-wrap: break-word;
+            border-color: rgba(0,0,0,0.1);
+            border-style: solid;
+        }
+
+        div.checkbox-area {
+            background-color: rgba(255, 255, 255, 1);
         }
 
         div.checks {
@@ -122,75 +128,125 @@
         .table-condensed {
             font-size: 12px;
         }
+
+        /* stardust metrics */
+        .stardust_metrics {
+            stroke-width: 3;
+            font-weight: bold;
+        }
+
+        .unknown_bw_dashed {
+            stroke-dasharray: 10 5;
+        }
+
+        .stardust_out {
+            stroke-dasharray: 10;
+            text-decoration: dashed underline !important;
+        }
+
+        .stardust_traffic {
+            stroke: #81d34d;
+            color: #81d34d;
+        }
+
+        .stardust_discards {
+            stroke: #433e85;
+            color: #433e85;
+        }
+
+        .stardust_errors {
+            stroke: #440154;
+            color: #440154;
+        }
+
+        .stardust_pkts {
+            stroke: #4ec36b;
+            color: #4ec36b;
+        }
+
+        .stardust_broadcast {
+            stroke: #29af7f;
+            color: #29af7f;
+        }
+
+        .stardust_unicast {
+            stroke: #25848e;
+            color: #25848e;
+        }
+
+        .stardust_multicast_pkts {
+            stroke: #38588c;
+            color: #38588c;
+        }
     </style>
 </head>
 
 <body>
-<div id="navbar_area">
-    <nav class="navbar navbar-expand-md navbar-light bg-light border-bottom">
-        <div class="container-fluid">
-            <a class="navbar-brand" href="./index.html">Parallel Traceroute</a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse"
+    <div id="navbar_area">
+        <nav class="navbar navbar-expand-md navbar-light bg-light border-bottom">
+            <div class="container-fluid">
+                <a class="navbar-brand" href="./index.html">Parallel Traceroute</a>
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse"
                     data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent"
                     aria-expanded="false" aria-label="Toggle navigation">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-            <div class="collapse navbar-collapse" id="navbarSupportedContent">
-                <ul class="navbar-nav me-auto mb-lg-0">
-                    <li class="nav-item">
-                        <a class="nav-link" href="./about.html">About</a>
-                    </li>
-                </ul>
-                <form class="d-flex">
-                    <button id="reset_config_btn" class="btn btn-outline-danger"
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+                <div class="collapse navbar-collapse" id="navbarSupportedContent">
+                    <ul class="navbar-nav me-auto mb-lg-0">
+                        <li class="nav-item">
+                            <a class="nav-link" href="./about.html">About</a>
+                        </li>
+                    </ul>
+                    <form class="d-flex">
+                        <button id="reset_config_btn" class="btn btn-outline-danger"
                             onclick="resetBtnHandler().then(data => force_map.setData(data));">
-                        <i class="fas fa-trash"></i> Reset Page
-                    </button>
-                </form>
+                            <i class="fas fa-trash"></i> Reset Page
+                        </button>
+                    </form>
+                </div>
             </div>
-        </div>
-    </nav>
-</div>
+        </nav>
+    </div>
 
-<div class="container-fluid">
-    <div class="row row-cols-1">
+    <div class="container-fluid">
+        <div class="row row-cols-1">
 
-        <div class="col bg-light h-100 col-xl-3 row row-cols-1 row-cols-md-3 row-cols-xl-1">
-            <form id="esmond_form" name="esmond_form" class="col mb-2 border-rounded col-12 col-md-4 col-xl-12"
-                  onsubmit="return false">
-                <div class="d-flex justify-content-between">
+            <div class="col bg-light h-100 col-xl-3 row row-cols-1 row-cols-md-3 row-cols-xl-1">
+                <form id="esmond_form" name="esmond_form" class="col mb-2 border-rounded col-12 col-md-4 col-xl-12"
+                    onsubmit="return false">
+                    <div class="d-flex justify-content-between">
                         <span>
                             Run Traceroute(s)
                         </span>
-                    <span>
+                        <span>
                             <i class="fas fa-question" data-toggle="tooltip" data-placement="bottom" data-html="true"
-                               title="Source:  ip/hostname or leave blank for system traceroute
-Dest:   ip/hostname
+                                title="Source:  ip/hostname or leave blank for system traceroute
+Dest:   ip/hostname  
 e.g. 1.1.1.1/cloudflare.com">
 
                             </i>
                         </span>
-                </div>
-                <div class="col-12 col-xl-12">
-                    <div class="form-floating mb-2">
-                        <input type="text" name="esmond_ip_source" id="esmond_ip_source" placeholder=""
-                               class="form-control">
-                        <label for="esmond_ip_source">Source </label>
                     </div>
-                    <div class="form-floating mb-2">
-                        <input type="text" name="esmond_ip_dest" id="esmond_ip_dest" placeholder=""
-                               class="form-control">
-                        <label for="esmond_ip_dest">Destination</label>
-                    </div>
-                    <!-- </div> -->
-                    <div class="btn-group col-12">
-                        <div class="form-floating col-sm-6 col-6">
-                            <input type="number" name="esmond_num_runs" id="esmond_num_runs" value="1" min="1"
-                                   max="10" class="form-control">
-                            <label for="esmond_num_runs">Count</label>
+                    <div class="col-12 col-xl-12">
+                        <div class="form-floating mb-2">
+                            <input type="text" name="esmond_ip_source" id="esmond_ip_source" placeholder=""
+                                class="form-control">
+                            <label for="esmond_ip_source">Source </label>
                         </div>
+                        <div class="form-floating mb-2">
+                            <input type="text" name="esmond_ip_dest" id="esmond_ip_dest" placeholder=""
+                                class="form-control">
+                            <label for="esmond_ip_dest">Destination</label>
+                        </div>
+                        <!-- </div> -->
+                        <div class="btn-group col-12">
+                            <div class="form-floating col-sm-6 col-6">
+                                <input type="number" name="esmond_num_runs" id="esmond_num_runs" value="1" min="1"
+                                    max="10" class="form-control">
+                                <label for="esmond_num_runs">Count</label>
+                            </div>
 
-                        <button id="e2e_btn" name="e2e_btn" class="btn btn-primary" onclick="let unique = uuid.v4();
+                            <button id="e2e_btn" name="e2e_btn" class="btn btn-primary" onclick="let unique = uuid.v4();
                                         let source = document.getElementById('esmond_ip_source').value;
                                         let dest = document.getElementById('esmond_ip_dest').value;
                                         let num_runs = document.getElementById('esmond_num_runs').value;
@@ -198,75 +254,75 @@ e.g. 1.1.1.1/cloudflare.com">
                                         e2eBtnHandler(source, dest, num_runs, unique).then(data => {
                                             force_map.setData(data);
                                         });" type="submit" class="btn btn-outline-primary">
-                            <i class="fas fa-play"></i> Run
-                        </button>
+                                <i class="fas fa-play"></i> Run
+                            </button>
+                        </div>
+                    </div>
+                </form>
+
+                <div id="cr_deck" class="col col-12 col-md-4 col-xl-12 overflow-auto">
+                    <div class="d-flex justify-content-between">
+                        <span>Past Runs</span>
+                        <span id="inQueue_area"></span>
+                    </div>
+
+                </div>
+
+                <div id="netbeam_table_area" style="display: none" class="col col-12 d-flex overflow-auto">
+                    <div style="display:none">
+                        Netbeam&nbsp;Metrics
+                    </div>
+                    <div id="netbeam_accordion" class="accordion accordion-flush w-100">
                     </div>
                 </div>
-            </form>
 
-            <div id="cr_deck" class="col col-12 col-md-4 col-xl-12 overflow-auto">
-                <div class="d-flex justify-content-between">
-                    <span>Past Runs</span>
-                    <span id="inQueue_area"></span>
-                </div>
 
             </div>
-
-            <div id="netbeam_table_area" style="display: none" class="col col-12 d-flex overflow-auto">
-                <div style="display:none">
-                    Netbeam&nbsp;Metrics
-                </div>
-                <div id="netbeam_accordion" class="accordion accordion-flush w-100">
-                </div>
-            </div>
-
-
-        </div>
-        <div class="col-xl-9 col-lg-12">
-            <div class="row row-cols-1 row-cols-sm-2 col-12 g-0">
-                <div class="col btn-group col-12 col-sm-6">
-                    <div class="col-6">
-                        <button id="refresh_vis_btn" class="btn btn-outline-danger form-control h-100"
+            <div class="col-xl-9 col-lg-12">
+                <div class="row row-cols-1 row-cols-sm-2 col-12 g-0">
+                    <div class="col btn-group col-12 col-sm-6">
+                        <div id="refresh_button_div" class="col-6">
+                            <button id="refresh_vis_btn" class="btn btn-outline-danger form-control h-100"
                                 onclick="updateViz().then(data => force_map.setData(data));">
-                            <i class="fas fa-undo"></i> Refresh Network
+                                <i class="fas fa-undo"></i> Refresh Network
+                            </button>
+                        </div>
+                        <button id="zoom_in" class="btn btn-outline-dark zoom_control" onclick="let currentZoom = force_map.zoomIn();
+                                checkZoomLevels(currentZoom);
+                                ">
+                            <i class="fas fa-search-plus"></i>
+                        </button>
+                        <button disabled id="zoom_out" class="btn btn-outline-dark zoom_control" onclick="let currentZoom = force_map.zoomOut();
+                                checkZoomLevels(currentZoom);
+                                ">
+                            <i class="fas fa-search-minus"></i>
+                        </button>
+                        <button disabled id="zoom_reset" class="btn btn-outline-dark zoom_control"
+                            onclick="force_map.svg.call(force_map.zoom.transform, d3.zoomIdentity); checkZoomLevels(1); ">
+                            <i class="fas fa-expand"></i>
                         </button>
                     </div>
-                    <button id="zoom_in" class="btn btn-outline-dark" onclick="let currentZoom = force_map.zoomIn();
-                                checkZoomLevels(currentZoom);
-                                ">
-                        <i class="fas fa-search-plus"></i>
-                    </button>
-                    <button disabled id="zoom_out" class="btn btn-outline-dark" onclick="let currentZoom = force_map.zoomOut();
-                                checkZoomLevels(currentZoom);
-                                ">
-                        <i class="fas fa-search-minus"></i>
-                    </button>
-                    <button disabled id="zoom_reset" class="btn btn-outline-dark"
-                            onclick="force_map.svg.call(force_map.zoom.transform, d3.zoomIdentity); checkZoomLevels(1); ">
-                        <i class="fas fa-expand"></i>
-                    </button>
-                </div>
-                <div class="col col-12 col-sm-6 btn-group">
-                    <button id="map_toggle_btn" class="btn btn-outline-success col-6"
+                    <div class="col col-12 col-sm-6 btn-group">
+                        <button id="map_toggle_btn" class="btn btn-outline-success col-6"
                             onclick="toggleMapBtnHandler()">
-                        <i class="fas fa-project-diagram"></i> Network View
-                    </button>
-                    <!-- <div class="btn-group"> -->
-                    <div id="map_select_wrapper" class="form-floating col-6">
-                        <select class="form-select h-100" id="map_select" onchange="mapSelectHandler();">
-                            <option selected value="world">World</option>
-                            <option value="us">Contiguous United States</option>
-                            <option value="eu">Europe</option>
-                        </select>
-                        <label for="map_select">Map</label>
-                        <!-- </div> -->
+                            <i class="fas fa-project-diagram"></i> Network View
+                        </button>
+                        <!-- <div class="btn-group"> -->
+                        <div id="map_select_wrapper" class="form-floating col-6">
+                            <select class="form-select h-100" id="map_select" onchange="mapSelectHandler();">
+                                <option selected value="world">World</option>
+                                <option value="us">Contiguous United States</option>
+                                <option value="eu">Europe</option>
+                            </select>
+                            <label for="map_select">Map</label>
+                            <!-- </div> -->
+                        </div>
                     </div>
                 </div>
+                <div id="d3_vis"></div>
             </div>
-            <div id="d3_vis"></div>
         </div>
     </div>
-</div>
 
 </body>
 

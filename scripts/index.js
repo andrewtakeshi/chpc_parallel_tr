@@ -1,5 +1,5 @@
-let visibleNTTs = ({"traceroutes": []});
-let hiddenNTTs = ({"traceroutes": []});
+let visibleNTTs = ({ "traceroutes": [] });
+let hiddenNTTs = ({ "traceroutes": [] });
 // Timeout values - pscheduler is 25 sec, system is 10 sec
 // const pscheduler_timeout = 25000;
 // const system_timeout = 10000;
@@ -410,10 +410,17 @@ function setTopojson(selectedOption) {
  * Hides or shows the map.
  */
 const toggleMapBtnHandler = async () => {
+    // toggler = force_map.showMap
     // force_map.showMap = !force_map.showMap;
+
     force_map.toggleMap();
+
+
+    document.getElementById('refresh_button_div').classList = force_map.showMap ? ["col-6"] : ["col-12"];
     document.getElementById('map_toggle_btn').innerHTML = force_map.showMap ? '<i class="fas fa-project-diagram"></i> Network View' : '<i class="fas fa-map"></i> Map View';
     document.getElementById('map_select_wrapper').classList = force_map.showMap ? 'form-floating col-6' : 'd-none';
+    Array.from(document.getElementsByClassName('zoom_control')).forEach(elem => force_map.showMap ? elem.style.display="" : elem.style.display="none");
+
     return await updateViz();
 }
 
