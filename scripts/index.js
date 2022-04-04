@@ -445,8 +445,8 @@ let waitForFinalEvent = (function () {
 $(window).resize(function () {
     waitForFinalEvent(function () {
         let newWidth = d3.select('#d3_vis').node().clientWidth;
-        force_map.resize(newWidth, 0.75 * newWidth);
-    }, 50, "windowResize");
+        force_map.resize(newWidth, 0.5 * newWidth);
+    }, 150, "windowResize");
 });
 
 function resizeHandler() {
@@ -454,7 +454,7 @@ function resizeHandler() {
     // force_map = new ForceMap('#d3_vis', force_map.geojson);
     // updateViz().then(data => force_map.setData(data));
     let force_parent = d3.select('#d3_vis').node();
-    force_map.resize(force_parent.clientWidth, 0.75 * force_parent.clientWidth);
+    force_map.resize(force_parent.clientWidth, 0.5 * force_parent.clientWidth);
 }
 
 function checkZoomLevels(newZoom) {

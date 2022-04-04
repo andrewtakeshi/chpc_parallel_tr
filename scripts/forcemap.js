@@ -20,7 +20,7 @@ class ForceMap {
         this.rootElementElement = d3.select(root_element).node();
         this.width = this.rootElementElement.clientWidth;
         this.height = 0.5 * this.rootElementElement.clientWidth;
-        
+
         // Map specific - see d3-geo for more information.
         // this.projection = d3.geoEquirectangular();
         // this.path = d3.geoPath().projection(this.projection);
@@ -153,7 +153,21 @@ class ForceMap {
         this.height = height;
         d3.select(this.rootElement).select('#mainVisSVG').remove();
         this.setup();
-        // this.simulation.alphaTarget(0.3).restart();
+        let nodes = this.simulation.nodes();
+
+        nodes.forEach(d => {
+            d.x = this.projection([d.lon, d.lat])[0];
+            d.y = this.projection([d.lon, d.lat])[1];
+        });
+
+        this.simulation.stop();
+
+        nodes.forEach(d => {
+            d.fx = null;
+            d.fy = null;
+        });
+
+        this.simulation.alpha(1).restart();
     }
 
     /************************************
@@ -203,6 +217,7 @@ class ForceMap {
      * Defines zoom behavior.
      */
     zoomHandler() {
+        console.log('inside zoom handler');
         // Map transforms
         d3.select('#mapGroup')
             .selectAll('path')
@@ -237,6 +252,8 @@ class ForceMap {
 
     /**
      * Hide or show the map, depending on the value of this.showMap.
+     * @param {boolean|T} forceDisplay - by default this is undefined. If it is undefined, the function toggles the value
+     * of this.showMap. If forceDisplay is defined (bool) then this.showMap is set to the value of forceDisplay.
      */
     toggleMap(forceDisplay = undefined) {
         if (forceDisplay !== undefined) {
@@ -443,9 +460,9 @@ class ForceMap {
         }
 
         function dragended(d) {
-            if (!d3.event.active) {
-                simulation.alphaTarget(0);
-            }
+            // if (!d3.event.active) {
+            //     simulation.alphaTarget(0);
+            // }
             d.fx = null;
             d.fy = null;
         }
@@ -821,6 +838,7 @@ class ForceMap {
      * Contains all the handlers as well, although they could likely be moved outside of this function.
      */
     update() {
+        console.log('called update');
         this.simulation.stop();
 
         this.setSimulation();
@@ -962,6 +980,27 @@ class ForceMap {
         d3.selectAll('.single_node')
             .call(this.nodeDrag());
 
+        // let all_nodes = d3.select('#forceGroup')
+        //     .selectAll('g.single_node');
+
+        // If force nodes exist, perform force transforms
+        if (this.allNodes.nodes().length > 0) {
+            // Select image and circle and perform appropriate transforms
+            this.allNodes.selectAll('circle')
+                .attr('r', d => d.radius / d3.event.transform.k)
+                .attr('stroke-width', 1 / d3.event.transform.k);
+            this.allNodes.selectAll('image')
+                .attr('width', d => d.diameter / d3.event.transform.k)
+                .attr('height', d => d.diameter / d3.event.transform.k)
+                .attr('x', d => (-d.radius) / d3.event.transform.k)
+                .attr('y', d => (-d.radius) / d3.event.transform.k);
+
+            // No link transformation needed because of 'vector-effect : non-scaling-stroke' in CSS.
+            // Move the entire force group
+            d3.select('#forceGroup')
+                .attr('transform', d3.event.transform);
+        }
+
         // Append defs so we can create our markers.
         if (this.forceG.select('defs').empty()) {
             this.forceG.append('defs');
@@ -1016,6 +1055,7 @@ class ForceMap {
         if (!this.showMap) {
             this.simulation.force('link', d3.forceLink(this.vLinks).id(d => d.id));
         }
+
         this.simulation.alpha(1).restart();
 
         /* ###### Helpers and Handlers ####### */
@@ -1068,8 +1108,6 @@ class ForceMap {
 
         // Shows the global tooltip on mouseover (if applicable)
         function nodeMouseoverHandler(d) {
-            console.log(d.ttl);
-
             if (d3.select(`#tooltip${CSS.escape(d.id.replace(/(\s|\.|\(|\))+/g, '_'))}`).node() !== null) return;
 
             that.floating_tooltip.transition().duration(200).style('opacity', 0.9);
@@ -1137,7 +1175,7 @@ class ForceMap {
 
             // Make draggable on mousedown
             tooltip.on('mousedown', function () {
-                d3.event.preventDefault();
+                // d3.event.preventDefault();
                 d3.select(this).raise();
                 draggable = true;
                 initialX = d3.event.clientX;
