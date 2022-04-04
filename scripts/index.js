@@ -417,8 +417,10 @@ const toggleMapBtnHandler = async () => {
     // toggler = force_map.showMap
     force_map.showMap = !force_map.showMap;
 
+    document.getElementById('refresh_button_div').classList = force_map.showMap ? ["col-6"] : ["col-12"];
     document.getElementById('map_toggle_btn').innerHTML = force_map.showMap ? '<i class="fas fa-project-diagram"></i> Network View' : '<i class="fas fa-map"></i> Map View';
     document.getElementById('map_select_wrapper').classList = force_map.showMap ? 'form-floating col-6' : 'd-none';
+    Array.from(document.getElementsByClassName('zoom_control')).forEach(elem => force_map.showMap ? elem.style.display="" : elem.style.display="none");
     // console.log(toggler);
     // document.getElementById('map_select_wrapper').classList = "form-floating btn-group d-none";
     force_map.toggleMap();
