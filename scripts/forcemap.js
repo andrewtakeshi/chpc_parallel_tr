@@ -446,9 +446,9 @@ class ForceMap {
         }
 
         function dragended(d) {
-            // if (!d3.event.active) {
-            //     simulation.alphaTarget(0);
-            // }
+            if (!d3.event.active) {
+                simulation.alphaTarget(0);
+            }
             d.fx = null;
             d.fy = null;
         }
@@ -979,22 +979,22 @@ class ForceMap {
         //     .selectAll('g.single_node');
 
         // If force nodes exist, perform force transforms
-        if (this.allNodes.nodes().length > 0) {
-            // Select image and circle and perform appropriate transforms
-            this.allNodes.selectAll('circle')
-                .attr('r', d => d.radius / d3.event.transform.k)
-                .attr('stroke-width', 1 / d3.event.transform.k);
-            this.allNodes.selectAll('image')
-                .attr('width', d => d.diameter / d3.event.transform.k)
-                .attr('height', d => d.diameter / d3.event.transform.k)
-                .attr('x', d => (-d.radius) / d3.event.transform.k)
-                .attr('y', d => (-d.radius) / d3.event.transform.k);
-
-            // No link transformation needed because of 'vector-effect : non-scaling-stroke' in CSS.
-            // Move the entire force group
-            d3.select('#forceGroup')
-                .attr('transform', d3.event.transform);
-        }
+        // if (this.allNodes.nodes().length > 0) {
+        //     // Select image and circle and perform appropriate transforms
+        //     this.allNodes.selectAll('circle')
+        //         .attr('r', d => d.radius / d3.event.transform.k)
+        //         .attr('stroke-width', 1 / d3.event.transform.k);
+        //     this.allNodes.selectAll('image')
+        //         .attr('width', d => d.diameter / d3.event.transform.k)
+        //         .attr('height', d => d.diameter / d3.event.transform.k)
+        //         .attr('x', d => (-d.radius) / d3.event.transform.k)
+        //         .attr('y', d => (-d.radius) / d3.event.transform.k);
+        //
+        //     // No link transformation needed because of 'vector-effect : non-scaling-stroke' in CSS.
+        //     // Move the entire force group
+        //     d3.select('#forceGroup')
+        //         .attr('transform', d3.event.transform);
+        // }
 
         // end todo
 

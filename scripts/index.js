@@ -402,7 +402,7 @@ function setTopojson(selectedOption) {
 
         // Set the topography in the force_map, then draw it
         force_map.setTopography(data);
-        force_map.drawMap();
+        force_map.toggleMap(force_map.showMap);
     });
 }
 
@@ -414,14 +414,14 @@ const toggleMapBtnHandler = async () => {
     // force_map.showMap = !force_map.showMap;
 
     force_map.toggleMap();
-
+    force_map.setSimulation();
 
     document.getElementById('refresh_button_div').classList = force_map.showMap ? ["col-6"] : ["col-12"];
     document.getElementById('map_toggle_btn').innerHTML = force_map.showMap ? '<i class="fas fa-project-diagram"></i> Network View' : '<i class="fas fa-map"></i> Map View';
     document.getElementById('map_select_wrapper').classList = force_map.showMap ? 'form-floating col-6' : 'd-none';
     Array.from(document.getElementsByClassName('zoom_control')).forEach(elem => force_map.showMap ? elem.style.display="" : elem.style.display="none");
 
-    return await updateViz();
+    force_map.update();
 }
 
 /**
