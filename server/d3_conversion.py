@@ -597,5 +597,5 @@ def add_additional_information(d3_json):
     # remove_unknowns(d3_json)
     d3_stardust.add_sd_info_threaded(d3_json)
     d3_geo_ip.add_geo_info_threaded(d3_json)
-    d3_rdap.rdap_threaded(d3_json)
+    d3_rdap.rdap_cache_threaded(d3_json)
     return d3_json

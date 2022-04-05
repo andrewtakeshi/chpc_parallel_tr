@@ -1,3 +1,6 @@
+// cam todo: start cleaning up index & merge library w/ it
+// cam todo: show traffic data on hover
+
 /**
  * Traceroute visualization; uses a map to display hops spatially and a force map to add an element of interactivity +
  * handle collisions between nodes in roughly the same area.
@@ -20,7 +23,7 @@ class ForceMap {
         this.rootElementElement = d3.select(root_element).node();
         this.width = this.rootElementElement.clientWidth;
         this.height = 0.5 * this.rootElementElement.clientWidth;
-        
+
         // Map specific - see d3-geo for more information.
         // this.projection = d3.geoEquirectangular();
         // this.path = d3.geoPath().projection(this.projection);
@@ -58,7 +61,6 @@ class ForceMap {
             .style('margin', 'auto');
 
         this.zoom = d3.zoom()
-            // TODO: possibly get working w/ config file - currently load of config happens after load of this for whatever reason.
             .scaleExtent([1, 10])
             .translateExtent([[-this.width + 150, -this.height + 150], [2 * this.width - 150, 2 * this.width - 150]])
             // We use double click for something else, so we override the zoom behaviour for this event.
@@ -169,22 +171,20 @@ class ForceMap {
 
     /**
      * get the current zoom level
-     * @returns 
+     * @returns
      */
     zoomInfo() {
         let zoomOutline = this.mapG.selectAll('path').node();
         return zoomOutline ? d3.zoomTransform(zoomOutline).k : 1;
     }
 
-    zoomIn()
-    {
+    zoomIn() {
         let newZoom = this.getNewZoomLevel(true);
         this.zoom.scaleTo(this.svg, newZoom);
         return newZoom;
     }
 
-    zoomOut()
-    {
+    zoomOut() {
         let newZoom = this.getNewZoomLevel(false);
         this.zoom.scaleTo(this.svg, newZoom);
         return newZoom;
@@ -424,6 +424,7 @@ class ForceMap {
      * @returns An instance of d3.drag with all the proper handlers set up.
      */
     nodeDrag() {
+
         let simulation = this.simulation;
         let width = this.width;
         let height = this.height;
@@ -502,12 +503,19 @@ class ForceMap {
         let margin = {top: 30, right: 200, bottom: 30, left: 60};
 
         // o* is the overall or outer width/height.
-        let oWidth = 850;
-        let oHeight = 350;
+        let oWidth = 600;
+        let oHeight = 250;
 
         // i* is the inner width/height - i.e. o* - margins.
         let iWidth = oWidth - margin.left - margin.right;
         let iHeight = oHeight - margin.top - margin.bottom;
+
+        // Prevents "double" graph from appearing.
+        // Used to happen when the nodeMouseClick handler was called. It would move the node slightly which would
+        // trigger the event again and lead to two (or more) graphs being appended to the div.
+        if (div.selectAll('svg').nodes().length > 0) {
+            return;
+        }
 
         // Append a new SVG for the traffic graph.
         let trafficGraph = div.append('svg')
@@ -524,14 +532,15 @@ class ForceMap {
         // 5 minute intervals).
         let allValArr = Object.values(trafficInfo);
 
-        let underscorinator = d => d.replace(/\s/g, '_').toLowerCase();
+        // make lowercase and convert whitespace to underscores
+        let underscorinator = d => d.replace(/\s/g, '_').toLowerCase(); // DOOFENSHMIRTZ!!!
 
-        // Underscorinator but it strips the last value (i.e. no 'in' or 'out')
-        let keyify = (d, s) => {
-            let d_split = d.split(s);
-            let ret = d_split[0].toLowerCase();
-            for (let i = 1; i < d_split.length - 1; i++) {
-                ret += `_${d_split[i].toLowerCase()}`;
+        // underscorinator but it strips the last value (i.e. no 'in' or 'out')
+        let keyify = (input_str, separator) => {
+            let input_split = input_str.split(separator);
+            let ret = input_split[0].toLowerCase();
+            for (let i = 1; i < input_split.length - 1; i++) {
+                ret += `_${input_split[i].toLowerCase()}`;
             }
             return ret;
         }
@@ -542,12 +551,6 @@ class ForceMap {
 
         // types_set is used for setting up the different y scale values.
         let types_set = new Set(types.map(d => keyify(d, ' ')));
-
-        // This should have at least as many values in the range as there are entries in types. If this has fewer entries
-        // it "wraps" around, which isn't the desired behaviour.
-        let colorScale = d3.scaleOrdinal()
-            .domain(types.map(d => underscorinator(d)))
-            .range(['steelblue', 'red', 'blue', 'crimson', 'cadetblue', 'darksalmon', 'skyblue', 'violet', 'gray', 'darkmagenta']);
 
         // Measurement is just the first word, i.e. "traffic" or "errors"
         let measurement_filter = (valArr, measurement) => {
@@ -644,6 +647,7 @@ class ForceMap {
                 .on('mouseover', d => console.log(d[measurement]));
         }
 
+        // Checks is true when the tooltip is pinned
         if (checks) {
             let list_items = div.append('div')
                 .style('position', 'absolute')
@@ -675,8 +679,7 @@ class ForceMap {
                 .classed('form-check-input', true)
                 .on('click', function (d) {
                     d3.event.stopPropagation();
-                    let val = underscorinator(d);
-                    paths_and_circs(val);
+                    paths_and_circs(underscorinator(d));
                 })
                 // Prevent dblclick on checkbox from hiding the tooltip.
                 .on('dblclick', _ => d3.event.stopPropagation());
@@ -687,9 +690,8 @@ class ForceMap {
 
             checkboxes.append('label')
                 .attr('for', d => `checkbox_${underscorinator(d)}_${div.attr('id')}`)
-                .attr('class', d => `stardust_${keyify(d, '_')} stardust_metrics`)
+                .attr('class', d => `stardust_${keyify(d, ' ')} stardust_metrics`)
                 .classed('stardust_out', d => d.toLowerCase().includes('out'))
-                // .style('color', d => colorScale(underscorinator(d)))
                 .text(d => d);
 
             let yScaleRow = div.append('div')
@@ -822,7 +824,6 @@ class ForceMap {
      * Contains all the handlers as well, although they could likely be moved outside of this function.
      */
     update() {
-        console.log('called update');
         this.simulation.stop();
 
         this.setSimulation();
@@ -867,7 +868,6 @@ class ForceMap {
             .range([16, 24]);
 
         let packet_scale_domain = [];
-
 
         // Preload ATR Grafana iFrames for rendered IP nodes and generate links
         // TODO: Fix preload of iframes, the url is broken for whatever reason.
@@ -998,7 +998,6 @@ class ForceMap {
 
         // end todo
 
-
         // Append defs so we can create our markers.
         if (this.forceG.select('defs').empty()) {
             this.forceG.append('defs');
@@ -1018,8 +1017,7 @@ class ForceMap {
             .attr('id', (d, i) => `marker_${i}`)
             .attr('markerWidth', markerWidth)
             .attr('markerHeight', markerHeight)
-            .attr('refX', d => (markerWidth*1.25))
-            // .attr('fake', (d => console.log(markerWidth*1.25)))
+            .attr('refX', d => (markerWidth * 1.25))
             .attr('refY', markerHeight / 2)
             .attr('orient', 'auto')
             .append('polygon')
@@ -1107,9 +1105,15 @@ class ForceMap {
             //  off the top of my head.
         }
 
+        function safePacketID(packet_id) {
+            let safe = CSS.escape(packet_id.replace(/(\s|\.|\(|\))+/g, '_'));
+            return safe.slice(-1) === '_' ? safe.slice(0, -1) : safe;
+        }
+
+
         // Shows the global tooltip on mouseover (if applicable)
         function nodeMouseoverHandler(d) {
-            if (d3.select(`#tooltip${CSS.escape(d.id.replace(/(\s|\.|\(|\))+/g, '_'))}`).node() !== null) return;
+            if (d3.select(`#tooltip_${safePacketID(d.id)}`).node() !== null) return;
 
             that.floating_tooltip.transition().duration(200).style('opacity', 0.9);
 
@@ -1141,7 +1145,6 @@ class ForceMap {
         function nodeClickHandler(d) {
             d3.event.preventDefault();
             if (that.expandNode(d)) {
-                console.log('calling update from nodeClickHandler');
                 that.update();
             }
         }
@@ -1150,64 +1153,65 @@ class ForceMap {
         function nodeDblClickHandler(d) {
             d3.event.preventDefault();
 
-            // todo: remove the floating tooltip before appending the new div
-            // Make sure that isn't already pinned
-            if (d3.select(`#tooltip${CSS.escape(d.id.replace(/(\s|\.|\(|\))+/g, '_'))}`).node() !== null) {
+            if (d3.select(`#tooltip_${safePacketID(d.id)}`).node() !== null) {
                 return;
             } else {
-                d3.select('#forcemap_tooltip').selectAll('div.removable').remove();
+                that.floating_tooltip.selectAll('svg').remove();
             }
 
             // Create the tooltip div
-            // todo: fix trailing underscore
             let tooltip = d3.select(that.rootElement)
                 .append('div')
-                .attr('id', `tooltip${CSS.escape(d.id.replace(/(\s|\.|\(|\))+/g, '_'))}`)
+                .attr('id', `tooltip_${safePacketID(d.id)}`)
                 .classed('tooltip removable', true);
 
             // Append tooltip stats
             generateTTS(d, d.packets, tooltip.append('div'));
 
             // Initial attributes
-            let draggable = false;
             let initialX = 0;
             let initialY = 0;
             let updatedX = 0;
             let updatedY = 0;
 
-            // Make draggable on mousedown
+            // Set up move on tooltip drag
             tooltip.on('mousedown', function () {
-                // d3.event.preventDefault();
+                // If we are clicking on the select list we don't want to be able to drag or do anything other than
+                // change the selection option, so we just return.
+                if (d3.event.target.nodeName && d3.event.target.nodeName === 'SELECT') {
+                    return;
+                }
+
+                // If the event is NOT on the select list (i.e. changing the y axis scale) then we want to stop
+                // the default action - this prevents text from being highlighted when we drag.
+                d3.event.preventDefault();
                 d3.select(this).raise();
-                draggable = true;
+
+                // Need to keep reference to this tooltip.
+                let tt = this;
+
                 initialX = d3.event.clientX;
                 initialY = d3.event.clientY;
-            });
 
-            // Remove draggable on mouseup
-            tooltip.on('mouseup', function () {
-                draggable = false;
-                initialX = 0;
-                initialY = 0;
-            });
+                // Attach listener to body to prevent drag from breaking when you move off of the tooltip.
+                d3.select('body').on('mousemove', () => {
+                    // Prevents text highlighting while dragging.
+                    d3.event.preventDefault();
 
-            // TODO: Make dragging the iframes easier. Not sure what the best way to do that is.
-            // 'Drag' the tooltip if draggable
-            tooltip.on('mousemove', function () {
-                d3.event.preventDefault();
-
-                if (draggable) {
-                    // Calculate updated position
                     updatedX = initialX - d3.event.clientX;
                     updatedY = initialY - d3.event.clientY;
                     initialX = d3.event.clientX;
                     initialY = d3.event.clientY;
 
-                    // Update position
-                    let thisElement = d3.select(this).node();
-                    thisElement.style.top = (thisElement.offsetTop - updatedY) + 'px';
-                    thisElement.style.left = (thisElement.offsetLeft - updatedX) + 'px';
-                }
+                    // Update position.
+                    tt.style.top = (tt.offsetTop - updatedY) + 'px';
+                    tt.style.left = (tt.offsetLeft - updatedX) + 'px';
+                });
+            });
+
+            // Remove mousemove listener from body on mouseup.
+            tooltip.on('mouseup', function () {
+                d3.select('body').on('mousemove', null);
             });
 
             // Remove on double click

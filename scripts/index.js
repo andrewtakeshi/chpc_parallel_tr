@@ -29,53 +29,6 @@ async function resetBtnHandler() {
     return await updateViz();
 }
 
-/**
- * Adds an entry to the current run table.
- * @param uuid - ID associated with the current run.
- */
-function addToCRTable(uuid) {
-    if (document.getElementById("esmond_ip_dest").value === "")
-        return;
-
-    document.getElementById("current_run_table_area").style.visibility = "visible";
-
-    let tbody = document.getElementById('cr_table').getElementsByTagName('tbody')[0];
-    let cell_ids = ['type', 'source', 'dest', 'numRuns', 'status', 'selected']
-
-    // Add row and cells
-    let row = tbody.insertRow();
-    row.id = `${uuid}`;
-    for (let i = 0; i < 6; i++) {
-        row.insertCell(i);
-        row.cells[i].id = `${uuid}_${cell_ids[i]}`
-    }
-
-    // Get cell data from DOM
-    let source = document.getElementById("esmond_ip_source").value;
-    let dest = document.getElementById("esmond_ip_dest").value;
-    let type = source ? "pScheduler" : "System";
-    let numRuns = document.getElementById("esmond_num_runs").value;
-
-    // Set cell data
-    row.cells[0].innerHTML = type;
-    // Localhost or source host (pScheduler)
-    row.cells[1].innerHTML = source ? source : self.location.hostname;
-    row.cells[2].innerHTML = dest;
-    row.cells[3].innerHTML = numRuns;
-    row.cells[4].innerHTML = `<div class="spinner-border spinner-border-sm" role="status"><span class="sr-only"></span></div>`
-    row.cells[4].style.textAlign = "center";
-    row.cells[5].style.textAlign = "center";
-
-    // Add checkbox + ability to hide/show run via handler
-    let checkbox = document.createElement('input');
-    checkbox.type = 'checkbox';
-    checkbox.checked = true;
-    checkbox.onchange = function () {
-        checkHandler(uuid, checkbox.checked).then(data => force_map.setData(data));
-    }
-    row.cells[5].appendChild(checkbox);
-}
-
 function cardMaker(uuid, source, dest, type, numRuns) {
     let newCard = document.createElement("div");
     newCard.id = id = `${uuid}_card`;
@@ -198,6 +151,7 @@ const netbeamTable = async (traceroutes) => {
         traceroute.packets.forEach(packet => {
             let ip = packet.ip;
             let speed = packet.speed ? packet.speed : "Unknown";
+            // todo: change to traffic_info and fix
             if ("traffic" in packet) {
                 // Set up card for each individual IP address. Done in traffic because
                 // it's the first table generated.
@@ -382,8 +336,6 @@ function setTopojson(selectedOption) {
             break;
     }
 
-    console.log(`selected ${resourceString}`);
-
     // Load the resource then perform any necessary filtering
     d3.json(resourceString).then(data => {
         data = topojson.feature(data, data.objects[Object.keys(data.objects)[0]]);
@@ -410,8 +362,7 @@ function setTopojson(selectedOption) {
  * Hides or shows the map.
  */
 const toggleMapBtnHandler = async () => {
-    // toggler = force_map.showMap
-    // force_map.showMap = !force_map.showMap;
+    // todo: force nodes into correct positions after toggle; it's "close" right now but pretty far off.
 
     force_map.toggleMap();
     force_map.setSimulation();
@@ -466,7 +417,6 @@ function resizeHandler() {
 
 function checkZoomLevels(newZoom) {
     let extent = force_map.zoom.scaleExtent();
-    console.log(extent[1]);
     if (newZoom === extent[0]) {
         d3.select('#zoom_out').attr('disabled', true);
         d3.select('#zoom_reset').attr('disabled', true);

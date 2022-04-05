@@ -11,7 +11,7 @@ from server import config
 es = elasticsearch.Elasticsearch(hosts=['https://el.gc1.prod.stardust.es.net:9200'], timeout=30)
 
 
-def sd_traffic_by_time_range(resource='lond-cr5::to_tenet_ip-b'):
+def sd_traffic(resource='lond-cr5::to_tenet_ip-b'):
     try:
         r = es.search(index='sd_public_interfaces',
                       body=
@@ -86,23 +86,27 @@ def sd_traffic_by_time_range(resource='lond-cr5::to_tenet_ip-b'):
         denominator = 30
 
         for hit in hits:
-            fields = hit['fields']
-            keys = fields.keys()
-            ts = hit['sort'][0]
+            try:
+                fields = hit['fields']
+                keys = fields.keys()
+                ts = hit['sort'][0]
 
-            if ts not in ret.keys():
-                ret[ts] = {'ts': ts}
-            for key in keys:
-                ret_key = key_map[key]
-                if ret_key in ret[ts].keys():
-                    # On 5 minute intervals (i.e. xx:00, xx:05, etc) the discards, errors, etc. are available.
-                    # For whatever reason, there is a "preliminary" packet that contains roughly half the traffic
-                    # information, and only the traffic information. Then, after the discards & errors are available,
-                    # we get a second packet with the rest of the traffic information + the discards and everything else
-                    # If we don't do the += it's just inaccurate.
-                    ret[ts][ret_key] += fields[key][0]
-                else:
-                    ret[ts][ret_key] = fields[key][0]
+                if ts not in ret.keys():
+                    ret[ts] = {'ts': ts}
+                for key in keys:
+                    ret_key = key_map[key]
+                    if ret_key in ret[ts].keys():
+                        # On 5 minute intervals (i.e. xx:00, xx:05, etc) the discards, errors, etc. are available.
+                        # For whatever reason, there is a "preliminary" packet that contains roughly half the traffic
+                        # information, and only the traffic information. Then, after the discards & errors are available,
+                        # we get a second packet with the rest of the traffic information + the discards and everything else
+                        # If we don't do the += it's just inaccurate.
+                        ret[ts][ret_key] += fields[key][0]
+                    else:
+                        ret[ts][ret_key] = fields[key][0]
+            except KeyError:
+                print(f'KeyError with {hit}')
+                continue
         for ts in ret.keys():
             for key in ret[ts].keys():
                 if key.startswith('traffic'):
@@ -128,7 +132,7 @@ def add_sd_info_tw(packet, sd_item):
     """
     packet['resource'] = sd_item['resource']
     packet['speed'] = sd_item['speed']
-    res = sd_traffic_by_time_range(sd_item['resource'])
+    res = sd_traffic(sd_item['resource'])
     if res is not None:
         packet['traffic_info'] = res
 

@@ -1,7 +1,3 @@
-//const api_server = 'network-viz.chpc.utah.edu:8081'
-// const api_server = '127.0.0.1:5000';
-// const tr_api = '/api/v1/resources/traceroutes';
-
 /**
  * Requests data from the API server.
  */
@@ -11,14 +7,12 @@ const runTraceroute = async (source, dest, num_runs) => {
         api_call += `&source=${source}`;
     }
     api_call += `&num_runs=${num_runs}`;
-    // console.log(`Requesting ${api_call}`);
     try {
         // TODO: Look @ adding callback function to stop spinner
         return await d3.json(api_call);
     } catch (e) {
         // Return 'Network Error' if the request fails. This is displayed in the CR table.
         if (e instanceof TypeError) {
-            // console.log('type error');
             return {'error': 'Network Error'};
         }
     }
@@ -147,9 +141,6 @@ const createInternetGraph = async (traceroutes, existing = undefined) => {
             }
         }
     }
-
-    console.log('ntts');
-    console.log(entities);
 
     return entities;
 };
