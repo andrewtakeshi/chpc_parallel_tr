@@ -45,7 +45,8 @@ class ForceMap {
             .attr('id', 'forcemap_tooltip')
             .classed('tooltip', true);
         this.tooltip_stats = this.floating_tooltip
-            .append('div');
+            .append('div')
+            .attr('id', 'forcemap_tooltip_stats');
 
         // Need to call setup first so we have the svg to append to
         this.setup();
@@ -500,7 +501,7 @@ class ForceMap {
      * pinned tooltips.
      */
     auxGraph(trafficInfo, div, checks = false) {
-        let margin = {top: 30, right: 200, bottom: 30, left: 60};
+        let margin = { top: 30, right: 200, bottom: 30, left: 60 };
 
         // o* is the overall or outer width/height.
         let oWidth = 600;
@@ -641,10 +642,22 @@ class ForceMap {
                 .selectAll('circle')
                 .data(allValArr.filter(d => `${measurement}` in d))
                 .join('circle')
-                .attr('r', 1.5)
+                .attr('r', 2)
                 .attr('cx', d => xScale(d.ts))
                 .attr('cy', d => selectedYScale(d[measurement]))
-                .on('mouseover', d => console.log(d[measurement]));
+                .on('mouseover', d => {
+                    d3.select("#forcemap_tooltip").raise();
+                    d3.select("#forcemap_tooltip").style('opacity', 0.9);
+                    d3.select("#forcemap_tooltip_stats").text((measurement.includes("traffic") ? d3.format('~s')(d[measurement]) + 'bps' : d[measurement]));
+                })
+                .on('mouseout', () => {
+                    d3.select("#forcemap_tooltip").style('opacity', 0);
+                    d3.select("#forcemap_tooltip_stats").text("");
+                })
+                .on('mousemove', () => {
+                    // Updates position of global tooltip.
+                    d3.select("#forcemap_tooltip").style('left', (d3.event.pageX + 10) + 'px').style('top', (d3.event.pageY + 10) + 'px')
+                });
         }
 
         // Checks is true when the tooltip is pinned
@@ -1088,6 +1101,7 @@ class ForceMap {
         function linkMouseOutHandler(d) {
             that.floating_tooltip.transition().duration(200).style('opacity', 0);
         }
+
 
         // Generate ToolTipStats. Not complicated, just abstracted b/c it's used more than once.
         function generateTTS(d, packets, selection) {

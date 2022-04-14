@@ -17,9 +17,9 @@ async function resetBtnHandler() {
 
     // Hide and clear tables on reset.
     document.getElementById("current_run_table_area").style.visibility = "hidden";
-    document.getElementById("netbeam_table_area").style.visibility = "hidden";
+    // document.getElementById("netbeam_table_area").style.visibility = "hidden";
     document.getElementById("cr_table").getElementsByTagName('tbody')[0].innerHTML = "";
-    document.getElementById("netbeam_accordion").innerHTML = "";
+    // document.getElementById("netbeam_accordion").innerHTML = "";
 
     // Remove all old traceroute data
     visibleNTTs.traceroutes = [];
@@ -29,6 +29,14 @@ async function resetBtnHandler() {
     return await updateViz();
 }
 
+/**
+ * Used to create a new traceroute run card.
+ * @param uuid - ID associated with the current run.
+ * @param source - source address for current run
+ * @param dest - dest address for current run
+ * @param type - type of run, can be system or pScheduler
+ * @param numRums - the requested number of traceroute runs 
+ */
 function cardMaker(uuid, source, dest, type, numRuns) {
     let newCard = document.createElement("div");
     newCard.id = id = `${uuid}_card`;
@@ -40,7 +48,7 @@ function cardMaker(uuid, source, dest, type, numRuns) {
                                 </div>
                                 ${numRuns} ${type} traceroute${numRuns == 1 ? `` : `s`}
                             </span>
-                            <span id="${uuid}_controls">
+                                <span id="${uuid}_controls">
                             </span>
                         </div>
                         <ul class="list-group list-group-flush">
@@ -77,119 +85,8 @@ function addToCRDeck(uuid) {
  * Adds a timeout to the API calls - this can be adjusted above
  */
 const timeout = (prom, time) => Promise.race([prom, new Promise((res) => setTimeout(
-    () => res({'error': 'Timed out'}),
+    () => res({ 'error': 'Timed out' }),
     time))]);
-
-/**
- * Helper method. Adds or updates the table entry for each host.
- */
-let netbeamTableHelper = (ip, label, hops, speed) => {
-    // Add entry if it doesn't exist. Each entry is it's own table.
-    if (!document.getElementById(`table_${ip}_${label}`)) {
-        let collapse_body = document.getElementById(`collapse_body_${ip}`);
-        collapse_body.innerHTML += `<table class="table table-bordered table-condensed table-sm" id="table_${ip}_${label}">
-                                        <thead>
-                                            <tr>
-                                                <th colspan="4" style="text-align: center">${label}</th>
-                                            </tr>
-                                            <tr>
-                                                <th>TIME</th>
-                                                <th>IN</th>
-                                                <th>OUT</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody id="table_body_${ip}_${label}"></tbody>
-                                        </table>`;
-    }
-
-    let tbody = document.getElementById(`table_body_${ip}_${label}`);
-
-    // Helper method to convert UTC to readable time
-    let normalizeUTCTime = (inDate) => {
-        let x = new Date(inDate);
-        return `${x.getMonth() + 1}/${x.getDate()}/${x.getFullYear()} ${x.getHours()}:${("0" + x.getMinutes()).substr(-2)}:${("0" + x.getSeconds()).substr(-2)}`
-    };
-
-    // Add each type of data to the table
-    hops.forEach(hop => {
-        // Checks to see if value is in table already (using time)
-        let rows = tbody.getElementsByTagName('tr');
-        let hopExists = false;
-        for (let row of rows) {
-            if (row.cells[0].innerHTML === normalizeUTCTime(hop[0])) {
-                hopExists = true;
-                break;
-            }
-        }
-
-        // If hop is not extant in table, adds to table
-        if (!hopExists) {
-            let row = tbody.insertRow();
-            for (let i = 0; i < 3; i++) {
-                row.insertCell(i);
-            }
-            row.cells[0].innerHTML = normalizeUTCTime(hop[0]);
-            row.cells[1].innerHTML = hop[1];
-            // row.cells[1].innerHTML = d3.format('~s')(hop[1]) + 'bits';
-            row.cells[2].innerHTML = hop[2];
-            // row.cells[2].innerHTML = d3.format('~s')(hop[2]) + 'bits';
-            // row.cells[3].innerHTML = speed;
-            document.getElementById(`speed_${ip.split(".").join("_")}`).innerHTML = d3.format('~s')(speed) + 'bps';
-
-        }
-    })
-}
-
-// todo: update table to work with stardust
-/**
- * Adds netbeam information to table (shown below viz)
- */
-const netbeamTable = async (traceroutes) => {
-    let accordion_div = document.getElementById('netbeam_accordion');
-    document.getElementById('netbeam_table_area').style.visibility = "visible";
-    traceroutes.forEach(traceroute => {
-        traceroute.packets.forEach(packet => {
-            let ip = packet.ip;
-            let speed = packet.speed ? packet.speed : "Unknown";
-            // todo: change to traffic_info and fix
-            if ("traffic" in packet) {
-                // Set up card for each individual IP address. Done in traffic because
-                // it's the first table generated.
-                if (accordion_div.getElementsByClassName('card').length === 0) {
-                    // accordion_div.innerHTML += `<div class="card"><div class="card-header">Netbeam Info</div></div>`;
-                }
-                let css_safe_ip = `${ip.split(".").join("_")}`
-                if (!document.getElementById(`collapse_${css_safe_ip}`)) {
-                    accordion_div.innerHTML +=
-                        // `<div class="accordion accordion-flush" id="accordionExample">
-                        `<div class="accordion-item col-12">
-                                <h2 class="accordion-header" id="heading_${css_safe_ip}">
-                                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse_${css_safe_ip}">
-                                        ${ip} &bull;&nbsp; <span id="speed_${css_safe_ip}" class="text-secondary"></span>
-                                    </button>
-                                </h2>
-                                <div id="collapse_${css_safe_ip}" class="accordion-collapse collapse" aria-labelledby="headingOne" data-bs-parent="#netbeam_accordion">
-                                    <div class="accordion-body">
-                                        <div class="card-body" id="collapse_body_${ip}"></div>
-                                    </div>
-                                </div>
-                            </div>`;
-                    //   </div>`;
-                }
-                netbeamTableHelper(ip, 'Traffic', packet.traffic, speed);
-            }
-            if ("unicast_packets" in packet) {
-                netbeamTableHelper(ip, "Unicast_packets", packet.unicast_packets, speed);
-            }
-            if ("discards" in packet) {
-                netbeamTableHelper(ip, "Discards", packet.discards, speed);
-            }
-            if ("errors" in packet) {
-                netbeamTableHelper(ip, "Errors", packet.errors, speed);
-            }
-        })
-    });
-}
 
 /**
  * Packages the data in a way that is usable by the visualization (i.e. clustered into orgs)
@@ -251,6 +148,7 @@ const e2eBtnHandler = async (source, dest, num_runs, uuid) => {
             innerHTML = `${inQueue} ${inQueue > 1 ? 'Traceroutes' : 'Traceroute'} Running`;
         }
         document.getElementById('inQueue_area').innerHTML = innerHTML;
+        d3.select('#cr_deck_header').classed("d-none", false);
     }
     inQueue += parseInt(num_runs);
     updateInQueue();
@@ -262,19 +160,22 @@ const e2eBtnHandler = async (source, dest, num_runs, uuid) => {
                 inQueue -= parseInt(num_runs);
                 updateInQueue();
                 if (value.error) {
-                    // This will be timeout or pScheduler
+                    // This will be a timeout or pScheduler error
+                    // change the appearance of the card
                     document.getElementById(`${uuid}_card`).classList = "card bg-warning mb-2";
                     document.getElementById(`${uuid}_status`).innerHTML = `<i class="fas fa-exclamation-triangle"></i> ` + value.error;
+                    // add a button to remove the card
                     let removeCardBtn = document.createElement("button");
                     removeCardBtn.classList = "btn btn-sm btn-danger";
                     removeCardBtn.innerHTML = `<i class="fas fa-trash"></i>`;
                     removeCardBtn.onclick = (() => document.getElementById(`${uuid}_card`).remove());
                     document.getElementById(`${uuid}_controls`).appendChild(removeCardBtn);
-                    // document.getElementById(`${uuid}_controls`).innerHTML = `<button class="btn btn-sm btn-danger" onclick="document.getElementById(`${uuid}_card`).remove();"><i class="fas fa-trash"></i></button>`
                     return null;
                 } else {
+                    // update the card title and color
                     document.getElementById(`${uuid}_status`).innerHTML = `${num_runs} ${source ? "pScheduler" : "System"} traceroute${num_runs == 1 ? "" : "s"}`;
                     document.getElementById(`${uuid}_card`).classList = "card bg-primary text-light mb-2";
+                    // add a checkbox to toggle run visibility
                     let checkbox = document.createElement('input');
                     checkbox.type = 'checkbox';
                     checkbox.checked = true;
@@ -310,7 +211,7 @@ const e2eBtnHandler = async (source, dest, num_runs, uuid) => {
     }
 
     // Add to the netbeam table
-    await netbeamTable(result.traceroutes);
+    // await netbeamTable(result.traceroutes);
 
     // Update the visualization
     visibleNTTs.traceroutes = visibleNTTs.traceroutes.concat(result.traceroutes);
@@ -367,10 +268,15 @@ const toggleMapBtnHandler = async () => {
     force_map.toggleMap();
     force_map.setSimulation();
 
-    document.getElementById('refresh_button_div').classList = force_map.showMap ? ["col-6"] : ["col-12"];
-    document.getElementById('map_toggle_btn').innerHTML = force_map.showMap ? '<i class="fas fa-project-diagram"></i> Network View' : '<i class="fas fa-map"></i> Map View';
-    document.getElementById('map_select_wrapper').classList = force_map.showMap ? 'form-floating col-6' : 'd-none';
-    Array.from(document.getElementsByClassName('zoom_control')).forEach(elem => force_map.showMap ? elem.style.display="" : elem.style.display="none");
+    d3.select('#non_map_controls')
+        .classed("col-sm-6", force_map.showMap)
+        .classed("col-12", !force_map.showMap);
+    
+    d3.select('#viz_controls')
+    .classed("row-cols-sm-2", force_map.showMap);
+
+    d3.select('#map_controls')
+        .classed("d-none", !force_map.showMap);
 
     force_map.update();
 }
@@ -434,3 +340,286 @@ function checkZoomLevels(newZoom) {
 // Create the force map. By default the map is shown and we shown the world map.
 const force_map = new ForceMap('#d3_vis');
 setTopojson('world');
+
+
+
+
+// 
+// Auxillary functions for the forcemap 
+// 
+
+/**
+ * Requests data from the API server.
+ */
+const runTraceroute = async (source, dest, num_runs) => {
+    let api_call = `http://${config.api_server}${config.tr_api}?dest=${dest}`;
+    if (source) {
+        api_call += `&source=${source}`;
+    }
+    api_call += `&num_runs=${num_runs}`;
+    try {
+        // TODO: Look @ adding callback function to stop spinner
+        return await d3.json(api_call);
+    } catch (e) {
+        // Return 'Network Error' if the request fails. This is displayed in the CR table.
+        if (e instanceof TypeError) {
+            return { 'error': 'Network Error' };
+        }
+    }
+};
+
+/**
+ * Get max bandwidth from GRNOC.
+ * @param ip - IP address, may or may not be part of GRNOC.
+ * @param org - Org of IP address
+ */
+const getMaxBWFromGRNOCIP = async (ip, org) => {
+    // TODO: Better way of telling if it's part of GRNOC - see also getATRChartURL
+    // if (ip.startsWith('198') || ip.startsWith('162') || ip.startsWith('192')) {
+    //     let api_call = `https://snapp-portal.grnoc.iu.edu/tsds-cross-domain/query.cgi?method=query;query=get%20max_bandwidth%20between(now-10m,%20now)%20from%20interface%20where%20interface_address.value%20=%20%22${ip}%22`;
+    //     return await d3.json(api_call);
+    // } else {
+    //     return {'results': []};
+    // }
+    // TODO: Add additional orgs (i.e. SIX)
+    if (org && org.toString() === 'Internet2') {
+        let api_call = `https://snapp-portal.grnoc.iu.edu/tsds-cross-domain/query.cgi?method=query;query=get%20max_bandwidth%20between(now-10m,%20now)%20from%20interface%20where%20interface_address.value%20=%20%22${ip}%22`;
+        return await d3.json(api_call);
+    } else {
+        return { 'results': [] };
+    }
+}
+
+/**
+ * Get GRNOC Grafana chart url.
+ * @param ip - IP address to ltraceroute ruookup
+ * @param org - Org of IP address
+ * @returns URL of chart.
+ */
+const getATRChartURL = (ip, org) => {
+    //(ip, org, start = 1588478400000, end = 1588564799000) => {
+    // if (ip.startsWith('198') || ip.startsWith('162') || ip.startsWith('192')) {
+    //     return `https://snapp-portal.grnoc.iu.edu/grafana/d-solo/f_KR9xeZk/ip-address-lookup?orgId=2&from=${start}&to=${end}&var-ip_addr=${ip}&panelId=2`;
+    // }
+    let end = Date.now();
+    let start = end - 900000;
+
+    // TODO: check this org stuff.
+    if (org !== null && org.toString() === 'Internet2') {
+        return `https://snapp-portal.grnoc.iu.edu/grafana/d-solo/f_KR9xeZk/ip-address-lookup?orgId=2&from=${start}&to=${end}&var-ip_addr=${ip}&panelId=2`;
+    }
+    return '';
+}
+
+/**
+ * Create internet graph using "visible" entities
+ * @param traceroutes
+ * @param existing
+ * @returns {Promise<Map<any, any>>}
+ */
+const createInternetGraph = async (traceroutes, existing = undefined) => {
+    let entities = existing;
+    if (entities == undefined) {
+        entities = new Map();
+    }
+
+    for (let trace of traceroutes) {
+        let packets = trace.packets;
+        for (let i = 0; i < packets.length; i++) {
+            if (packets[i].ip == undefined)
+                packets[i].ip = `hop_${i}_${trace.id.substring(0, 5)}`;
+        }
+        for (let i = 0; i < packets.length; i++) {
+            const packet = packets[i];
+            packet.ts = trace.ts;
+            const entity_id = `ip(${packet.ip})`;
+            let entity = entities.get(entity_id);
+
+            if (!entity) {
+                let maxBW = undefined;
+                const tsdsResult = await getMaxBWFromGRNOCIP(packet.ip, packet.org);
+                if (tsdsResult.results.length > 0) {
+                    maxBW = tsdsResult.results[0].max_bandwidth;
+                }
+                // Set properties for each node
+                entity = ({
+                    id: entity_id,
+                    ip: packet.ip,
+                    org: packet.org,
+                    domain: packet.domain,
+                    ttl: packet.ttl,
+                    max_bandwidth: packet.speed ? packet.speed : maxBW,
+                    packets: [],
+                    source_ids: new Set(),
+                    target_ids: new Set(),
+                    lat: packet.lat,
+                    lon: packet.lon,
+                    city: packet.city,
+                    region: packet.region
+                });
+                entities.set(entity_id, entity);
+            }
+
+            entity.packets.push(packet);
+
+            // Add the previous packet as a source and next packet as a target.
+            if (i > 0) {
+                entity.source_ids.add(`ip(${packets[i - 1].ip})`);
+                // for (let j = i - 1; j >= 0; j--) {
+                //     if (packets[j].ttl !== packets[i].ttl) {
+                //         let ttl = packets[j].ttl;
+                //         while (packets[j].ttl === ttl) {
+                //             entity.source_ids.add(`ip(${packets[j].ip})`);
+                //             --j;
+                //         }
+                //         break;
+                //     }
+                // }
+            }
+            if (i < packets.length - 1) {
+                entity.target_ids.add(`ip(${packets[i + 1].ip})`)
+                // for (let j = i + 1; j < packets.length; j++) {
+                //     if (packets[j].ttl !== packets[i].ttl) {
+                //         let ttl = packets[j].ttl;
+                //         while (packets[j].ttl === ttl) {
+                //             entity.target_ids.add(`ip(${packets[j].ip})`);
+                //             ++j;
+                //         }
+                //         break;
+                //     }
+                // }
+            }
+        }
+    }
+
+    return entities;
+};
+
+/**
+ * clusterBy takes a map of entities with an 'id' property and returns a map of new entities that reference
+ * the input entities as children. Clustering is breadth-first driven by the given label equality, degree,
+ * and relationship parameters.
+ */
+const clusterBy = (entities, getLabel, getRelationships, id_prefix = undefined, max_degree = 1) => {
+    const result = new Map();
+
+    // Helper method for cleanliness
+    const addToCluster = (cluster_id, entity) => {
+        if (!result.has(cluster_id)) {
+            // Use ES6 Proxy to recursively access properties of hierarchical clusters (see `handler` def)
+            result.set(cluster_id, new Proxy(({ id: cluster_id, children: new Map() }), propHandler));
+        }
+        // Set the children of the proxy to be the actual entity.
+        result.get(cluster_id).children.set(entity.id, entity);
+    }
+
+    const orphan_ids = [...entities.keys()];
+    const cluster_count = new Map();
+
+    let i = 0;
+    while (i < orphan_ids.length) {
+        // Start a new cluster from an unclustered entity
+        const orphan = entities.get(orphan_ids[i]);
+
+        // label is the org label - lambda passed by calling function
+        const label = getLabel(orphan);
+
+        // Disjoint clusters of the same label are enumerated for distinctness
+        if (!cluster_count.has(label))
+            cluster_count.set(label, 0);
+        cluster_count.set(label, cluster_count.get(label) + 1);
+
+        // cluster_id is the id_prefix + org (label) + cluster count
+        let cluster_id = id_prefix ? `${id_prefix}(${label})` : label;
+        cluster_id += ` cluster-${cluster_count.get(label)}`;
+
+        let candidates = [orphan_ids[i]];
+        const visited = new Set();
+
+        while (candidates.length > 0) {
+            const candidate_id = candidates.pop();
+            const candidate = entities.get(candidate_id);
+
+            if (!visited.has(candidate_id)) {
+                visited.add(candidate_id); // Don't check this candidate again for this cluster
+                if (getLabel(candidate) == label) {
+                    // Found a match, add to result
+                    addToCluster(cluster_id, candidate);
+
+                    // getRelationships is a lambda that returns a set of the source ids and target ids?
+                    const neighbors = Array.from(getRelationships(candidate));
+
+                    // Add neighbors as new search candidates
+                    candidates = candidates.concat(neighbors);
+
+                    // TODO add support for max_degree > 1 (recursive neighbors), probably change candidates to a Set at
+                    //  the same time
+
+                    // This entity now belongs to a cluster, so we remove orphans
+                    orphan_ids.splice(orphan_ids.indexOf(candidate_id), 1);
+                }
+            }
+        }
+    }
+    return result;
+};
+
+/**
+ * Look up appropriate property reducer for getting specific property from Proxy (i.e. Org).
+ * @param property - Property to lookup
+ * @returns {function(*, *): Set<*>} - Function specifying how to handle lookup of the property
+ */
+const propReducer = (property) => {
+    let f = null;
+    switch (property) {
+        case 'source_ids':
+        case 'target_ids':
+            f = (a, b) => new Set([...a, ...b]);
+            break;
+        case 'packets':
+            f = (a, b) => a.concat(b);
+            break;
+        // Add in case of lat and lon; then we take average later inside of 'handler'
+        case 'lat':
+        case 'lon':
+            f = (a, b) => a + b;
+            break;
+        case 'city':
+        case 'region':
+            f = (a, b) => a === b ? a : 'Avg. Location';
+            break;
+        case 'max_bandwidth':
+            // I think min is best because it gives the most restricted view; not positive though.
+            // Return the minimum bandwidth for the node - defaults to 0 if a bandwidth is undefined
+            f = (a, b) => Math.min(a ? a : 0, b ? b : 0);
+            break;
+        case 'ttl':
+            f = (a, b) => Math.min(a, b);
+            break;
+        default:
+            f = (a, b) => a === b ? a : undefined;
+    }
+    return f;
+}
+
+/**
+ * If property is not present and the object has an array of child nodes, return an appropriate reduction of that
+ * property across all children
+ */
+const propHandler = ({
+    get: (obj, property) => {
+        if (property in obj) {
+            return obj[property]
+        } else if (obj.children) {
+            let children = Array.from(obj.children.values());
+            let retVal = children.map(child => child[property])
+                // propReducer returns the appropriate function for the reduction.
+                .reduce((accumulator, value) => propReducer(property)(accumulator, value));
+
+            // Return average value in case of lat or lon - can't be done as part of reduce.
+            return (property === 'lat' || property === 'lon') ?
+                (retVal / children.length) : retVal;
+        }
+        return undefined;
+    }
+})
