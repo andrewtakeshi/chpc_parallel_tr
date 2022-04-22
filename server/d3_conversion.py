@@ -11,7 +11,7 @@ import time
 import requests
 from icmplib import traceroute
 
-from server import d3_conversion_utils, d3_geo_ip, d3_rdap, d3_stardust  # d3_netbeam
+from server import d3_conversion_utils, d3_geo_ip, d3_rdap, d3_stardust, d3_tsds # d3_netbeam
 from server.config import variables as config
 
 # TODO: Add locks to everything, and variabalize the max and min limit values.
@@ -505,6 +505,8 @@ def system_to_d3(dest, num_runs=1):
     my_ip = d3_conversion_utils.my_ip()
     i = 0
 
+    # TODO: TRY WITH FNAL.GOV - FIGURE OUT WHY IT GOES PAST THE LAST HOP
+
     # Process output of each traceroute.
     for proc in processList:
         output.append(dict())
@@ -594,7 +596,8 @@ def add_additional_information(d3_json):
     functions called here should modify the JSON in place and should not return anything.
     :return: Modified version of d3_json.
     """
-    # remove_unknowns(d3_json)
+    remove_unknowns(d3_json)
+    d3_tsds.add_tsds_info_threaded(d3_json)
     d3_stardust.add_sd_info_threaded(d3_json)
     d3_geo_ip.add_geo_info_threaded(d3_json)
     d3_rdap.rdap_cache_threaded(d3_json)

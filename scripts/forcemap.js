@@ -450,8 +450,9 @@ class ForceMap {
             if (!d3.event.active) {
                 simulation.alphaTarget(0);
             }
-            d.fx = null;
-            d.fy = null;
+            // TODO: REMOVE THESE LINES, ADD BACK FIXED-POS ON DRAG
+            // d.fx = null;
+            // d.fy = null;
         }
 
         return d3.drag()
@@ -502,9 +503,18 @@ class ForceMap {
     auxGraph(trafficInfo, div, checks = false) {
         let margin = {top: 30, right: 200, bottom: 30, left: 60};
 
+        let trafficKeys = trafficInfo.keys;
+        trafficInfo = trafficInfo.info;
+
+        // Check to make sure there's actually data to display.
+        if (trafficKeys.length === 0 || Object.keys(trafficInfo).length === 0) {
+            return;
+        }
+
+
         // o* is the overall or outer width/height.
-        let oWidth = 600;
-        let oHeight = 250;
+        let oWidth = 800;
+        let oHeight = 400;
 
         // i* is the inner width/height - i.e. o* - margins.
         let iWidth = oWidth - margin.left - margin.right;
@@ -533,10 +543,11 @@ class ForceMap {
         let allValArr = Object.values(trafficInfo);
 
         // make lowercase and convert whitespace to underscores
-        let underscorinator = d => d.replace(/\s/g, '_').toLowerCase(); // DOOFENSHMIRTZ!!!
+        let underscorinator = d => d.replace(/\s/g, '_').toLowerCase();
 
         // underscorinator but it strips the last value (i.e. no 'in' or 'out')
-        let keyify = (input_str, separator) => {
+        // Used to generate keys for the y scales.
+        let make_y_key = (input_str, separator) => {
             let input_split = input_str.split(separator);
             let ret = input_split[0].toLowerCase();
             for (let i = 1; i < input_split.length - 1; i++) {
@@ -546,13 +557,16 @@ class ForceMap {
         }
 
         // Names here MUST correspond to keys in the auxiliary data dictionary (i.e. netbeam, stardust).
-        let types = ['Traffic In', 'Traffic Out', 'Unicast Packets In', 'Unicast Packets Out',
-            'Errors In', 'Errors Out', 'Discards In', 'Discards Out', 'Packets In', 'Packets Out'];
+        // let types = ['Traffic In', 'Traffic Out', 'Unicast Packets In', 'Unicast Packets Out',
+        //     'Errors In', 'Errors Out', 'Discards In', 'Discards Out', 'Packets In', 'Packets Out'];
+        let types = trafficKeys.map(d => d.replace(/_/g, ' ').toLowerCase());
 
         // types_set is used for setting up the different y scale values.
-        let types_set = new Set(types.map(d => keyify(d, ' ')));
+        let types_set = new Set(types.map(d => make_y_key(d, ' ')));
 
         // Measurement is just the first word, i.e. "traffic" or "errors"
+        // measurement_filter is used to get all the values of a specific type of measurement
+        // this in turn is used to create the extent for the scales
         let measurement_filter = (valArr, measurement) => {
             let retArr = []
             for (let val of valArr) {
@@ -618,7 +632,7 @@ class ForceMap {
                 return;
             }
 
-            let measure_key = keyify(measurement, '_');
+            let measure_key = make_y_key(measurement, '_');
 
             // should be everything except for the first/last
             let selectedYScale = yScales[measure_key];
@@ -685,12 +699,12 @@ class ForceMap {
                 .on('dblclick', _ => d3.event.stopPropagation());
 
             checkboxes.selectAll('input')
-                .filter(d => d === types[0] || d === types[1])
+                .filter(d => d === 'traffic in' || d === 'traffic out')
                 .property('checked', true);
 
             checkboxes.append('label')
                 .attr('for', d => `checkbox_${underscorinator(d)}_${div.attr('id')}`)
-                .attr('class', d => `stardust_${keyify(d, ' ')} stardust_metrics`)
+                .attr('class', d => `stardust_${make_y_key(d, ' ')} stardust_metrics`)
                 .classed('stardust_out', d => d.toLowerCase().includes('out'))
                 .text(d => d);
 
@@ -714,6 +728,10 @@ class ForceMap {
                 .join('option')
                 .attr('value', d => d)
                 .text(d => d.replace('_', ' '));
+
+            yScaleSelect.selectAll('option')
+                .filter(d => d === 'traffic')
+                .attr('selected', true);
 
             yScaleSelect.on('change', _ => {
                 let key = d3.event.target.value;
@@ -1062,15 +1080,33 @@ class ForceMap {
         // Helper method to get traffic info from Netbeam-polled nodes into acceptable format for secondary d3 vis.
         function generateTrafficInfo(packets) {
             let trafficInfo = {};
+            let trafficKeys = new Set();
 
             for (let packet of packets) {
                 // Merge all the packets together
-                trafficInfo = {
-                    ...trafficInfo,
-                    ...packet['traffic_info']
+
+                if (packet['traffic_info']) {
+                    trafficInfo = {
+                        ...trafficInfo,
+                        ...packet['traffic_info']
+                    }
+
+                    for (let k of Object.keys(packet['traffic_info'])) {
+                        trafficKeys = new Set([...trafficKeys, ...Object.keys(packet['traffic_info'][k])]);
+                    }
                 }
+
             }
-            return trafficInfo;
+
+            trafficKeys = [...trafficKeys].sort();
+
+            // Remove the 'ts' key from trafficKeys.
+            let tsIdx = trafficKeys.findIndex(d => d === 'ts');
+            if (tsIdx) {
+                trafficKeys.splice(tsIdx, 1);
+            }
+
+            return {'info': trafficInfo, 'keys': trafficKeys};
         }
 
         // Link handlers

@@ -38,8 +38,8 @@ def sd_traffic(resource='lond-cr5::to_tenet_ip-b'):
                               'values.in_ucast_pkts.delta',
                               'values.out_ucast_pkts.delta',
 
-                              'values.in_bcast_pkts.delta',
-                              'values.in_mcast_pkts.delta',
+                              # 'values.in_bcast_pkts.delta',
+                              # 'values.in_mcast_pkts.delta',
 
                               'values.in_pkts.delta',
                               'values.out_pkts.delta',
@@ -74,7 +74,10 @@ def sd_traffic(resource='lond-cr5::to_tenet_ip-b'):
             'values.out_ucast_pkts.delta': 'unicast_packets_out',
 
             'values.in_bcast_pkts.delta': 'broadcast_packets_in',
+            'values.out_bcast_pkts.delta': 'broadcast_packets_out',
+
             'values.in_mcast_pkts.delta': 'multicast_packets_in',
+            'values.out_mcast_pkts.delta': 'multicast_packets_out',
 
             'values.in_pkts.delta': 'packets_in',
             'values.out_pkts.delta': 'packets_out'
