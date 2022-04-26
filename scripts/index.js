@@ -268,17 +268,22 @@ const toggleMapBtnHandler = async () => {
     force_map.toggleMap();
     force_map.setSimulation();
 
-    d3.select('#non_map_controls')
-        .classed("col-sm-6", force_map.showMap)
-        .classed("col-12", !force_map.showMap);
+    document.getElementById('map_toggle_btn').innerHTML = force_map.showMap ? '<i class="fas fa-project-diagram"></i> Network View' : '<i class="fas fa-map"></i> Map View';
     
-    d3.select('#viz_controls')
-    .classed("row-cols-sm-2", force_map.showMap);
+    // d3.select('#viz_controls')
+    // .classed("row-cols-sm-2", force_map.showMap);
 
     d3.select('#map_controls')
         .classed("d-none", !force_map.showMap);
 
     force_map.update();
+}
+
+const toggleExpandASBtnHandler = async () =>{
+    console.log("expand all grouped nodes");
+    // possibly add a boolean to forcemap to keep track of needing to expand all? because using the document to store state feels a little wrong
+    btnTxt = document.getElementById('as_toggle_expand_btn').innerHTML
+    document.getElementById('as_toggle_expand_btn').innerHTML = btnTxt.includes("Expand") ?  '<i class="fas fa-circle"></i> Collapse All Orgs' : '<i class="fas fa-ellipsis-h"></i> Expand All Orgs';
 }
 
 /**
