@@ -8,7 +8,11 @@ default_location:
   region: "UT"
 interface_file: "interfaces.json"
 sd_interface_file: "sd_interfaces.json"
-interface_refresh_interval: 86400
+tsds_db_file: "tsds_ip.db"
+# 1 week refresh interval (s)
+interface_refresh_interval: 604800
+# 2 week refresh interval (s)
+tsds_refresh_interval: 1209600
 tr_start_port: 33434
 
 # Debatable whether these should be configurable.

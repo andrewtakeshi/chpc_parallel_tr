@@ -11,7 +11,9 @@ variables = {
     },
     'interface_file': 'interfaces.json',
     'sd_interface_file': 'sd_interfaces.json',
+    'tsds_db_file': 'tsds_ip.db',
     'interface_refresh_interval': 86400,
+    'tsds_refresh_interval': 1209600,
     'tr_start_port': 33434
 }
 
