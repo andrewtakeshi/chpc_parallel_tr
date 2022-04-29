@@ -96,7 +96,7 @@
         line.link {
             vector-effect: non-scaling-stroke;
         }
-        
+
         #cr_deck {
             max-height: 25vh;
 
@@ -180,7 +180,7 @@
                     <form class="d-flex">
                         <button id="reset_config_btn" class="btn btn-outline-danger"
                             onclick="resetBtnHandler().then(data => force_map.setData(data));">
-                            <i class="fas fa-trash"></i> Reset Page
+                            <i class="fas fa-trash"></i> Clear All Traceroute Data
                         </button>
                     </form>
                 </div>
@@ -245,41 +245,50 @@ e.g. 1.1.1.1/cloudflare.com">
                         <span>Past Runs</span>
                         <span id="inQueue_area"></span>
                     </div>
-                    
-                    <div id="cr_deck" class="col col-12 row row-cols-1 row-cols-sm-2 row-cols-xl-1 overflow-auto g-0"></div>
+
+                    <div id="cr_deck" class="col col-12 row row-cols-1 row-cols-sm-2 row-cols-xl-1 overflow-auto g-0">
+                    </div>
                 </div>
 
             </div>
             <div class="col-xl-9 col-lg-12">
-                <div id="viz_controls" class="row row-cols-1 row-cols-sm-2 col-12 g-0">
-                    <div id="non_map_controls" class="col btn-group col-12 col-sm-6">
-                        <div id="refresh_button_div" class="col-6">
-                            <button id="refresh_vis_btn" class="btn btn-outline-danger form-control h-100"
+                <div id="viz_controls" class="row row-cols-1 col-12 g-0">
+                    <div id="non_map_controls" class="col btn-group col-12">
+                        <div id="refresh_button_div" class="col-4">
+                            <button id="refresh_vis_btn" class="btn btn-outline-secondary form-control h-100"
                                 onclick="updateViz().then(data => force_map.setData(data));">
                                 <i class="fas fa-undo"></i> Refresh Network
                             </button>
                         </div>
-                        <button id="map_toggle_btn" class="btn btn-outline-success col-6"
+                        <button id="as_toggle_expand_btn" class="btn btn-outline-success col-4"
+                            onclick="toggleExpandASBtnHandler()">
+                            <i class="fas fa-ellipsis-h"></i> Expand All Orgs
+                        </button>
+                        <button id="map_toggle_btn" class="btn btn-outline-success col-4"
                             onclick="toggleMapBtnHandler()">
                             <i class="fas fa-project-diagram"></i> Network View
                         </button>
                     </div>
-                    <div id="map_controls" class="col col-12 col-sm-6 btn-group">
-                        <button id="zoom_in" class="btn btn-outline-dark zoom_control" onclick="let currentZoom = force_map.zoomIn();
+                    <div id="map_controls" class="col col-12 btn-group">
+                        <div id="zoom_buttons" class="col col-6 col-sm-4 btn-group">
+                            <button id="zoom_in" class="col col-4 btn btn-outline-dark zoom_control" onclick="let currentZoom = force_map.zoomIn();
                                 checkZoomLevels(currentZoom);
                                 ">
-                            <i class="fas fa-search-plus"></i>
-                        </button>
-                        <button disabled id="zoom_out" class="btn btn-outline-dark zoom_control" onclick="let currentZoom = force_map.zoomOut();
+                                <i class="fas fa-search-plus"></i>
+                            </button>
+                            <button disabled id="zoom_out" class="col col-4 btn btn-outline-dark zoom_control"
+                                onclick="let currentZoom = force_map.zoomOut();
                                 checkZoomLevels(currentZoom);
                                 ">
-                            <i class="fas fa-search-minus"></i>
-                        </button>
-                        <button disabled id="zoom_reset" class="btn btn-outline-dark zoom_control"
-                            onclick="force_map.svg.call(force_map.zoom.transform, d3.zoomIdentity); checkZoomLevels(1); ">
-                            <i class="fas fa-expand"></i>
-                        </button>
-                        <div id="map_select_wrapper" class="form-floating col-6">
+                                <i class="fas fa-search-minus"></i>
+                            </button>
+                            <button disabled id="zoom_reset"
+                                class="col col-4 btn btn-outline-dark zoom_control"
+                                onclick="force_map.svg.call(force_map.zoom.transform, d3.zoomIdentity); checkZoomLevels(1); ">
+                                <i class="fas fa-expand"></i>
+                            </button>
+                        </div>
+                        <div id="map_select_wrapper" class="form-floating col-6 col-sm-8">
                             <select class="form-select h-100" id="map_select" onchange="mapSelectHandler();">
                                 <option selected value="world">World</option>
                                 <option value="us">Contiguous United States</option>
