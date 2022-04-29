@@ -2,7 +2,7 @@
  * Traceroute visualization; uses a map to display hops spatially and a force map to add an element of interactivity +
  * handle collisions between nodes in roughly the same area.
  *
- * @author Paul Fischer, Andrew Golightly, Cam Davie
+ * @author Paul Fischer, Andrew Golightly, Cameron Davie
  */
 class ForceMap {
     /**
@@ -1098,8 +1098,12 @@ class ForceMap {
         // Link handlers
         function generateTTSLink(d, selection) {
             selection.selectAll('text').remove();
+            let bwLabel = "unknown bandwidth"; 
+            if(!d.unknown_bw){
+                bwLabel = `${d3.format('~s')(d.max_bandwidth)}bps`
+            }
             selection.append('text')
-                .text(`${d3.format('~s')(d.max_bandwidth)}bps`);
+                .text(bwLabel);
         }
 
         function linkMouseOverHandler(d) {
