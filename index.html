@@ -1,4 +1,4 @@
-<!-- Author: Andrew Golightly -->
+<!-- Author: Andrew Golightly, Cameron Davie -->
 <!DOCTYPE html>
 <html lang="en">
 
@@ -8,32 +8,28 @@
 
     <!--    Stylesheets (Bootstrap, FA) -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css"
-          integrity="sha384-1BmE4kWBq78iYhFldvKuhfTAU6auU8tT94WrHftjDbrCEXSU1oBoqyl2QvZ6jIW3"
-          crossorigin="anonymous"/>
+        integrity="sha384-1BmE4kWBq78iYhFldvKuhfTAU6auU8tT94WrHftjDbrCEXSU1oBoqyl2QvZ6jIW3" crossorigin="anonymous" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css"
-          integrity="sha512-1ycn6IcaQQ40/MKBW2W4Rhis/DbILU74C1vSrLJxCq57o941Ym01SwNsOMqvEBFlcgUa6xLiPY/NS5R+E6ztJQ=="
-          crossorigin="anonymous"
-          referrerpolicy="no-referrer"/>
+        integrity="sha512-1ycn6IcaQQ40/MKBW2W4Rhis/DbILU74C1vSrLJxCq57o941Ym01SwNsOMqvEBFlcgUa6xLiPY/NS5R+E6ztJQ=="
+        crossorigin="anonymous" referrerpolicy="no-referrer" />
 
     <!--Bootstrap JS-->
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"
-            integrity="sha256-/xUj+3OJU5yExlq6GSYGSHk7tPXikynS7ogEvDej/m4="
-            crossorigin="anonymous"></script>
+        integrity="sha256-/xUj+3OJU5yExlq6GSYGSHk7tPXikynS7ogEvDej/m4=" crossorigin="anonymous"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.6/umd/popper.min.js"
-            integrity="sha384-wHAiFfRlMFy6i5SRaxvfOCifBUQy1xHdJ/yoi7FRNXMRBu5WHdZYu1hA6ZOblgut"
-            crossorigin="anonymous"></script>
+        integrity="sha384-wHAiFfRlMFy6i5SRaxvfOCifBUQy1xHdJ/yoi7FRNXMRBu5WHdZYu1hA6ZOblgut"
+        crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.min.js"></script>
 
     <!--    JSYaml mainly used for config loading-->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js"
-            integrity="sha512-CSBhVREyzHAjAFfBlIBakjoRUKp5h7VSweP0InR/pAJyptH7peuhCsqAI/snV+TwZmXZqoUklpXp6R6wMnYf5Q=="
-            crossorigin="anonymous"
-            referrerpolicy="no-referrer"></script>
+        integrity="sha512-CSBhVREyzHAjAFfBlIBakjoRUKp5h7VSweP0InR/pAJyptH7peuhCsqAI/snV+TwZmXZqoUklpXp6R6wMnYf5Q=="
+        crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 
     <!--    UUID used for current run table-->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/node-uuid/1.4.8/uuid.min.js"
-            integrity="sha512-rV0Q1QWodkoLjts/qP2XHtjvUPTmN46k4eH0lzOR3mDui8a0YnL/uqydipXA9mQ2wG6J4imL0BO6/26rcFho7Q=="
-            crossorigin="anonymous"></script>
+        integrity="sha512-rV0Q1QWodkoLjts/qP2XHtjvUPTmN46k4eH0lzOR3mDui8a0YnL/uqydipXA9mQ2wG6J4imL0BO6/26rcFho7Q=="
+        crossorigin="anonymous"></script>
 
     <!--    D3 and map stuff-->
     <script src="external/d3/d3.js"></script>
@@ -42,7 +38,6 @@
 
     <!--    Our stuff-->
     <script src="scripts/config.js" async></script>
-    <script src="scripts/library.js"></script>
     <script src="scripts/forcemap.js" defer></script>
     <script src="scripts/index.js" defer></script>
 
@@ -67,7 +62,7 @@
             background-color: rgba(255, 255, 255, 0.9);
             border-radius: 10px;
             word-wrap: break-word;
-            border-color: rgba(0,0,0,0.1);
+            border-color: rgba(0, 0, 0, 0.1);
             border-style: solid;
         }
 
@@ -102,31 +97,15 @@
         }
 
         #cr_deck {
-            max-height: 30vh;
+            max-height: 25vh;
 
         }
 
         @media (min-width: 1200px) {
             #cr_deck {
-                max-height: 50vh;
+                max-height: 68vh;
 
             }
-        }
-
-        #netbeam_table_area {
-            max-height: 30vh;
-
-        }
-
-        @media (min-width: 1200px) {
-            #netbeam_table_area {
-                max-height: 50vh;
-
-            }
-        }
-
-        .table-condensed {
-            font-size: 12px;
         }
 
         /* stardust metrics */
@@ -200,7 +179,7 @@
                     <form class="d-flex">
                         <button id="reset_config_btn" class="btn btn-outline-danger"
                             onclick="resetBtnHandler().then(data => force_map.setData(data));">
-                            <i class="fas fa-trash"></i> Reset Page
+                            <i class="fas fa-trash"></i> Clear All Traceroute Data
                         </button>
                     </form>
                 </div>
@@ -211,7 +190,7 @@
     <div class="container-fluid">
         <div class="row row-cols-1">
 
-            <div class="col bg-light h-100 col-xl-3 row row-cols-1 row-cols-md-3 row-cols-xl-1">
+            <div class="col bg-light h-100 col-xl-3 row row-cols-1 row-cols-md-2 row-cols-xl-1">
                 <form id="esmond_form" name="esmond_form" class="col mb-2 border-rounded col-12 col-md-4 col-xl-12"
                     onsubmit="return false">
                     <div class="d-flex justify-content-between">
@@ -260,62 +239,61 @@ e.g. 1.1.1.1/cloudflare.com">
                     </div>
                 </form>
 
-                <div id="cr_deck" class="col col-12 col-md-4 col-xl-12 overflow-auto">
-                    <div class="d-flex justify-content-between">
+                <div id="cr_deck_container" class="col col-12 col-md-8 col-xl-12">
+                    <div id="cr_deck_header" class="d-flex justify-content-between d-none">
                         <span>Past Runs</span>
                         <span id="inQueue_area"></span>
                     </div>
 
-                </div>
-
-                <div id="netbeam_table_area" style="display: none" class="col col-12 d-flex overflow-auto">
-                    <div style="display:none">
-                        Netbeam&nbsp;Metrics
-                    </div>
-                    <div id="netbeam_accordion" class="accordion accordion-flush w-100">
+                    <div id="cr_deck" class="col col-12 row row-cols-1 row-cols-sm-2 row-cols-xl-1 overflow-auto g-0">
                     </div>
                 </div>
-
 
             </div>
             <div class="col-xl-9 col-lg-12">
-                <div class="row row-cols-1 row-cols-sm-2 col-12 g-0">
-                    <div class="col btn-group col-12 col-sm-6">
-                        <div id="refresh_button_div" class="col-6">
-                            <button id="refresh_vis_btn" class="btn btn-outline-danger form-control h-100"
+                <div id="viz_controls" class="row row-cols-1 col-12 g-0">
+                    <div id="non_map_controls" class="col btn-group col-12">
+                        <div id="refresh_button_div" class="col-4">
+                            <button id="refresh_vis_btn" class="btn btn-outline-secondary form-control h-100"
                                 onclick="updateViz().then(data => force_map.setData(data));">
                                 <i class="fas fa-undo"></i> Refresh Network
                             </button>
                         </div>
-                        <button id="zoom_in" class="btn btn-outline-dark zoom_control" onclick="let currentZoom = force_map.zoomIn();
-                                checkZoomLevels(currentZoom);
-                                ">
-                            <i class="fas fa-search-plus"></i>
+                        <button id="as_toggle_expand_btn" class="btn btn-outline-success col-4"
+                            onclick="toggleExpandASBtnHandler()">
+                            <i class="fas fa-ellipsis-h"></i> Expand All Orgs
                         </button>
-                        <button disabled id="zoom_out" class="btn btn-outline-dark zoom_control" onclick="let currentZoom = force_map.zoomOut();
-                                checkZoomLevels(currentZoom);
-                                ">
-                            <i class="fas fa-search-minus"></i>
-                        </button>
-                        <button disabled id="zoom_reset" class="btn btn-outline-dark zoom_control"
-                            onclick="force_map.svg.call(force_map.zoom.transform, d3.zoomIdentity); checkZoomLevels(1); ">
-                            <i class="fas fa-expand"></i>
-                        </button>
-                    </div>
-                    <div class="col col-12 col-sm-6 btn-group">
-                        <button id="map_toggle_btn" class="btn btn-outline-success col-6"
+                        <button id="map_toggle_btn" class="btn btn-outline-success col-4"
                             onclick="toggleMapBtnHandler()">
                             <i class="fas fa-project-diagram"></i> Network View
                         </button>
-                        <!-- <div class="btn-group"> -->
-                        <div id="map_select_wrapper" class="form-floating col-6">
+                    </div>
+                    <div id="map_controls" class="col col-12 btn-group">
+                        <div id="zoom_buttons" class="col col-6 col-sm-4 btn-group">
+                            <button id="zoom_in" class="col col-4 btn btn-outline-dark zoom_control" onclick="let currentZoom = force_map.zoomIn();
+                                checkZoomLevels(currentZoom);
+                                ">
+                                <i class="fas fa-search-plus"></i>
+                            </button>
+                            <button disabled id="zoom_out" class="col col-4 btn btn-outline-dark zoom_control"
+                                onclick="let currentZoom = force_map.zoomOut();
+                                checkZoomLevels(currentZoom);
+                                ">
+                                <i class="fas fa-search-minus"></i>
+                            </button>
+                            <button disabled id="zoom_reset"
+                                class="col col-4 btn btn-outline-dark zoom_control"
+                                onclick="force_map.svg.call(force_map.zoom.transform, d3.zoomIdentity); checkZoomLevels(1); ">
+                                <i class="fas fa-expand"></i>
+                            </button>
+                        </div>
+                        <div id="map_select_wrapper" class="form-floating col-6 col-sm-8">
                             <select class="form-select h-100" id="map_select" onchange="mapSelectHandler();">
                                 <option selected value="world">World</option>
                                 <option value="us">Contiguous United States</option>
                                 <option value="eu">Europe</option>
                             </select>
                             <label for="map_select">Map</label>
-                            <!-- </div> -->
                         </div>
                     </div>
                 </div>

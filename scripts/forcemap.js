@@ -1,11 +1,8 @@
-// cam todo: start cleaning up index & merge library w/ it
-// cam todo: show traffic data on hover
-
 /**
  * Traceroute visualization; uses a map to display hops spatially and a force map to add an element of interactivity +
  * handle collisions between nodes in roughly the same area.
  *
- * @author Paul Fischer, Andrew Golightly
+ * @author Paul Fischer, Andrew Golightly, Cameron Davie
  */
 class ForceMap {
     /**
@@ -34,6 +31,8 @@ class ForceMap {
         this.node_visual_alias = new Map();
         this.atr_iframes = new Map();
 
+        // here we map our different bit speed ranges to a range that can be used
+        // with d3.interpolateViridis() for an accessible color scale
         this.linkColorScale = d3.scaleQuantile()
             .domain([0, 100000000, 250000000, 500000000, 1000000000, 2000000000, 5000000000, 10000000000, 20000000000,
                 40000000000, 80000000000, 100000000000, 400000000000])
@@ -45,7 +44,8 @@ class ForceMap {
             .attr('id', 'forcemap_tooltip')
             .classed('tooltip', true);
         this.tooltip_stats = this.floating_tooltip
-            .append('div');
+            .append('div')
+            .attr('id', 'forcemap_tooltip_stats');
 
         // Need to call setup first so we have the svg to append to
         this.setup();
@@ -135,6 +135,7 @@ class ForceMap {
         this.update();
     }
 
+    // called when window is resized to ensure visualization displays correctly as other elements change
     resize(width, height) {
         this.width = width;
         this.height = height;
@@ -171,7 +172,6 @@ class ForceMap {
 
     /**
      * get the current zoom level
-     * @returns
      */
     zoomInfo() {
         let zoomOutline = this.mapG.selectAll('path').node();
@@ -232,6 +232,10 @@ class ForceMap {
         }
     }
 
+    /**
+     * clamp v within lo, hi boundaries
+     * used for clamping zoom level
+     */
     clamp(v, lo, hi) {
         return v < lo ? lo : v > hi ? hi : v;
     }
@@ -501,7 +505,8 @@ class ForceMap {
      * pinned tooltips.
      */
     auxGraph(trafficInfo, div, checks = false) {
-        let margin = {top: 30, right: 200, bottom: 30, left: 60};
+        // 200px margin on right side of graph to allow for legend / metric checkboxes
+        let margin = { top: 30, right: 200, bottom: 30, left: 60 };
 
         let trafficKeys = trafficInfo.keys;
         trafficInfo = trafficInfo.info;
@@ -542,8 +547,9 @@ class ForceMap {
         // 5 minute intervals).
         let allValArr = Object.values(trafficInfo);
 
-        // make lowercase and convert whitespace to underscores
-        let underscorinator = d => d.replace(/\s/g, '_').toLowerCase();
+        // Ah, Perry the Platypus! It seems you've met my Underscorinator!
+        // It makes strings lowercase and converts their whitespace to underscores!
+        let underscorinator = d => d.replace(/\s/g, '_').toLowerCase(); // DOOFENSHMIRTZ!!!
 
         // underscorinator but it strips the last value (i.e. no 'in' or 'out')
         // Used to generate keys for the y scales.
@@ -655,13 +661,27 @@ class ForceMap {
                 .selectAll('circle')
                 .data(allValArr.filter(d => `${measurement}` in d))
                 .join('circle')
-                .attr('r', 1.5)
+                .attr('r', 2)
                 .attr('cx', d => xScale(d.ts))
                 .attr('cy', d => selectedYScale(d[measurement]))
-                .on('mouseover', d => console.log(d[measurement]));
+                .on('mouseover', d => {
+                    d3.select("#forcemap_tooltip").raise();
+                    d3.select("#forcemap_tooltip").style('opacity', 0.9);
+                    d3.select("#forcemap_tooltip_stats").text((measurement.includes("traffic") ? d3.format('~s')(d[measurement]) + 'bps' : d[measurement]));
+                })
+                .on('mouseout', () => {
+                    d3.select("#forcemap_tooltip").style('opacity', 0);
+                    d3.select("#forcemap_tooltip_stats").text("");
+                })
+                .on('mousemove', () => {
+                    // Updates position of global tooltip.
+                    d3.select("#forcemap_tooltip").style('left', (d3.event.pageX + 10) + 'px').style('top', (d3.event.pageY + 10) + 'px')
+                });
         }
 
-        // Checks is true when the tooltip is pinned
+        // Checks is true when the tooltip is pinned, meaning that we want to show the
+        // metric checkboxes allowing the user to select metrics. 
+        // Otherwise we will just show a simple legend
         if (checks) {
             let list_items = div.append('div')
                 .style('position', 'absolute')
@@ -754,6 +774,7 @@ class ForceMap {
                 // }
             });
         } else {
+            // in this case, the tooltip is not pinned, so we are just displaying a simple in/out traffic legend
             let inLegend = trafficGraph.append('g')
                 .attr('id', 'inLegend')
                 .attr('transform', `translate(${iWidth}, 10)`);
@@ -811,6 +832,7 @@ class ForceMap {
         // Select all nodes that are actual nodes (not abstracted org nodes)
         let nodes = Array.from(this.all_nodes_flat.values()).filter(d => d.id.startsWith('ip'));
 
+        // loop through nodes to find the node with min bw and its ip 
         for (let node of nodes) {
             if (node.max_bandwidth && node.max_bandwidth < min_bw) {
                 min_bw = node.max_bandwidth;
@@ -935,7 +957,7 @@ class ForceMap {
             d.diameter = nodeDiameterScale(d.packets.length);
             d.radius = d.diameter / 2;
         }
-
+        // set the bounds on the size of a path in the viz (based on packet count)
         let packet_scale = d3.scaleLinear().domain(d3.extent(packet_scale_domain)).range([3, 7]);
 
         // Lambda to check for unknown or undefined domains - returns true if domain is known, false otherwise.
@@ -1112,8 +1134,12 @@ class ForceMap {
         // Link handlers
         function generateTTSLink(d, selection) {
             selection.selectAll('text').remove();
+            let bwLabel = "unknown bandwidth"; 
+            if(!d.unknown_bw){
+                bwLabel = `${d3.format('~s')(d.max_bandwidth)}bps`
+            }
             selection.append('text')
-                .text(`${d3.format('~s')(d.max_bandwidth)}bps`);
+                .text(bwLabel);
         }
 
         function linkMouseOverHandler(d) {
@@ -1124,6 +1150,7 @@ class ForceMap {
         function linkMouseOutHandler(d) {
             that.floating_tooltip.transition().duration(200).style('opacity', 0);
         }
+
 
         // Generate ToolTipStats. Not complicated, just abstracted b/c it's used more than once.
         function generateTTS(d, packets, selection) {
