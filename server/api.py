@@ -10,7 +10,6 @@ import logging, sys
 logging.basicConfig(stream=sys.stderr, level=logging.INFO)
 
 app = flask.Flask(__name__)
-# Changed from True
 app.config["DEBUG"] = True
 cors = CORS(app)
 
@@ -45,12 +44,6 @@ def traceroutes():
     Handles running traceroutes.
     :return: JSON string formatted for d3 with all additional information added.
     """
-    # if "dest" in request.args:
-    #     dest = request.args["dest"]
-    # else:
-    #     response = jsonify({'error': 'invalid destination'})
-    #     response.headers.add('Access-Control-Allow-Origin', '*')
-    #     return response
 
     # Check for destination not being empty happens client side
     dest = request.args['dest']
