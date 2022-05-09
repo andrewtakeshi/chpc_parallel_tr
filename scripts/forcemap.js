@@ -51,7 +51,11 @@ class ForceMap {
         this.setup();
     }
 
+    /**
+     * Function to initialize, or re-initialize a force map.
+     */
     setup() {
+        // Create our SVG with appropriate width/height.
         this.svg = d3.select(this.rootElement)
             .append('svg')
             .attr('width', this.width)
@@ -60,6 +64,7 @@ class ForceMap {
             .style('display', 'block')
             .style('margin', 'auto');
 
+        // Set up the zoom function, and assign it to our zoomHandler.
         this.zoom = d3.zoom()
             .scaleExtent([1, 10])
             .translateExtent([[-this.width + 150, -this.height + 150], [2 * this.width - 150, 2 * this.width - 150]])
@@ -71,7 +76,7 @@ class ForceMap {
         this.forceG = this.svg.append('g')
             .attr('id', 'forceGroup');
 
-        // All d3-geo (the map) related things go to mapG
+        // All d3-geo (map) related things go to mapG
         this.mapG = this.svg.append('g')
             .attr('id', 'mapGroup');
 
@@ -130,30 +135,39 @@ class ForceMap {
         // Disables or enables the map, depending on the value of this.showMap.
         this.toggleMap(this.showMap);
 
-        // We call update directly so that we don't "collapse" any nodes + it's easier than figuring out why calling it
-        // the same way that all the other updates are done doesn't work.
+        // We call update directly so that we don't "collapse" any nodes
         this.update();
     }
 
+    /**
+     * Handles resize. Makes the map scalable with the window.
+     * @param width
+     * @param height
+     */
     resize(width, height) {
+        // Adjust width and height
         this.width = width;
         this.height = height;
+
+        // Remove the old visualization, and setup a new one.
         d3.select(this.rootElement).select('#mainVisSVG').remove();
         this.setup();
-        let nodes = this.simulation.nodes();
 
-        nodes.forEach(d => {
-            d.x = this.projection([d.lon, d.lat])[0];
-            d.y = this.projection([d.lon, d.lat])[1];
-        });
-
-        this.simulation.stop();
-
-        nodes.forEach(d => {
-            d.fx = null;
-            d.fy = null;
-        });
-
+        if (this.showMap) {
+            // Manually set the node positions to where the map projection says they should be.
+            let nodes = this.simulation.nodes();
+            nodes.forEach(d => {
+                d.fx = this.projection([d.lon, d.lat])[0];
+                d.fy = this.projection([d.lon, d.lat])[1];
+            });
+            this.simulation.stop();
+            nodes.forEach(d => {
+                d.fx = null;
+                d.fy = null;
+            });
+        } else {
+            // TODO: Manual placement in network view.
+        }
         this.simulation.alpha(1).restart();
     }
 
@@ -178,26 +192,37 @@ class ForceMap {
         return zoomOutline ? d3.zoomTransform(zoomOutline).k : 1;
     }
 
+    /**
+     * Handler for zoom in button click.
+     * @returns d3 zoom object, representing the new zoom level.
+     */
     zoomIn() {
         let newZoom = this.getNewZoomLevel(true);
         this.zoom.scaleTo(this.svg, newZoom);
         return newZoom;
     }
 
+    /**
+     * Handler for zoom out button click.
+     * @returns d3 zoom object, representing the new zoom level.
+     */
     zoomOut() {
         let newZoom = this.getNewZoomLevel(false);
         this.zoom.scaleTo(this.svg, newZoom);
         return newZoom;
     }
 
+    /**
+     * @param zoomIn
+     * @returns d3 zoom object, representing the new zoom level.
+     */
     getNewZoomLevel(zoomIn = false) {
         let oldZoom = this.zoomInfo();
         let scaleExtent = this.zoom.scaleExtent();
-        let clamp = (v, lo, hi) => v < lo ? lo : v > hi ? hi : v;
 
         let newZoom = zoomIn ? 1.5 * oldZoom : 0.66 * oldZoom;
 
-        return clamp(newZoom, scaleExtent[0], scaleExtent[1]);
+        return this.clamp(newZoom, scaleExtent[0], scaleExtent[1]);
     }
 
     /**
@@ -232,6 +257,13 @@ class ForceMap {
         }
     }
 
+    /**
+     * Helper function to clamp values to a specified range.
+     * @param v - Value to clamp
+     * @param lo - Low end
+     * @param hi - High end
+     * @returns Clamped value
+     */
     clamp(v, lo, hi) {
         return v < lo ? lo : v > hi ? hi : v;
     }
@@ -291,8 +323,7 @@ class ForceMap {
         // Reset zoom when we draw/redraw the map.
         this.svg.call(this.zoom).call(this.zoom.transform, d3.zoomIdentity);
 
-        // // We call update directly so that we don't "collapse" any nodes + it's easier than figuring out why calling it
-        // // the same way that all the other updates are done doesn't work.
+        // // We call update directly so that we don't "collapse" any nodes
         // this.update();
     }
 
@@ -332,7 +363,8 @@ class ForceMap {
                 .force('charge', d3.forceManyBody()
                     .distanceMax(100))
                 // .force('center', d3.forceCenter(this.width / 2, this.height / 2))
-                .force('forceX', d3.forceX(d => (d.ttl * ((that.width - 100) / denominator())) + 15))
+                // .force('forceX', d3.forceX(d => (d.ttl * ((that.width - 100) / denominator())) + 15))
+                .force('forceX', d3.forceX(d => (d.ttl - 1) * ((that.width - 100) / denominator())))
                 .force('forceY', d3.forceY(that.height / 2)
                     .strength(0.3))
                 .force('collision', d3.forceCollide()
@@ -450,16 +482,15 @@ class ForceMap {
             if (!d3.event.active) {
                 simulation.alphaTarget(0);
             }
-            // TODO: REMOVE THESE LINES, ADD BACK FIXED-POS ON DRAG
-            // d.fx = null;
-            // d.fy = null;
+
+            // Keep fixed position in network view, but reset back to force in map view.
+            if (that.showMap) {
+                d.fx = null;
+                d.fy = null;
+            }
         }
 
         return d3.drag()
-            // Needed for smooth dragging, along with calling drag from the group (i.e. g.single_node) rather than
-            // calling on the circle
-            // Update: removed this to fix the issue with drag when zoomed. Still no jittering, so I'm not entirely sure why it was required before.
-            // .container(d3.select('#mainVisSVG').node())
             .on('start', dragstarted)
             .on('drag', dragged)
             .on('end', dragended);
@@ -503,6 +534,8 @@ class ForceMap {
     auxGraph(trafficInfo, div, checks = false) {
         let margin = {top: 30, right: 200, bottom: 30, left: 60};
 
+        // Initially, trafficInfo has both the actual data and all of the available keys includeded in the data.
+        // We separate the two here.
         let trafficKeys = trafficInfo.keys;
         trafficInfo = trafficInfo.info;
 
@@ -510,7 +543,6 @@ class ForceMap {
         if (trafficKeys.length === 0 || Object.keys(trafficInfo).length === 0) {
             return;
         }
-
 
         // o* is the overall or outer width/height.
         let oWidth = 800;

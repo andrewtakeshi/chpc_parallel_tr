@@ -37,16 +37,14 @@ def tsds_query_template(ip,
     # f'aggregate(values.outdiscard, 60, average) as discards_out' \
 
 
-def add_tsds_info_threaded(tr_data, db_path=None):
+def add_tsds_info_threaded(tr_data):
     """
     Adds TSDS information to traceroute data, if applicable.
     :param tr_data: Dictionary containing the traceroute data. 
     :param db_path: Path to database. If None, then it uses the config file db path.
     :return: None. Modifies tr_data directly.
     """
-    # Set db path, if applicable.
-    if db_path is None:
-        db_path = config.variables['tsds_db_file']
+    db_path = config.variables['tsds_db_file']
 
     # Open connection to db.
     con = sqlite3.connect(db_path)
@@ -90,27 +88,21 @@ def add_tsds_info_threaded(tr_data, db_path=None):
         thread.join()
 
 
-def tsds_db_setup(db_path=None):
+def tsds_db_setup():
     """
     Create the database table with the appropriate schema.
     :param db_path: Path to the database file. If None, uses the path from the config file.
     :return: None.
     """
-    if db_path is None:
-        db_path = config.variables['tsds_db_file']
-
+    db_path = config.variables['tsds_db_file']
     con = sqlite3.connect(db_path)
     cur = con.cursor()
     res = cur.execute("SELECT name FROM sqlite_master WHERE TYPE='table' AND NAME='resources'").fetchone()
-    print(res)
-    if res:
-        print('yes')
-
-
-
-    # cur.execute(
-    #     'CREATE TABLE resources (ip text primary key not null, tsds_enabled integer, last_modified datetime default '
-    #     'current_timestamp)')
+    # create table if it doesn't exist
+    if not res:
+        cur.execute(
+            'CREATE TABLE resources (ip text primary key not null, tsds_enabled integer, last_modified datetime default '
+            'current_timestamp)')
     con.commit()
     con.close()
 
@@ -161,3 +153,7 @@ def tsds_db_tw(packet, existing, modify_db, db_path):
                         {'tsds_enabled': tsds_enabled, 'ip': ip})
         con.commit()
         con.close()
+
+
+# Call setup whenever we load this file
+tsds_db_setup()

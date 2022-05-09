@@ -287,13 +287,13 @@ e.g. 1.1.1.1/cloudflare.com">
                                 <i class="fas fa-undo"></i> Refresh Network
                             </button>
                         </div>
-                        <button id="zoom_in" class="btn btn-outline-dark zoom_control" onclick="let currentZoom = force_map.zoomIn();
-                                checkZoomLevels(currentZoom);
+                        <button id="zoom_in" class="btn btn-outline-dark zoom_control" onclick="let newZoom = force_map.zoomIn();
+                                checkZoomLevels(newZoom);
                                 ">
                             <i class="fas fa-search-plus"></i>
                         </button>
-                        <button disabled id="zoom_out" class="btn btn-outline-dark zoom_control" onclick="let currentZoom = force_map.zoomOut();
-                                checkZoomLevels(currentZoom);
+                        <button disabled id="zoom_out" class="btn btn-outline-dark zoom_control" onclick="let newZoom = force_map.zoomOut();
+                                checkZoomLevels(newZoom);
                                 ">
                             <i class="fas fa-search-minus"></i>
                         </button>

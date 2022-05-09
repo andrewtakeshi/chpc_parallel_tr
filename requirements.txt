@@ -4,7 +4,8 @@ cffi==1.14.6
 chardet==4.0.0
 charset-normalizer==2.0.3
 click==8.0.1
-dataclasses==0.8
+# 0.8 for 3.6, 0.6 for anything > 3.6
+dataclasses>=0.6
 dominate==2.6.0
 elasticsearch==7.16.2
 Flask==2.0.1

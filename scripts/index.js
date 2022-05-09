@@ -384,7 +384,7 @@ const mapSelectHandler = async () => {
 }
 
 /**
- * waiter
+ * Buffers events until a certain amount of time has passed. Prevents repeated sending of the same event, i.e. resize.
  * Borrowed from https://stackoverflow.com/questions/2854407/javascript-jquery-window-resize-how-to-fire-after-the-resize-is-completed
  */
 let waitForFinalEvent = (function () {
@@ -400,36 +400,38 @@ let waitForFinalEvent = (function () {
     };
 })();
 
+/**
+ * Handles disable/enable of zoom buttons, depending on current zoom level.
+ * @param newZoom - the zoom level after the zoom action has taken place (i.e. zoom level after clicking the button).
+ */
+function checkZoomLevels(newZoom) {
+    let extent = force_map.zoom.scaleExtent();
+    // Fully zoomed out.
+    if (newZoom === extent[0]) {
+        d3.select('#zoom_in').attr('disabled', null);
+        d3.select('#zoom_out').attr('disabled', true);
+        d3.select('#zoom_reset').attr('disabled', true);
+    // Fully zoomed in.
+    } else if (newZoom === extent[1]) {
+        d3.select('#zoom_in').attr('disabled', true);
+        d3.select('#zoom_out').attr('disabled', null);
+        d3.select('#zoom_reset').attr('disabled', null);
+    // Somewhere in between.
+    } else {
+        d3.select('#zoom_in').attr('disabled', null);
+        d3.select('#zoom_out').attr('disabled', null);
+        d3.select('#zoom_reset').attr('disabled', null);
+    }
+}
+
+// Register the resize event.
 $(window).resize(function () {
+    // buffer the resize event to prevent recreating the force map hundreds of times/sec.
     waitForFinalEvent(function () {
         let newWidth = d3.select('#d3_vis').node().clientWidth;
         force_map.resize(newWidth, 0.5 * newWidth);
     }, 150, "windowResize");
 });
-
-function resizeHandler() {
-    // document.getElementById('d3_vis').innerHTML = '';
-    // force_map = new ForceMap('#d3_vis', force_map.geojson);
-    // updateViz().then(data => force_map.setData(data));
-    let force_parent = d3.select('#d3_vis').node();
-    force_map.resize(force_parent.clientWidth, 0.5 * force_parent.clientWidth);
-}
-
-function checkZoomLevels(newZoom) {
-    let extent = force_map.zoom.scaleExtent();
-    if (newZoom === extent[0]) {
-        d3.select('#zoom_out').attr('disabled', true);
-        d3.select('#zoom_reset').attr('disabled', true);
-        d3.select('#zoom_in').attr('disabled', null);
-    } else if (newZoom === extent[1]) {
-        d3.select('#zoom_in').attr('disabled', true);
-        d3.select('#zoom_out').attr('disabled', null);
-    } else {
-        d3.select('#zoom_out').attr('disabled', null);
-        d3.select('#zoom_in').attr('disabled', null);
-        d3.select('#zoom_reset').attr('disabled', null);
-    }
-}
 
 // Create the force map. By default the map is shown and we shown the world map.
 const force_map = new ForceMap('#d3_vis');
