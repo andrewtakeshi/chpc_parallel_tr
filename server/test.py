@@ -1,6 +1,8 @@
 import json
 import time
 
+import requests
+
 from server import d3_tsds, d3_conversion
 
 # diff = difflib.Differ()
@@ -208,7 +210,13 @@ def pretty_print_d3c_system(in_dict):
 # packet = d3_json['traceroutes'][0]['packets'][5]
 
 # print(json.dumps(d3_conversion.system_to_d3('198.124.252.102', 1)))
-d3_tsds.tsds_db_setup()
+# d3_tsds.tsds_db_setup()
 # d3_tsds.tsds_db_check('8.8.8.8')
 # d3_tsds.tsds_db_tw({'ip': '140.182.44.2'}, False, True)
 # d3_tsds.tsds_db_tw({'ip': '8.8.8.8'}, True, False)
+r = requests.get(d3_tsds.tsds_query_template('140.182.44.2'), timeout=5).json()
+print(r)
+r = requests.get(d3_tsds.tsds_query_template('149.165.183.85'), timeout=5).json()
+print(r)
+r = requests.get(d3_tsds.tsds_query_template('134.68.3.147'), timeout=5).json()
+print(r)

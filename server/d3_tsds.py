@@ -19,6 +19,7 @@ def tsds_query_template(ip,
     :param base_url: TSDS URL. By default it queries tsds-cross-domain, which should check all available TSDS instances.
     :return: Properly formatted URL.
     """
+    # TODO: Verify that max_bandwidth is what they use on their end for the link speed.
     query = f'{base_url}query=get ' \
             f'aggregate(values.input, 60, average) as traffic_in, ' \
             f'aggregate(values.output, 60, average) as traffic_out, ' \
@@ -26,10 +27,11 @@ def tsds_query_template(ip,
             f'aggregate(values.outUcast, 60, average) as unicast_packets_out, ' \
             f'aggregate(values.inerror, 60, average) as errors_in, ' \
             f'aggregate(values.outerror, 60, average) as errors_out, ' \
-            f'node, intf, description, interface_address.value ' \
+            f'node, intf, description, interface_address.value, max_bandwidth as speed, ' \
             f'between(now - 15m, now) ' \
-            f'by node, intf, interface_address.value ' \
             f'from interface where interface_address.value = "{ip}"'
+    # f'by node, intf, interface_address.value ' \
+
     return query
 
     # Discard information unavailable from TSDS right now - shows as null.
@@ -135,6 +137,8 @@ def tsds_db_tw(packet, existing, modify_db, db_path):
                         traffic_info[ts_str] = {}
                         traffic_info[ts_str]['ts'] = entry[0]
                     traffic_info[ts_str][metric] = entry[1]
+        if 'speed' in results and results['speed'] is not None:
+            traffic_info['speed'] = results['speed']
 
         packet['traffic_info'] = traffic_info
 

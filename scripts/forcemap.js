@@ -7,29 +7,26 @@
 class ForceMap {
     /**
      * Constructs a new force map.
-     * @param root_element  Path or ID. Must be selectable by d3. Typically this is just the div where the force map
+     * @param rootElement  Path or ID. Must be selectable by d3. Typically this is just the div where the force map
      * visualization should go.
-     * @param showMap       Boolean which determines if the map should be initially shown or hidden. The force map
+     * @param isMapShown       Boolean which determines if the map should be initially shown or hidden. The force map
      * is configured to use lat/lon to map the nodes to their respective locations if the map is shown, or to place the
      * nodes in a roughly straight line if it is hidden.
      */
-    constructor(root_element, showMap = true) {
+    constructor(rootElement, isMapShown = true) {
         // Common elements
-        this.showMap = showMap;
-        this.rootElement = root_element;
-        this.rootElementElement = d3.select(root_element).node();
+        this.showMap = isMapShown;
+        this.rootElementPathOrID = rootElement;
+        this.rootElementElement = d3.select(rootElement).node();
         this.width = this.rootElementElement.clientWidth;
         this.height = 0.5 * this.rootElementElement.clientWidth;
-
-        // Map specific - see d3-geo for more information.
-        // this.projection = d3.geoEquirectangular();
-        // this.path = d3.geoPath().projection(this.projection);
-        this.packets = new Map();
+        this.expanded = false;
 
         // Force specific - see d3-force for more information.
-        this.node_data = new Map();
-        this.node_visual_alias = new Map();
-        this.atr_iframes = new Map();
+        // nodeProxyMap maps from cluster id's to proxies, i.e. from Org cluster to proxy for all the nodes in the org
+        // or from IP (singleton) cluster to proxy for that IP address, as far as I understand it.
+        this.nodeProxyMap = new Map();
+        this.nodeVisualAlias = new Map();
 
         // here we map our different bit speed ranges to a range that can be used
         // with d3.interpolateViridis() for an accessible color scale
@@ -39,11 +36,11 @@ class ForceMap {
             .range(d3.range(0, 1, 0.09)) //set range to 0-1 with 14 buckets for use with d3.interpolateViridis()
 
         // Global tooltip - this is different from the "pinned" tooltips.
-        this.floating_tooltip = d3.select(root_element)
+        this.floatingTT = d3.select(rootElement)
             .append('div')
             .attr('id', 'forcemap_tooltip')
             .classed('tooltip', true);
-        this.tooltip_stats = this.floating_tooltip
+        this.statsTT = this.floatingTT
             .append('div')
             .attr('id', 'forcemap_tooltip_stats');
 
@@ -56,7 +53,7 @@ class ForceMap {
      */
     setup() {
         // Create our SVG with appropriate width/height.
-        this.svg = d3.select(this.rootElement)
+        this.svg = d3.select(this.rootElementPathOrID)
             .append('svg')
             .attr('width', this.width)
             .attr('height', this.height)
@@ -85,7 +82,7 @@ class ForceMap {
 
         // TODO: Remove attributes from here - should be applied directly to links or done in CSS.
         // Create group for all the links
-        this.all_links = this.forceG.append('g')
+        this.allLinks = this.forceG.append('g')
             .classed('all_links', true)
             .attr('stroke', '#999')
             .attr('stroke-opacity', 1)
@@ -150,7 +147,7 @@ class ForceMap {
         this.height = height;
 
         // Remove the old visualization, and setup a new one.
-        d3.select(this.rootElement).select('#mainVisSVG').remove();
+        d3.select(this.rootElementPathOrID).select('#mainVisSVG').remove();
         this.setup();
 
         if (this.showMap) {
@@ -186,7 +183,7 @@ class ForceMap {
     /**
      * get the current zoom level
      */
-    zoomInfo() {
+    getCurrentZoom() {
         let zoomOutline = this.mapG.selectAll('path').node();
         return zoomOutline ? d3.zoomTransform(zoomOutline).k : 1;
     }
@@ -212,14 +209,16 @@ class ForceMap {
     }
 
     /**
-     * @param zoomIn
-     * @returns d3 zoom object, representing the new zoom level.
+     * Performs a zoom transformation to zoom in or out.
+     * @param isZoomIn - Determines whether new zoom is a zoom in (true) or zoom out (false).
+     * @returns d3 zoom object, representing the new zoom level clamped to the current scale extent.
      */
-    getNewZoomLevel(zoomIn = false) {
-        let oldZoom = this.zoomInfo();
+    getNewZoomLevel(isZoomIn = false) {
+        let oldZoom = this.getCurrentZoom();
         let scaleExtent = this.zoom.scaleExtent();
+        let zoomInc = 1.5;
 
-        let newZoom = zoomIn ? 1.5 * oldZoom : 0.66 * oldZoom;
+        let newZoom = isZoomIn ? zoomInc * oldZoom : (1 / zoomInc) * oldZoom;
 
         return this.clamp(newZoom, scaleExtent[0], scaleExtent[1]);
     }
@@ -234,16 +233,16 @@ class ForceMap {
             .style('stroke-width', 1 / d3.event.transform.k + 'px')
             .attr('transform', d3.event.transform);
 
-        let all_nodes = d3.select('#forceGroup')
+        let allNodes = d3.select('#forceGroup')
             .selectAll('g.single_node');
 
         // If force nodes exist, perform force transforms
-        if (all_nodes.nodes().length > 0) {
+        if (allNodes.nodes().length > 0) {
             // Select image and circle and perform appropriate transforms
-            all_nodes.selectAll('circle')
+            allNodes.selectAll('circle')
                 .attr('r', d => d.radius / d3.event.transform.k)
                 .attr('stroke-width', 1 / d3.event.transform.k);
-            all_nodes.selectAll('image')
+            allNodes.selectAll('image')
                 .attr('width', d => d.diameter / d3.event.transform.k)
                 .attr('height', d => d.diameter / d3.event.transform.k)
                 .attr('x', d => (-d.radius) / d3.event.transform.k)
@@ -266,7 +265,7 @@ class ForceMap {
 
     /**
      * Hide or show the map, depending on the value of this.showMap.
-     * @param {boolean|T} forceDisplay - by default this is undefined. If it is undefined, the function toggles the value
+     * @param forceDisplay - by default this is undefined. If it is undefined, the function toggles the value
      * of this.showMap. If forceDisplay is defined (bool) then this.showMap is set to the value of forceDisplay.
      */
     toggleMap(forceDisplay = undefined) {
@@ -369,7 +368,7 @@ class ForceMap {
 
         // Common to both simulations; updates the link and node positions on every tick of the simulation.
         this.simulation.on('tick', () => {
-            this.all_links
+            this.allLinks
                 .attr('x1', d => d.source.x)
                 .attr('y1', d => d.source.y)
                 .attr('x2', d => d.target.x)
@@ -386,7 +385,7 @@ class ForceMap {
     collapseNode(node) {
         const _collapse = (child) => {
             child.expanded = false;
-            this.node_visual_alias.set(child.id, node.id)
+            this.nodeVisualAlias.set(child.id, node.id)
             if (child.children) {
                 for (var [id, child] of child.children) {
                     _collapse(child);
@@ -422,7 +421,7 @@ class ForceMap {
      * @returns Color according to d3.scaleOrdinal.
      */
     getNodeColorOrg(node) {
-        const domain = d3.map([...this.node_data.values()], v => v.org).keys();
+        const domain = d3.map([...this.nodeProxyMap.values()], v => v.org).keys();
         const scale = d3.scaleOrdinal(d3.schemeCategory10).domain(domain);
         return scale(node.org);
     }
@@ -432,19 +431,19 @@ class ForceMap {
      * Recursively adds children to the map, if they exist.
      */
     flattenNodeData() {
-        let flat_data = new Map();
+        let flatData = new Map();
         const _flatten = (child) => {
-            flat_data.set(child.id, child)
+            flatData.set(child.id, child)
             if (child.children) {
                 for (var [id, child] of child.children) {
                     _flatten(child);
                 }
             }
         };
-        for (let [id, entity] of this.node_data) {
+        for (let [id, entity] of this.nodeProxyMap) {
             _flatten(entity)
         }
-        return flat_data;
+        return flatData;
     }
 
     /**
@@ -502,16 +501,20 @@ class ForceMap {
             return;
         }
 
-        this.node_data = data;
-        this.all_nodes_flat = this.flattenNodeData();
+        this.unclusteredData = data;
+        this.nodeProxyMap = this.clusterBy(data,
+            (d) => d.org,
+            (d) => new Set([...d.source_ids, ...d.target_ids]),
+            "Org");
+        this.allNodesFlat = this.flattenNodeData();
 
-        for (var [k, v] of this.node_data) {
+        for (var [k, v] of this.nodeProxyMap) {
             v.expanded = false;
-            this.node_visual_alias.set(k, k);
+            this.nodeVisualAlias.set(k, k);
             if (v.children) {
                 for (var [kk, vv] of v.children) {
                     vv.expanded = false;
-                    this.node_visual_alias.set(kk, k);
+                    this.nodeVisualAlias.set(kk, k);
                 }
             }
         }
@@ -529,7 +532,7 @@ class ForceMap {
      */
     auxGraph(trafficInfo, div, checks = false) {
         // 200px margin on right side of graph to allow for legend / metric checkboxes
-        let margin = { top: 30, right: 200, bottom: 30, left: 60 };
+        let margin = {top: 30, right: 200, bottom: 30, left: 60};
 
         // Initially, trafficInfo has both the actual data and all of the available keys includeded in the data.
         // We separate the two here.
@@ -577,27 +580,24 @@ class ForceMap {
 
         // underscorinator but it strips the last value (i.e. no 'in' or 'out')
         // Used to generate keys for the y scales.
-        let make_y_key = (input_str, separator) => {
-            let input_split = input_str.split(separator);
-            let ret = input_split[0].toLowerCase();
-            for (let i = 1; i < input_split.length - 1; i++) {
-                ret += `_${input_split[i].toLowerCase()}`;
+        let yKeyinator = (inStr, sep) => {
+            let inputSplit = inStr.split(sep);
+            let ret = inputSplit[0].toLowerCase();
+            for (let i = 1; i < inputSplit.length - 1; i++) {
+                ret += `_${inputSplit[i].toLowerCase()}`;
             }
             return ret;
         }
 
-        // Names here MUST correspond to keys in the auxiliary data dictionary (i.e. netbeam, stardust).
-        // let types = ['Traffic In', 'Traffic Out', 'Unicast Packets In', 'Unicast Packets Out',
-        //     'Errors In', 'Errors Out', 'Discards In', 'Discards Out', 'Packets In', 'Packets Out'];
         let types = trafficKeys.map(d => d.replace(/_/g, ' ').toLowerCase());
 
-        // types_set is used for setting up the different y scale values.
-        let types_set = new Set(types.map(d => make_y_key(d, ' ')));
+        // typesSet is used for setting up the different y scale values.
+        let typesSet = new Set(types.map(d => yKeyinator(d, ' ')));
 
         // Measurement is just the first word, i.e. "traffic" or "errors"
-        // measurement_filter is used to get all the values of a specific type of measurement
+        // measurementFilter is used to get all the values of a specific type of measurement
         // this in turn is used to create the extent for the scales
-        let measurement_filter = (valArr, measurement) => {
+        let measurementFilter = (valArr, measurement) => {
             let retArr = []
             for (let val of valArr) {
                 let valKeys = Object.keys(val)
@@ -637,12 +637,12 @@ class ForceMap {
         // Set up yScales - we want a separate scale for each of the measurements b/c using a single scale for
         // everything hides things like the packets in/out.
         let yScales = {};
-        for (let measurement of types_set) {
+        for (let measurement of typesSet) {
             yScales[measurement] = d3.scaleLinear()
                 // Use the max of 1 & measurement result to ensure that there is some difference for all measurements, i.e.
                 // discards are usually 0 but they should show up on the bottom
-                .domain([0, d3.max([1, d3.max(measurement_filter(allValArr, measurement))])])
-                // .domain(d3.extent(measurement_filter(allValArr, measurement)))
+                .domain([0, d3.max([1, d3.max(measurementFilter(allValArr, measurement))])])
+                // .domain(d3.extent(measurementFilter(allValArr, measurement)))
                 .range([iHeight, 0]);
         }
 
@@ -653,26 +653,29 @@ class ForceMap {
             .ticks(6)
             .tickFormat(d => d3.format('~s')(d) + 'bps'));
 
-        // Measurement here is the full name (i.e. traffic_in or errors_out).
-        let paths_and_circs = (measurement) => {
-
+        /**
+         * Appends appropriate elements to create the line graph for measurement.
+         * @param measurement - Key corresponding to the measurement; i.e. for traffic_in, the measurement would be
+         * traffic_in. trafficKeys contains all the available measurements for each node.
+         */
+        let generateLineGraph = (measurement) => {
             if (d3.select(`#${measurement}_line_${div.attr('id')}`).node() !== null) {
                 d3.select(`#${measurement}_line_${div.attr('id')}`).remove();
                 d3.select(`#${measurement}_circs_${div.attr('id')}`).remove();
                 return;
             }
 
-            let measure_key = make_y_key(measurement, '_');
+            let measureKey = yKeyinator(measurement, '_');
 
             // should be everything except for the first/last
-            let selectedYScale = yScales[measure_key];
+            let selectedYScale = yScales[measureKey];
 
             trafficGraph.append('path')
                 .attr('id', `${measurement}_line_${div.attr('id')}`)
                 .datum(allValArr.filter(d => `${measurement}` in d))
-                .classed('stardust_metrics', true)
-                .classed(`stardust_${measure_key}`, true)
-                .classed("stardust_out", measurement.includes("out"))
+                .classed('aux_metrics', true)
+                .classed(`aux_${measureKey}`, true)
+                .classed('aux_out', measurement.includes("out"))
                 .attr('fill', 'none')
                 .attr('d', d3.line()
                     .x(d => xScale(d.ts))
@@ -736,7 +739,7 @@ class ForceMap {
                 .classed('form-check-input', true)
                 .on('click', function (d) {
                     d3.event.stopPropagation();
-                    paths_and_circs(underscorinator(d));
+                    generateLineGraph(underscorinator(d));
                 })
                 // Prevent dblclick on checkbox from hiding the tooltip.
                 .on('dblclick', _ => d3.event.stopPropagation());
@@ -747,8 +750,8 @@ class ForceMap {
 
             checkboxes.append('label')
                 .attr('for', d => `checkbox_${underscorinator(d)}_${div.attr('id')}`)
-                .attr('class', d => `stardust_${make_y_key(d, ' ')} stardust_metrics`)
-                .classed('stardust_out', d => d.toLowerCase().includes('out'))
+                .attr('class', d => `aux_${yKeyinator(d, ' ')} aux_metrics`)
+                .classed('aux_out', d => d.toLowerCase().includes('out'))
                 .text(d => d);
 
             let yScaleRow = div.append('div')
@@ -767,7 +770,7 @@ class ForceMap {
                 .attr('style', 'width: auto');
 
             yScaleSelect.selectAll('option')
-                .data([...types_set])
+                .data([...typesSet])
                 .join('option')
                 .attr('value', d => d)
                 .text(d => d.replace('_', ' '));
@@ -809,8 +812,8 @@ class ForceMap {
                 .attr('x2', 40)
                 .attr('y1', 0)
                 .attr('y2', 0)
-                .classed('stardust_traffic', true)
-                .classed('stardust_metrics', true)
+                .classed('aux_traffic', true)
+                .classed('aux_metrics', true)
                 .attr('transform', `translate(30, -5)`);
             inLegend.append('circle')
                 .attr('cx', 50)
@@ -828,17 +831,17 @@ class ForceMap {
                 .attr('x2', 40)
                 .attr('y1', 0)
                 .attr('y2', 0)
-                .classed('stardust_traffic', true)
-                .classed('stardust_metrics', true)
-                .classed('stardust_out', true)
+                .classed('aux_traffic', true)
+                .classed('aux_metrics', true)
+                .classed('aux_out', true)
                 .attr('transform', `translate(30, -5)`);
             outLegend.append('circle')
                 .attr('cx', 50)
                 .attr('cy', -5)
                 .attr('r', 1.5);
         }
-        paths_and_circs('traffic_in');
-        paths_and_circs('traffic_out');
+        generateLineGraph('traffic_in');
+        generateLineGraph('traffic_out');
     }
 
     /**
@@ -848,12 +851,12 @@ class ForceMap {
         let min_bw = Number.MAX_SAFE_INTEGER;
         let ip = null;
 
-        if (!this.all_nodes_flat) {
+        if (!this.allNodesFlat) {
             return;
         }
 
         // Select all nodes that are actual nodes (not abstracted org nodes)
-        let nodes = Array.from(this.all_nodes_flat.values()).filter(d => d.id.startsWith('ip'));
+        let nodes = Array.from(this.allNodesFlat.values()).filter(d => d.id.startsWith('ip'));
 
         // loop through nodes to find the node with min bw and its ip
         for (let node of nodes) {
@@ -894,9 +897,9 @@ class ForceMap {
         // Appends maxBW to the vis.
         this.getOverallMaxBW();
 
-        this.nodeValues = Array.from(this.node_data.values());
+        this.nodeValues = Array.from(this.nodeProxyMap.values());
 
-        this.vLinks = new Array();
+        this.vLinks = [];
 
         let that = this;
 
@@ -922,41 +925,25 @@ class ForceMap {
             }
         }
 
-        // Remove preloaded ATR Grafana iFrames
-        this.floating_tooltip.selectAll('iframe').remove();
-
         // Set up scale for nodes diameters.
         let nodeDiameterScale = d3.scaleLinear()
-            .domain(d3.extent([...this.node_data.values()], v => v.packets.length))
+            .domain(d3.extent([...this.nodeProxyMap.values()], v => v.packets.length))
             .range([16, 24]);
 
         let packet_scale_domain = [];
 
-        // Preload ATR Grafana iFrames for rendered IP nodes and generate links
-        // TODO: Fix preload of iframes, the url is broken for whatever reason.
+        // Generate links
         for (let d of this.nodeValues) {
-            if (d.id.startsWith('ip') && !this.atr_iframes.has(d.id)) {
-                const url = getATRChartURL(d.ip, d.org);
-                if (url.length > 0) {
-                    const iframe = this.floating_tooltip.append('iframe')
-                        .attr('width', 600)
-                        .attr('height', 300)
-                        .style('display', 'none')
-                        .attr('src', url);
-                    this.atr_iframes.set(d.id, iframe);
-                }
-            }
-
             // Add links to vLinks from the source node 'd' to all targets 't'
             let target_aliases = new Set();
             if (d.target_ids) {
                 for (let t of d.target_ids) {
                     // node_visual_alias contains mapping from ip=>cluster and cluster=>ip
-                    target_aliases.add(this.node_visual_alias.get(t));
+                    target_aliases.add(this.nodeVisualAlias.get(t));
                 }
                 for (let t of target_aliases) {
                     if (d.id !== t) {
-                        let target = this.all_nodes_flat.get(t);
+                        let target = this.allNodesFlat.get(t);
                         let d_mbw = d.max_bandwidth ? d.max_bandwidth : 0;
                         let t_mbw = target.max_bandwidth ? target.max_bandwidth : 0;
                         let unknown_bw = !(d.max_bandwidth && target.max_bandwidth);
@@ -1019,7 +1006,9 @@ class ForceMap {
             .attr('stroke', d => this.getNodeColorOrg(d))
             .attr('stroke-width', 1 / zoomDenominator)
             .attr('fill', d => this.getNodeColorOrg(d))
-            .attr('opacity', d => known(d.domain) ? 0.0 : 1.0)
+            .attr('opacity', d => known(d.domain) ? 0.0 : 1.0);
+
+        this.allNodes
             // Doubleclick 'pins' the charts
             .on('dblclick', nodeDblClickHandler)
             // Click to expand nodes
@@ -1029,7 +1018,7 @@ class ForceMap {
             .on('mouseout', nodeMouseoutHandler)
             .on('mousemove', () => {
                 // Updates position of global tooltip.
-                this.floating_tooltip.style('left', (d3.event.pageX + 10) + 'px').style('top', (d3.event.pageY + 10) + 'px')
+                this.floatingTT.style('left', (d3.event.pageX + 10) + 'px').style('top', (d3.event.pageY + 10) + 'px')
             });
 
         // Drag is called on the group to prevent jittering.
@@ -1058,7 +1047,6 @@ class ForceMap {
         //     d3.select('#forceGroup')
         //         .attr('transform', d3.event.transform);
         // }
-
         // end todo
 
         // Append defs so we can create our markers.
@@ -1077,7 +1065,7 @@ class ForceMap {
             .attr('id', (d, i) => `marker_${i}`)
             .attr('markerWidth', markerWidth)
             .attr('markerHeight', markerHeight)
-            .attr('refX', d => (markerWidth * 1.25))
+            .attr('refX', _ => (markerWidth * 1.25))
             .attr('refY', markerHeight / 2)
             .attr('orient', 'auto')
             .append('polygon')
@@ -1087,11 +1075,11 @@ class ForceMap {
             .on('mouseout', linkMouseOutHandler)
             .on('mousemove', () => {
                 // Updates position of global tooltip.
-                this.floating_tooltip.style('left', (d3.event.pageX + 10) + 'px').style('top', (d3.event.pageY + 10) + 'px')
+                this.floatingTT.style('left', (d3.event.pageX + 10) + 'px').style('top', (d3.event.pageY + 10) + 'px')
             });
 
         // Add links.
-        this.all_links = this.all_links
+        this.allLinks = this.allLinks
             .data(this.vLinks)
             .join('line')
             .classed('link', true)
@@ -1106,7 +1094,7 @@ class ForceMap {
             .on('mouseout', linkMouseOutHandler)
             .on('mousemove', () => {
                 // Updates position of global tooltip.
-                this.floating_tooltip.style('left', (d3.event.pageX + 10) + 'px').style('top', (d3.event.pageY + 10) + 'px')
+                this.floatingTT.style('left', (d3.event.pageX + 10) + 'px').style('top', (d3.event.pageY + 10) + 'px')
             });
 
         this.simulation.nodes(this.nodeValues);
@@ -1155,7 +1143,7 @@ class ForceMap {
         function generateTTSLink(d, selection) {
             selection.selectAll('text').remove();
             let bwLabel = "unknown bandwidth";
-            if(!d.unknown_bw){
+            if (!d.unknown_bw) {
                 bwLabel = `${d3.format('~s')(d.max_bandwidth)}bps`
             }
             selection.append('text')
@@ -1163,12 +1151,12 @@ class ForceMap {
         }
 
         function linkMouseOverHandler(d) {
-            that.floating_tooltip.transition().duration(200).style('opacity', 0.9);
-            generateTTSLink(d, that.tooltip_stats);
+            that.floatingTT.transition().duration(200).style('opacity', 0.9);
+            generateTTSLink(d, that.statsTT);
         }
 
         function linkMouseOutHandler(d) {
-            that.floating_tooltip.transition().duration(200).style('opacity', 0);
+            that.floatingTT.transition().duration(200).style('opacity', 0);
         }
 
         // Generate ToolTipStats. Not complicated, just abstracted b/c it's used more than once.
@@ -1197,36 +1185,41 @@ class ForceMap {
         function nodeMouseoverHandler(d) {
             if (d3.select(`#tooltip_${safePacketID(d.id)}`).node() !== null) return;
 
-            that.floating_tooltip.transition().duration(200).style('opacity', 0.9);
+            that.floatingTT.transition().duration(200).style('opacity', 0.9);
 
             let packets = d.packets;
 
             let trafficInfo = generateTrafficInfo(packets);
 
-            generateTTS(d, packets, that.tooltip_stats);
+            generateTTS(d, packets, that.statsTT);
 
-            if (d.id.startsWith('ip') && that.atr_iframes.has(d.id)) {
-                // Show grafana iframe
-                that.atr_iframes.get(d.id).style('display', 'block');
-            } else if (d.id.startsWith('ip') && Object.keys(trafficInfo).length > 0) {
+            if (d.id.startsWith('ip') && Object.keys(trafficInfo).length > 0) {
                 // Show d3 vis of netbeam data
-                that.auxGraph(trafficInfo, that.floating_tooltip);
+                that.auxGraph(trafficInfo, that.floatingTT);
             }
         }
 
         // Hide global tooltip on mouseout (if applicable)
         function nodeMouseoutHandler(d) {
-            that.floating_tooltip.transition().duration(200).style('opacity', 0);
-            if (d.id.startsWith('ip') && that.atr_iframes.has(d.id)) {
-                that.atr_iframes.get(d.id).style('display', 'none');
-            }
-            that.floating_tooltip.selectAll('svg').remove();
+            that.floatingTT.transition().duration(200).style('opacity', 0);
+            that.floatingTT.selectAll('svg').remove();
         }
 
         // Expand nodes on single click (no drag)
         function nodeClickHandler(d) {
             d3.event.preventDefault();
             if (that.expandNode(d)) {
+                // TODO: Uncommment, and find a way to signal the frontend that all nodes have been expanded.
+                // Without signaling the frontend the potential for desync between the expand/collapse text and action
+                // being performed is introduced.
+                // let all_expanded_temp = true;
+                // for (let node of that.node_values) {
+                //     if (!node.expanded) {
+                //         all_expanded_temp = false;
+                //         break;
+                //     }
+                // }
+                // that.expanded = all_expanded_temp;
                 that.update();
             }
         }
@@ -1238,11 +1231,11 @@ class ForceMap {
             if (d3.select(`#tooltip_${safePacketID(d.id)}`).node() !== null) {
                 return;
             } else {
-                that.floating_tooltip.selectAll('svg').remove();
+                that.floatingTT.selectAll('svg').remove();
             }
 
             // Create the tooltip div
-            let tooltip = d3.select(that.rootElement)
+            let tooltip = d3.select(that.rootElementPathOrID)
                 .append('div')
                 .attr('id', `tooltip_${safePacketID(d.id)}`)
                 .classed('tooltip removable', true);
@@ -1307,14 +1300,7 @@ class ForceMap {
 
             let trafficInfo = generateTrafficInfo(d.packets);
 
-            if (d.id.startsWith('ip') && that.atr_iframes.has(d.id)) {
-                // Add iframe for grafana
-                tooltip.append('iframe')
-                    .attr('width', 600)
-                    .attr('height', 300)
-                    .attr('src', getATRChartURL(d.ip, d.org))
-                    .style('display', 'block');
-            } else if (d.id.startsWith('ip') && Object.keys(trafficInfo).length > 0) {
+            if (d.id.startsWith('ip') && Object.keys(trafficInfo).length > 0) {
                 // Add the d3 vis for netbeam info
                 that.auxGraph(trafficInfo, tooltip, true);
             } else {
@@ -1322,5 +1308,91 @@ class ForceMap {
                 tooltip.remove();
             }
         }
+    }
+
+    nodeExpansionToggle() {
+        if (this.expanded) {
+            this.setData(this.unclusteredData);
+        } else {
+            for (let node of this.nodeValues) {
+                this.expandNode(node);
+            }
+        }
+
+        // Reset fixed positions in network view.
+        if (!this.showMap) {
+            for (let node of this.nodeValues) {
+                node.fx = null;
+                node.fy = null;
+            }
+        }
+
+        this.expanded = !this.expanded;
+
+        this.update();
+    }
+
+    clusterBy(entities, getLabel, getRelationships, id_prefix = undefined, max_degree = 1) {
+        let result = new Map();
+
+        // Helper method for cleanliness
+        let addToCluster = (cluster_id, entity) => {
+            if (!result.has(cluster_id)) {
+                // Use ES6 Proxy to recursively access properties of hierarchical clusters (see `handler` def)
+                result.set(cluster_id, new Proxy(({id: cluster_id, children: new Map()}), propHandler));
+            }
+            // Set the children of the proxy to be the actual entity.
+            result.get(cluster_id).children.set(entity.id, entity);
+        }
+
+        let orphan_ids = [...entities.keys()];
+        let cluster_count = new Map();
+
+        let i = 0;
+        while (i < orphan_ids.length) {
+            // Start a new cluster from an unclustered entity
+            const orphan = entities.get(orphan_ids[i]);
+
+            // label is the org label - lambda passed by calling function
+            const label = getLabel(orphan);
+
+            // Disjoint clusters of the same label are enumerated for distinctness
+            if (!cluster_count.has(label))
+                cluster_count.set(label, 0);
+            cluster_count.set(label, cluster_count.get(label) + 1);
+
+            // cluster_id is the id_prefix + org (label) + cluster count
+            let cluster_id = id_prefix ? `${id_prefix}(${label})` : label;
+            cluster_id += ` cluster-${cluster_count.get(label)}`;
+
+            let candidates = [orphan_ids[i]];
+            const visited = new Set();
+
+            while (candidates.length > 0) {
+                const candidate_id = candidates.pop();
+                const candidate = entities.get(candidate_id);
+
+                if (!visited.has(candidate_id)) {
+                    visited.add(candidate_id); // Don't check this candidate again for this cluster
+                    if (getLabel(candidate) == label) {
+                        // Found a match, add to result
+                        addToCluster(cluster_id, candidate);
+
+                        // getRelationships is a lambda that returns a set of the source ids and target ids?
+                        const neighbors = Array.from(getRelationships(candidate));
+
+                        // Add neighbors as new search candidates
+                        candidates = candidates.concat(neighbors);
+
+                        // TODO add support for max_degree > 1 (recursive neighbors), probably change candidates to a Set at
+                        //  the same time
+
+                        // This entity now belongs to a cluster, so we remove orphans
+                        orphan_ids.splice(orphan_ids.indexOf(candidate_id), 1);
+                    }
+                }
+            }
+        }
+        return result;
     }
 }
