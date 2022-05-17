@@ -138,7 +138,7 @@ def tsds_db_tw(packet, existing, modify_db, db_path):
                         traffic_info[ts_str]['ts'] = entry[0]
                     traffic_info[ts_str][metric] = entry[1]
         if 'speed' in results and results['speed'] is not None:
-            traffic_info['speed'] = results['speed']
+            packet['max_bandwidth'] = results['speed']
 
         packet['traffic_info'] = traffic_info
 

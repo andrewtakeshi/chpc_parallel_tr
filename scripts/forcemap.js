@@ -26,6 +26,7 @@ class ForceMap {
         // nodeProxyMap maps from cluster id's to proxies, i.e. from Org cluster to proxy for all the nodes in the org
         // or from IP (singleton) cluster to proxy for that IP address, as far as I understand it.
         this.nodeProxyMap = new Map();
+        this.nodeValues = [];
         this.nodeVisualAlias = new Map();
 
         // here we map our different bit speed ranges to a range that can be used
@@ -239,10 +240,13 @@ class ForceMap {
         // If force nodes exist, perform force transforms
         if (allNodes.nodes().length > 0) {
             // Select image and circle and perform appropriate transforms
-            allNodes.selectAll('circle')
+            allNodes.selectAll('.single_node_circle')
                 .attr('r', d => d.radius / d3.event.transform.k)
                 .attr('stroke-width', 1 / d3.event.transform.k);
-            allNodes.selectAll('image')
+            allNodes.selectAll('.single_node_expandable')
+                .attr('r', d => d.radius / d3.event.transform.k)
+                .attr('stroke-width', 2 / d3.event.transform.k);
+            allNodes.selectAll('.single_node_img')
                 .attr('width', d => d.diameter / d3.event.transform.k)
                 .attr('height', d => d.diameter / d3.event.transform.k)
                 .attr('x', d => (-d.radius) / d3.event.transform.k)
@@ -280,6 +284,13 @@ class ForceMap {
             this.zoom.on('zoom', this.zoomHandler);
             this.svg.call(this.zoom.transform, d3.zoomIdentity);
             this.drawMap();
+
+            // Also reset all nodes that have been moved and "stuck" as part of network view.
+            for (let node of this.nodeValues)
+            {
+                node.fx = null;
+                node.fy = null;
+            }
         } else {
             // Reset zoom, disable it, and then remove the map.
             this.svg.call(this.zoom.transform, d3.zoomIdentity);
@@ -384,7 +395,7 @@ class ForceMap {
      */
     collapseNode(node) {
         const _collapse = (child) => {
-            child.expanded = false;
+            child.expanded = true;
             this.nodeVisualAlias.set(child.id, node.id)
             if (child.children) {
                 for (var [id, child] of child.children) {
@@ -1004,9 +1015,19 @@ class ForceMap {
             .classed('single_node_circle', true)
             .attr('r', d => (d.diameter) / zoomDenominator / 2)
             .attr('stroke', d => this.getNodeColorOrg(d))
+            // .attr('stroke', d => d.expanded ? 'black': 'red')
             .attr('stroke-width', 1 / zoomDenominator)
             .attr('fill', d => this.getNodeColorOrg(d))
             .attr('opacity', d => known(d.domain) ? 0.0 : 1.0);
+
+        // Acts as an outline around each node. Colored skyblue if the node can be expanded. No outline if the node is
+        // already expanded.
+        this.allNodes.append('circle')
+            .classed('single_node_expandable', true)
+            .attr('r', d => ((d.diameter + 2) / zoomDenominator / 2))
+            .attr('stroke', d => d.expanded ? 'none' : 'skyblue')
+            .attr('stroke-width', 2 / zoomDenominator)
+            .attr('fill', 'none');
 
         this.allNodes
             // Doubleclick 'pins' the charts
