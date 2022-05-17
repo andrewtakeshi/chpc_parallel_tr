@@ -1081,7 +1081,7 @@ class ForceMap {
             .data(this.vLinks)
             .join('marker')
             // Every marker gets an ID so we can reference it later.
-            .attr('id', (d, i) => `marker_${i}`)
+            .attr('id', (_, i) => `marker_${i}`)
             .attr('markerWidth', markerWidth)
             .attr('markerHeight', markerHeight)
             .attr('refX', _ => (markerWidth * 1.25))
@@ -1103,7 +1103,7 @@ class ForceMap {
             .join('line')
             .classed('link', true)
             // .attr('stroke-width', d => packetScale(d.packet_count))
-            .attr('stroke-width', 1)
+            .attr('stroke-width', 3)
             .attr('stroke', d => d3.interpolateViridis(this.linkColorScale(d.max_bandwidth))) //viridis is a color-blind accessible color scale
             // Should be dashed if the bandwidth is unknown
             .classed('unknown_bw_dashed', d => d.unknown_bw)
