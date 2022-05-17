@@ -7,19 +7,19 @@
 class ForceMap {
     /**
      * Constructs a new force map.
-     * @param rootElement  Path or ID. Must be selectable by d3. Typically this is just the div where the force map
+     * @param rootElPathOrID Path or ID. Must be selectable by d3. Typically this is just the div where the force map
      * visualization should go.
-     * @param isMapShown       Boolean which determines if the map should be initially shown or hidden. The force map
+     * @param isMapShown Boolean which determines if the map should be initially shown or hidden. The force map
      * is configured to use lat/lon to map the nodes to their respective locations if the map is shown, or to place the
      * nodes in a roughly straight line if it is hidden.
      */
-    constructor(rootElement, isMapShown = true) {
+    constructor(rootElPathOrID, isMapShown = true) {
         // Common elements
         this.showMap = isMapShown;
-        this.rootElementPathOrID = rootElement;
-        this.rootElementElement = d3.select(rootElement).node();
-        this.width = this.rootElementElement.clientWidth;
-        this.height = 0.5 * this.rootElementElement.clientWidth;
+        this.rootElPathOrID = rootElPathOrID;
+        this.rootElementNode = d3.select(rootElPathOrID).node();
+        this.width = this.rootElementNode.clientWidth;
+        this.height = 0.5 * this.rootElementNode.clientWidth;
         this.expanded = false;
 
         // Force specific - see d3-force for more information.
@@ -37,7 +37,7 @@ class ForceMap {
             .range(d3.range(0, 1, 0.09)) //set range to 0-1 with 14 buckets for use with d3.interpolateViridis()
 
         // Global tooltip - this is different from the "pinned" tooltips.
-        this.floatingTT = d3.select(rootElement)
+        this.floatingTT = d3.select(rootElPathOrID)
             .append('div')
             .attr('id', 'forcemap_tooltip')
             .classed('tooltip', true);
@@ -54,7 +54,7 @@ class ForceMap {
      */
     setup() {
         // Create our SVG with appropriate width/height.
-        this.svg = d3.select(this.rootElementPathOrID)
+        this.svg = d3.select(this.rootElPathOrID)
             .append('svg')
             .attr('width', this.width)
             .attr('height', this.height)
@@ -148,7 +148,7 @@ class ForceMap {
         this.height = height;
 
         // Remove the old visualization, and setup a new one.
-        d3.select(this.rootElementPathOrID).select('#mainVisSVG').remove();
+        d3.select(this.rootElPathOrID).select('#mainVisSVG').remove();
         this.setup();
 
         if (this.showMap) {
@@ -538,7 +538,7 @@ class ForceMap {
      * @param trafficInfo - Traffic info gathered from auxiliary API
      * @param div - d3 selection corresponding to the root element to draw the graph on.
      * @param checks - Boolean which determines if the checkboxes controlling the additional information (i.e. discards,
-     * errors, and unicast packets) should be added. By default this is false, and should only be set to true for the
+     * errors, and unicast packets) should be added. By default, this is false, and should only be set to true for the
      * pinned tooltips.
      */
     auxGraph(trafficInfo, div, checks = false) {
@@ -720,7 +720,7 @@ class ForceMap {
         // Checks is true when the tooltip is pinned, meaning that we want to show the metric checkboxes allowing the
         // user to select metrics. Otherwise we will just show a simple legend.
         if (checks) {
-            let list_items = div.append('div')
+            let metricList = div.append('div')
                 .style('position', 'absolute')
                 .style('top', `${margin.top}px`)
                 .style('right', '20px')
@@ -728,12 +728,12 @@ class ForceMap {
                 .attr('width', `${margin.right - 20}px`)
                 .attr('height', `${iHeight}px`);
 
-            if (list_items.selectAll('ul').nodes().length === 0) {
-                list_items.append('ul');
+            if (metricList.selectAll('ul').nodes().length === 0) {
+                metricList.append('ul');
             }
 
             // Bind data to the list items
-            list_items.selectAll('ul')
+            metricList.selectAll('ul')
                 .selectAll('li')
                 .data(types)
                 .join('li')
@@ -859,7 +859,7 @@ class ForceMap {
      * Finds overall max bandwidth to display on the graph.
      */
     getOverallMaxBW() {
-        let min_bw = Number.MAX_SAFE_INTEGER;
+        let minBW = Number.MAX_SAFE_INTEGER;
         let ip = null;
 
         if (!this.allNodesFlat) {
@@ -871,14 +871,14 @@ class ForceMap {
 
         // loop through nodes to find the node with min bw and its ip
         for (let node of nodes) {
-            if (node.max_bandwidth && node.max_bandwidth < min_bw) {
-                min_bw = node.max_bandwidth;
+            if (node.max_bandwidth && node.max_bandwidth < minBW) {
+                minBW = node.max_bandwidth;
                 ip = node.ip;
             }
         }
 
         this.maxBW.selectAll('text')
-            .data([min_bw, ip])
+            .data([minBW, ip])
             .join('text')
             .attr('fill', 'black')
             .attr('x', 25)
@@ -941,28 +941,28 @@ class ForceMap {
             .domain(d3.extent([...this.nodeProxyMap.values()], v => v.packets.length))
             .range([16, 24]);
 
-        let packet_scale_domain = [];
+        let packetScaleDomain = [];
 
         // Generate links
         for (let d of this.nodeValues) {
             // Add links to vLinks from the source node 'd' to all targets 't'
-            let target_aliases = new Set();
+            let targetAliases = new Set();
             if (d.target_ids) {
                 for (let t of d.target_ids) {
                     // node_visual_alias contains mapping from ip=>cluster and cluster=>ip
-                    target_aliases.add(this.nodeVisualAlias.get(t));
+                    targetAliases.add(this.nodeVisualAlias.get(t));
                 }
-                for (let t of target_aliases) {
+                for (let t of targetAliases) {
                     if (d.id !== t) {
                         let target = this.allNodesFlat.get(t);
                         let d_mbw = d.max_bandwidth ? d.max_bandwidth : 0;
                         let t_mbw = target.max_bandwidth ? target.max_bandwidth : 0;
                         let unknown_bw = !(d.max_bandwidth && target.max_bandwidth);
-                        packet_scale_domain.push(target.packets.length);
+                        packetScaleDomain.push(target.packets.length);
                         this.vLinks.push(({
                             source: d,
                             target: target,
-                            // TODO: Tweak value of packet_scale to make links more visible + easier to hover over.
+                            // TODO: Tweak value of packetScale to make links more visible + easier to hover over.
                             // Used to determine the width of the line.
                             packet_scale: Math.sqrt(target.packets.length),
                             packet_count: target.packets.length, //
@@ -979,7 +979,7 @@ class ForceMap {
             d.radius = d.diameter / 2;
         }
         // set the bounds on the size of a path in the viz (based on packet count)
-        let packet_scale = d3.scaleLinear().domain(d3.extent(packet_scale_domain)).range([3, 7]);
+        let packetScale = d3.scaleLinear().domain(d3.extent(packetScaleDomain)).range([3, 7]);
 
         // Lambda to check for unknown or undefined domains - returns true if domain is known, false otherwise.
         let known = (domain) => domain !== null && domain !== 'unknown' && typeof domain !== 'undefined';
@@ -1046,12 +1046,10 @@ class ForceMap {
         d3.selectAll('.single_node')
             .call(this.nodeDrag());
 
-
         // begin todo: attempt to make nodes appear in right place
         // let all_nodes = d3.select('#forceGroup')
         //     .selectAll('g.single_node');
-
-        // If force nodes exist, perform force transforms
+        //// If force nodes exist, perform force transforms
         // if (this.allNodes.nodes().length > 0) {
         //     // Select image and circle and perform appropriate transforms
         //     this.allNodes.selectAll('circle')
@@ -1104,7 +1102,8 @@ class ForceMap {
             .data(this.vLinks)
             .join('line')
             .classed('link', true)
-            .attr('stroke-width', d => packet_scale(d.packet_count))
+            // .attr('stroke-width', d => packetScale(d.packet_count))
+            .attr('stroke-width', 1)
             .attr('stroke', d => d3.interpolateViridis(this.linkColorScale(d.max_bandwidth))) //viridis is a color-blind accessible color scale
             // Should be dashed if the bandwidth is unknown
             .classed('unknown_bw_dashed', d => d.unknown_bw)
@@ -1126,22 +1125,27 @@ class ForceMap {
 
         this.simulation.alpha(1).restart();
 
-        /* ###### Helpers and Handlers ####### */
+        /* ###### Helpers and Handlers for update() ####### */
 
-        // Helper method to get traffic info from Netbeam-polled nodes into acceptable format for secondary d3 vis.
+        /**
+         * Helper method to get traffic info from auxiliary-info enabled nodes (i.e. stardust, tsds) into acceptable
+         * format for secondary d3 vis.
+         *
+         * Returns the traffic info and the keys available in the traffic info, as {'info': {...}, 'keys': [...]}
+         */
         function generateTrafficInfo(packets) {
             let trafficInfo = {};
             let trafficKeys = new Set();
 
             for (let packet of packets) {
                 // Merge all the packets together
-
                 if (packet['traffic_info']) {
                     trafficInfo = {
                         ...trafficInfo,
                         ...packet['traffic_info']
                     }
 
+                    // Merge sets to
                     for (let k of Object.keys(packet['traffic_info'])) {
                         trafficKeys = new Set([...trafficKeys, ...Object.keys(packet['traffic_info'][k])]);
                     }
@@ -1160,27 +1164,33 @@ class ForceMap {
             return {'info': trafficInfo, 'keys': trafficKeys};
         }
 
-        // Link handlers
-        function generateTTSLink(d, selection) {
-            selection.selectAll('text').remove();
+        /**
+         * Helper method to generate tooltip stats (TTS) for each link.
+         * @param link Link, must have max_bandwidth property.
+         * @param d3Selection d3 d3Selection to append the text to.
+         */
+        function generateTTSLink(link, d3Selection) {
+            d3Selection.selectAll('text').remove();
             let bwLabel = "unknown bandwidth";
-            if (!d.unknown_bw) {
-                bwLabel = `${d3.format('~s')(d.max_bandwidth)}bps`
+            if (!link.unknown_bw) {
+                bwLabel = `${d3.format('~s')(link.max_bandwidth)}bps`
             }
-            selection.append('text')
+            d3Selection.append('text')
                 .text(bwLabel);
         }
 
-        function linkMouseOverHandler(d) {
+        function linkMouseOverHandler(link) {
             that.floatingTT.transition().duration(200).style('opacity', 0.9);
-            generateTTSLink(d, that.statsTT);
+            generateTTSLink(link, that.statsTT);
         }
 
-        function linkMouseOutHandler(d) {
+        function linkMouseOutHandler() {
             that.floatingTT.transition().duration(200).style('opacity', 0);
         }
 
-        // Generate ToolTipStats. Not complicated, just abstracted b/c it's used more than once.
+        /**
+         * Generate tooltip stats (TTS) for nodes. Not complicated, just abstracted b/c it's used more than once.
+         */
         function generateTTS(d, packets, selection) {
             selection.selectAll('text').remove();
             selection.append('text')
@@ -1196,41 +1206,50 @@ class ForceMap {
             //  off the top of my head.
         }
 
-        function safePacketID(packet_id) {
-            let safe = CSS.escape(packet_id.replace(/(\s|\.|\(|\))+/g, '_'));
+        /**
+         * Takes a packet ID and makes it safe for CSS stuff.
+         */
+        function safePacketID(packetID) {
+            let safe = CSS.escape(packetID.replace(/(\s|\.|\(|\))+/g, '_'));
             return safe.slice(-1) === '_' ? safe.slice(0, -1) : safe;
         }
 
-
-        // Shows the global tooltip on mouseover (if applicable)
-        function nodeMouseoverHandler(d) {
-            if (d3.select(`#tooltip_${safePacketID(d.id)}`).node() !== null) return;
+        /**
+         * Shows the global tooltip on mouseover (if applicable)
+         */
+        function nodeMouseoverHandler(node) {
+            if (d3.select(`#tooltip_${safePacketID(node.id)}`).node() !== null) return;
 
             that.floatingTT.transition().duration(200).style('opacity', 0.9);
 
-            let packets = d.packets;
+            let packets = node.packets;
 
             let trafficInfo = generateTrafficInfo(packets);
 
-            generateTTS(d, packets, that.statsTT);
+            generateTTS(node, packets, that.statsTT);
 
-            if (d.id.startsWith('ip') && Object.keys(trafficInfo).length > 0) {
+            // Append graph if applicable.
+            if (node.id.startsWith('ip') && Object.keys(trafficInfo).length > 0) {
                 // Show d3 vis of netbeam data
                 that.auxGraph(trafficInfo, that.floatingTT);
             }
         }
 
-        // Hide global tooltip on mouseout (if applicable)
-        function nodeMouseoutHandler(d) {
+        /**
+         * Hide global tooltip on mouseout (if applicable)
+         */
+        function nodeMouseoutHandler() {
             that.floatingTT.transition().duration(200).style('opacity', 0);
             that.floatingTT.selectAll('svg').remove();
         }
 
-        // Expand nodes on single click (no drag)
+        /**
+         * Expand nodes on single click (no drag)
+         */
         function nodeClickHandler(d) {
             d3.event.preventDefault();
             if (that.expandNode(d)) {
-                // TODO: Uncommment, and find a way to signal the frontend that all nodes have been expanded.
+                // TODO: Signal the frontend that all nodes have been expanded.
                 // Without signaling the frontend the potential for desync between the expand/collapse text and action
                 // being performed is introduced.
                 // let all_expanded_temp = true;
@@ -1245,7 +1264,9 @@ class ForceMap {
             }
         }
 
-        // Pin draggable tooltip on double click (if applicable)
+        /**
+         * Pin draggable tooltip on double click (if applicable)
+         */
         function nodeDblClickHandler(d) {
             d3.event.preventDefault();
 
@@ -1256,7 +1277,7 @@ class ForceMap {
             }
 
             // Create the tooltip div
-            let tooltip = d3.select(that.rootElementPathOrID)
+            let tooltip = d3.select(that.rootElPathOrID)
                 .append('div')
                 .attr('id', `tooltip_${safePacketID(d.id)}`)
                 .classed('tooltip removable', true);
@@ -1321,16 +1342,21 @@ class ForceMap {
 
             let trafficInfo = generateTrafficInfo(d.packets);
 
-            if (d.id.startsWith('ip') && Object.keys(trafficInfo).length > 0) {
+            if (trafficInfo.keys.length === 0) {
+                return;
+            }
+
+            if (d.id.startsWith('ip')) {
                 // Add the d3 vis for netbeam info
                 that.auxGraph(trafficInfo, tooltip, true);
-            } else {
-                // If neither data source is applicable, remove the tooltip
-                tooltip.remove();
             }
         }
     }
 
+    /**
+     * Sets all nodes to be expanded or contracted, depending on the value of this.expanded.
+     * The forcemap doesn't keep track of expanded state, it is only set by the expand/contract button.
+     */
     nodeExpansionToggle() {
         if (this.expanded) {
             this.setData(this.unclusteredData);
@@ -1353,51 +1379,62 @@ class ForceMap {
         this.update();
     }
 
-    clusterBy(entities, getLabel, getRelationships, id_prefix = undefined, max_degree = 1) {
+    /**
+     * clusterBy takes a map of entities with an 'id' property and returns a map of new entities that reference the
+     * input entities as children. Clustering is breadth-first driven by the given label equality, degree, and
+     * relationship parameters.
+     * @param entities - Map of entities with ID property.
+     * @param getLabel - Function to access entity property acting as cluster label.
+     * @param getRelationships - Function to access entity property containing inter-entity relationships (i.e. source
+     * and destination entity IDs).
+     * @param idPrefix - Optional; prefix for ID of resulting clusters.
+     * @returns Map that goes from ID
+     */
+    clusterBy(entities, getLabel, getRelationships, idPrefix = undefined) {
         let result = new Map();
 
         // Helper method for cleanliness
-        let addToCluster = (cluster_id, entity) => {
-            if (!result.has(cluster_id)) {
+        let addToCluster = (clusterID, entity) => {
+            if (!result.has(clusterID)) {
                 // Use ES6 Proxy to recursively access properties of hierarchical clusters (see `handler` def)
-                result.set(cluster_id, new Proxy(({id: cluster_id, children: new Map()}), propHandler));
+                result.set(clusterID, new Proxy(({id: clusterID, children: new Map()}), propHandler));
             }
             // Set the children of the proxy to be the actual entity.
-            result.get(cluster_id).children.set(entity.id, entity);
+            result.get(clusterID).children.set(entity.id, entity);
         }
 
-        let orphan_ids = [...entities.keys()];
-        let cluster_count = new Map();
+        let orphans = [...entities.keys()];
+        let clusterCount = new Map();
 
         let i = 0;
-        while (i < orphan_ids.length) {
+        while (i < orphans.length) {
             // Start a new cluster from an unclustered entity
-            const orphan = entities.get(orphan_ids[i]);
+            const orphan = entities.get(orphans[i]);
 
             // label is the org label - lambda passed by calling function
             const label = getLabel(orphan);
 
             // Disjoint clusters of the same label are enumerated for distinctness
-            if (!cluster_count.has(label))
-                cluster_count.set(label, 0);
-            cluster_count.set(label, cluster_count.get(label) + 1);
+            if (!clusterCount.has(label))
+                clusterCount.set(label, 0);
+            clusterCount.set(label, clusterCount.get(label) + 1);
 
-            // cluster_id is the id_prefix + org (label) + cluster count
-            let cluster_id = id_prefix ? `${id_prefix}(${label})` : label;
-            cluster_id += ` cluster-${cluster_count.get(label)}`;
+            // clusterID is the idPrefix + org (label) + cluster count
+            let clusterID = idPrefix ? `${idPrefix}(${label})` : label;
+            clusterID += ` cluster-${clusterCount.get(label)}`;
 
-            let candidates = [orphan_ids[i]];
+            let candidates = [orphans[i]];
             const visited = new Set();
 
             while (candidates.length > 0) {
-                const candidate_id = candidates.pop();
-                const candidate = entities.get(candidate_id);
+                const candidateID = candidates.pop();
+                const candidate = entities.get(candidateID);
 
-                if (!visited.has(candidate_id)) {
-                    visited.add(candidate_id); // Don't check this candidate again for this cluster
-                    if (getLabel(candidate) == label) {
+                if (!visited.has(candidateID)) {
+                    visited.add(candidateID); // Don't check this candidate again for this cluster
+                    if (getLabel(candidate) === label) {
                         // Found a match, add to result
-                        addToCluster(cluster_id, candidate);
+                        addToCluster(clusterID, candidate);
 
                         // getRelationships is a lambda that returns a set of the source ids and target ids?
                         const neighbors = Array.from(getRelationships(candidate));
@@ -1405,11 +1442,8 @@ class ForceMap {
                         // Add neighbors as new search candidates
                         candidates = candidates.concat(neighbors);
 
-                        // TODO add support for max_degree > 1 (recursive neighbors), probably change candidates to a Set at
-                        //  the same time
-
                         // This entity now belongs to a cluster, so we remove orphans
-                        orphan_ids.splice(orphan_ids.indexOf(candidate_id), 1);
+                        orphans.splice(orphans.indexOf(candidateID), 1);
                     }
                 }
             }

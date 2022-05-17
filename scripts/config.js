@@ -2,7 +2,6 @@ let config = {};
 
 /**
  * Load some variables from config file.
- * TODO: Think about using JSON instead so we don't need to pull in jsyaml for this small thing.
  */
 $.get('config.yaml')
     .done(data => {
