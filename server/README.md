@@ -16,7 +16,8 @@
 
 ## Demonstration Sites
 
-- 134.55.200.107: ESNet site. Goes through SIX (which also has Netbeam info) and 4 additional Netbeam enabled nodes. 
+- 198.124.252.102: ESNet (Stardust) site. Can also look at sd_interfaces.json for additional IP addresses to test. 
+- 140.182.44.2: TSDS site. Can also look at tsds_ip.db (VSCode and Pycharm can both open this) for additional IP addresses to test. 
 - 8.8.8.8: Google DNS. This is used to demonstrate one of the key features of this project, the parallelization. By running multiple traceroutes here, we can view the load balancing done by seeing how many different paths are taken to the same IP address.
     - This hasn't been working recently, and I'm not sure why.
 
@@ -56,7 +57,7 @@ chown apache sd_interfaces.json && chgrp apache sd_interfaces.json
 systemctl restart httpd
 ```
 
-Change `/var/www/html/demo/scripts/library.js` to point to the correct API server address, if needed. By default it uses `127.0.0.1:8081` (i.e. `localhost:8081`); this should be sufficient for most use cases. However, it can be helpful to use a different API server especially when debugging. It may also be beneficial or desired to split the frontend from the backend and this allows us to do so. 
+Change `config.yaml` to point to the correct API server address, if needed. By default it uses `127.0.0.1:5000` (i.e. `localhost:5000`); this should be sufficient for most use cases. However, it can be helpful to use a different API server especially when debugging. It may also be beneficial or desired to split the frontend from the backend and this allows us to do so. 
 
 If you run into any issues testing the API endpoint separately is a good place to start (located on port 8081). From there, reading the log (`/var/log/httpd/error.log`) should be enough to find the source of any issues.
 
